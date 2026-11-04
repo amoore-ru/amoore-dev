@@ -1,88 +1,47 @@
-# amoore Dev v2.0
+# amoore Dev v4.0 — Mission Control
 
-Панель управления статусом сайтов + команда + логи + инжектор заставок.
+## Быстрый старт
 
-## Стек
+1. SQL Editor по порядку:
+   - `supabase-schema.sql`
+   - `supabase-rls-rbac.sql`
+   - `supabase-v4-mission-control.sql`
+2. Storage → New bucket **`media`** (Public)
+3. Раскомментируй storage policies в конце `supabase-v4-mission-control.sql`
+4. Edge Function:
+   ```bash
+   supabase functions deploy send-telegram
+   supabase secrets set TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=...
+   ```
+5. В `app.js` и на сайтах (core.js config):
+   ```js
+   const SUPABASE_URL  = 'https://xxx.supabase.co';
+   const SUPABASE_ANON = 'eyJ...';
+   ```
 
-HTML5 · Vanilla CSS (Liquid Glass, Dark `#070b16`, Manrope) · Vanilla JS · Supabase
+## Вкладки и роли
 
----
+| Вкладка | super_admin | admin | moderator |
+|---------|-------------|-------|-----------|
+| Дашборд | ✅ | ✅ | ✅ (без тумблеров) |
+| Контент | ✅ | ✅ | — |
+| Бот | ✅ | ✅ | — |
+| Медиа | ✅ | ✅ | — |
+| Настройки (flags) | ✅ | — | — |
+| Команда | ✅ | — | — |
+| Логи | ✅ | ✅ | — |
 
-## 1. Supabase
-
-1. SQL Editor → выполнить `supabase-schema.sql`
-2. Authentication → Users → создать пользователя (email + пароль)
-3. Раскомментировать и выполнить UPSERT админа:
-
-```sql
-INSERT INTO public.admins (email, name, nickname, telegram_id, role, access_token)
-VALUES (
-  'your@email.com',
-  'Ваше Имя',
-  'nickname',
-  NULL,
-  'super_admin',
-  'ВАШ-СЕКРЕТНЫЙ-ТОКЕН'
-)
-ON CONFLICT (email) DO UPDATE SET
-  name = EXCLUDED.name,
-  nickname = EXCLUDED.nickname,
-  role = EXCLUDED.role,
-  access_token = EXCLUDED.access_token;
-```
-
-4. Settings → API → скопировать URL и anon key
-
----
-
-## 2. Панель
-
-В `index.html` заменить:
-
-```js
-const SUPABASE_URL  = 'https://....supabase.co';
-const SUPABASE_ANON = 'eyJ...';
-```
-
-Вкладки:
-- **Дашборд** — статистика + карточки сайтов (Landing / Studio)
-- **Команда** — добавление админов, генерация токена, удаление (super_admin)
-- **Логи** — audit_logs с ником, действием, сайтом, временем
-
-Сессия только в `sessionStorage`.
-
----
-
-## 3. Инжектор `amoore-core.js`
+## amoore-core.js на сайтах
 
 ```html
 <script>
-  window.AMOORE_SITE_ID = 'landing'; // или 'studio'
-  window.AMOORE_SUPABASE_URL = 'https://....supabase.co';
+  window.AMOORE_SITE_ID = 'landing';
+  window.AMOORE_SUPABASE_URL = 'https://xxx.supabase.co';
   window.AMOORE_SUPABASE_ANON = 'eyJ...';
+  window.AMOORE_NEWS_SELECTOR = '#news-list'; // опционально
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/path/to/amoore-core.js"></script>
+<script src="/amoore-core.js"></script>
 ```
 
-### God Mode
-
-| Способ | Как |
-|--------|-----|
-| sessionStorage | после входа в панель токен уже там |
-| URL | `?god=ВАШ_ТОКЕН` → сохраняется и страница перезагружается |
-
-God Bar: `position: relative` + `body.prepend` — сдвигает контент, не перекрывает шапку.
-
----
-
-## Файлы
-
-```
-amoore-dev/
-├── index.html
-├── style.css
-├── amoore-core.js
-├── supabase-schema.sql
-└── README.md
-```
+Делает: статус/заставки, God Mode, визиты, feature-flag классы `flag-*`, рендер новостей.

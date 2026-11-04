@@ -2,29 +2,24 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>amoore Dev — Control Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+  <title>amoore Dev — Mission Control</title>
   <meta name="theme-color" content="#070b16">
   <meta name="robots" content="noindex, nofollow">
-
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-
-  <!-- ==================== LOGIN ==================== -->
   <div class="login-screen" id="login-screen">
     <div class="login-card glass">
       <div class="login-logo">
         <div class="mark">a.</div>
         <h1>amoore Dev</h1>
-        <p>Система управления экосистемой</p>
+        <p>Mission Control</p>
       </div>
-
       <form id="login-form" autocomplete="off">
         <div class="form-group" id="email-group">
           <label for="email">Email</label>
@@ -38,806 +33,172 @@
           <label for="token">Токен доступа</label>
           <input type="password" id="token" placeholder="Секретный токен" required autocomplete="off">
         </div>
-        <button type="submit" class="btn btn-primary" id="login-btn">
-          <span id="login-btn-text">Войти</span>
-        </button>
-        <button type="button" class="btn btn-ghost" id="full-login-btn" style="width:100%;margin-top:10px;display:none;font-size:12px">
-          Войти с email и паролем
-        </button>
+        <button type="submit" class="btn btn-primary" id="login-btn"><span id="login-btn-text">Войти</span></button>
+        <button type="button" class="btn btn-ghost" id="full-login-btn" style="width:100%;margin-top:10px;display:none;font-size:12px">Войти с email и паролем</button>
       </form>
-
       <div class="login-error" id="login-error"></div>
     </div>
   </div>
 
-  <!-- ==================== APP ==================== -->
   <div class="app" id="app">
     <header class="topbar">
       <div class="topbar-brand">
         <div class="mark">a.</div>
-        <div>
-          <strong>amoore Dev</strong>
-          <span>Control Panel</span>
-        </div>
+        <div><strong>amoore Dev</strong><span>Mission Control</span></div>
       </div>
-
+      <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
       <nav class="topbar-tabs" id="topbar-tabs">
-        <button class="tab-btn active" data-view="dashboard">Дашборд</button>
-        <button class="tab-btn" data-view="team">Команда</button>
-        <button class="tab-btn" data-view="logs">Логи</button>
+        <button class="tab-btn active" data-view="dashboard" id="tab-dashboard">Дашборд</button>
+        <button class="tab-btn" data-view="content" id="tab-content">Контент</button>
+        <button class="tab-btn" data-view="bot" id="tab-bot">Бот</button>
+        <button class="tab-btn" data-view="media" id="tab-media">Медиа</button>
+        <button class="tab-btn" data-view="settings" id="tab-settings">Настройки</button>
+        <button class="tab-btn" data-view="team" id="tab-team">Команда</button>
+        <button class="tab-btn" data-view="logs" id="tab-logs">Логи</button>
       </nav>
-
       <div class="topbar-right">
-        <div class="admin-badge">
-          <span class="dot"></span>
-          <span>Admin Mode</span>
-        </div>
+        <div class="admin-badge"><span class="dot"></span><span>Admin</span></div>
         <span class="admin-name" id="admin-nickname">—</span>
         <button class="btn btn-ghost btn-sm" id="logout-btn">Выйти</button>
       </div>
     </header>
 
     <main class="main">
-
-      <!-- ===== VIEW: Dashboard ===== -->
+      <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
         <div class="stats-row" id="stats-row">
-          <div class="stat-card glass">
-            <div class="stat-value" id="stat-total">—</div>
-            <div class="stat-label">Всего сайтов</div>
+          <div class="stat-card glass"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Сайтов</div></div>
+          <div class="stat-card glass"><div class="stat-value" id="stat-open">—</div><div class="stat-label">Открыто</div></div>
+          <div class="stat-card glass danger"><div class="stat-value" id="stat-closed">—</div><div class="stat-label">Закрыто</div></div>
+        </div>
+        <div class="widgets-row">
+          <div class="widget glass">
+            <div class="widget-title">Статус бота</div>
+            <div class="bot-status-line" id="bot-status-line">
+              <span class="status-dot offline" id="bot-dot"></span>
+              <span id="bot-status-text">Проверка…</span>
+            </div>
+            <div class="widget-meta" id="bot-heartbeat">—</div>
           </div>
-          <div class="stat-card glass">
-            <div class="stat-value" id="stat-open">—</div>
-            <div class="stat-label">Открыто</div>
+          <div class="widget glass">
+            <div class="widget-title">Визиты за 24ч</div>
+            <div class="stat-value" id="stat-visits" style="margin-top:8px">—</div>
+            <div class="widget-meta" id="visits-breakdown">landing / studio</div>
           </div>
-          <div class="stat-card glass danger">
-            <div class="stat-value" id="stat-closed">—</div>
-            <div class="stat-label">Закрыто</div>
+          <div class="widget glass widget-feed">
+            <div class="widget-title">Последние действия</div>
+            <div id="mini-audit" class="mini-audit">Загрузка…</div>
           </div>
         </div>
-
-        <div class="section-title">Сайты экосистемы</div>
-        <div class="sites-grid" id="sites-grid">
-          <div class="loading-state">Загрузка сайтов…</div>
-        </div>
+        <div class="section-title" style="margin-top:28px">Сайты экосистемы</div>
+        <div class="sites-grid" id="sites-grid"><div class="loading-state">Загрузка…</div></div>
       </div>
 
-      <!-- ===== VIEW: Team ===== -->
+      <!-- CONTENT / CMS -->
+      <div class="view" id="view-content">
+        <div class="section-title">Новая публикация</div>
+        <form class="team-form glass" id="news-form">
+          <div class="form-row">
+            <div class="form-group"><label>Заголовок</label><input id="news-title" required placeholder="Заголовок"></div>
+            <div class="form-group"><label>Тип</label>
+              <select id="news-type"><option value="news">news</option><option value="patch">patch</option><option value="soon">soon</option></select>
+            </div>
+          </div>
+          <div class="form-group"><label>Текст</label><textarea id="news-body" rows="4" required placeholder="Текст новости…" style="width:100%;padding:14px 16px;background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:var(--font);font-size:16px;resize:vertical;outline:none"></textarea></div>
+          <button type="submit" class="btn btn-primary" style="width:auto;padding:12px 28px">Опубликовать</button>
+        </form>
+        <div class="section-title">Все новости</div>
+        <div id="news-admin-list" class="team-list"><div class="loading-state">Загрузка…</div></div>
+      </div>
+
+      <!-- BOT -->
+      <div class="view" id="view-bot">
+        <div class="section-title">Рассылка Telegram</div>
+        <div class="team-form glass">
+          <div class="form-group"><label>Сообщение</label>
+            <textarea id="tg-message" rows="5" placeholder="Текст для отправки ботом…" style="width:100%;padding:14px 16px;background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:var(--font);font-size:16px;resize:vertical;outline:none"></textarea>
+          </div>
+          <button type="button" class="btn btn-primary" id="tg-send-btn" style="width:auto;padding:12px 28px">Отправить в Telegram</button>
+        </div>
+        <div class="section-title">История</div>
+        <div id="bot-logs-list" class="team-list"><div class="loading-state">Загрузка…</div></div>
+      </div>
+
+      <!-- MEDIA -->
+      <div class="view" id="view-media">
+        <div class="section-title">Медиатека</div>
+        <div class="dropzone glass" id="dropzone">
+          <p>Перетащите файл сюда или <label class="linkish">выберите<input type="file" id="media-file" accept="image/*" hidden></label></p>
+          <p class="widget-meta">Bucket: media · публичный доступ</p>
+        </div>
+        <div class="media-grid" id="media-grid"><div class="loading-state">Загрузка…</div></div>
+      </div>
+
+      <!-- SETTINGS / FLAGS -->
+      <div class="view" id="view-settings">
+        <div class="section-title">Feature Flags</div>
+        <div id="flags-list" class="team-list"><div class="loading-state">Загрузка…</div></div>
+      </div>
+
+      <!-- TEAM -->
       <div class="view" id="view-team">
-        <div class="section-title">Добавить администратора</div>
+        <div class="section-title">Добавить пользователя</div>
         <div class="team-form glass">
           <form id="add-admin-form">
             <div class="form-row">
-              <div class="form-group">
-                <label for="new-email">Email</label>
-                <input type="email" id="new-email" placeholder="admin@amoore.ru" required>
-              </div>
-              <div class="form-group">
-                <label for="new-name">Имя</label>
-                <input type="text" id="new-name" placeholder="Иван Иванов" required>
-              </div>
+              <div class="form-group"><label>Email</label><input type="email" id="new-email" required></div>
+              <div class="form-group"><label>Имя</label><input type="text" id="new-name" required></div>
             </div>
             <div class="form-row">
-              <div class="form-group">
-                <label for="new-nickname">Никнейм</label>
-                <input type="text" id="new-nickname" placeholder="ivan" required>
-              </div>
-              <div class="form-group">
-                <label for="new-role">Роль</label>
-                <select id="new-role">
-                  <option value="admin">admin</option>
-                  <option value="super_admin">super_admin</option>
-                </select>
+              <div class="form-group"><label>Никнейм</label><input type="text" id="new-nickname" required></div>
+              <div class="form-group"><label>Роль</label>
+                <select id="new-role"><option value="moderator">moderator</option><option value="admin">admin</option><option value="super_admin">super_admin</option></select>
               </div>
             </div>
             <div class="token-row" style="margin-bottom:18px">
-              <div class="form-group">
-                <label for="new-token">Токен доступа</label>
-                <input type="text" id="new-token" placeholder="Сгенерируйте или введите" required>
-              </div>
+              <div class="form-group"><label>Токен</label><input type="text" id="new-token" required></div>
               <button type="button" class="btn btn-ghost" id="gen-token-btn">Сгенерировать</button>
             </div>
-            <button type="submit" class="btn btn-primary" id="add-admin-btn" style="width:auto;padding:12px 28px">
-              Добавить
-            </button>
+            <button type="submit" class="btn btn-primary" id="add-admin-btn" style="width:auto;padding:12px 28px">Добавить</button>
           </form>
         </div>
-
         <div class="section-title">Команда</div>
-        <div class="team-list" id="team-list">
-          <div class="loading-state">Загрузка…</div>
-        </div>
+        <div class="team-list" id="team-list"><div class="loading-state">Загрузка…</div></div>
       </div>
 
-      <!-- ===== VIEW: Logs ===== -->
+      <!-- LOGS -->
       <div class="view" id="view-logs">
         <div class="section-title">История действий</div>
         <div class="logs-wrap glass" style="padding:0;overflow:hidden">
           <table class="logs-table" id="logs-table">
-            <thead>
-              <tr>
-                <th>Кто</th>
-                <th>Действие</th>
-                <th>Сайт</th>
-                <th>Заставка</th>
-                <th>Время</th>
-              </tr>
-            </thead>
-            <tbody id="logs-tbody">
-              <tr><td colspan="5" class="loading-state">Загрузка логов…</td></tr>
-            </tbody>
+            <thead><tr><th>Кто</th><th>Действие</th><th>Сайт</th><th>Заставка</th><th>Время</th></tr></thead>
+            <tbody id="logs-tbody"><tr><td colspan="5" class="loading-state">Загрузка…</td></tr></tbody>
           </table>
           <div class="logs-cards" id="logs-cards"></div>
         </div>
       </div>
-
     </main>
   </div>
 
-  <!-- ==================== MODAL: Close site ==================== -->
   <div class="modal-overlay" id="close-modal">
     <div class="modal glass">
       <h2>Закрыть сайт</h2>
-      <p id="modal-site-name">Выберите тип заставки</p>
-
-      <div class="radio-group" id="overlay-radios">
-        <label class="radio-item selected" data-value="maintenance">
-          <input type="radio" name="overlay" value="maintenance" checked>
-          <span class="radio-custom"></span>
-          <div>
-            <div class="radio-label">Плановые работы</div>
-            <div class="radio-desc">Maintenance — технические работы</div>
-          </div>
-        </label>
-        <label class="radio-item" data-value="crash">
-          <input type="radio" name="overlay" value="crash">
-          <span class="radio-custom"></span>
-          <div>
-            <div class="radio-label">Крах</div>
-            <div class="radio-desc">Crash — сайт упал, чиним</div>
-          </div>
-        </label>
-        <label class="radio-item" data-value="private">
-          <input type="radio" name="overlay" value="private">
-          <span class="radio-custom"></span>
-          <div>
-            <div class="radio-label">Приват</div>
-            <div class="radio-desc">Private — доступ ограничен</div>
-          </div>
-        </label>
+      <p id="modal-site-name">Выберите заставку</p>
+      <div class="radio-group">
+        <label class="radio-item selected" data-value="maintenance"><input type="radio" name="overlay" value="maintenance" checked><span class="radio-custom"></span><div><div class="radio-label">Плановые работы</div><div class="radio-desc">Maintenance</div></div></label>
+        <label class="radio-item" data-value="crash"><input type="radio" name="overlay" value="crash"><span class="radio-custom"></span><div><div class="radio-label">Крах</div><div class="radio-desc">Crash</div></div></label>
+        <label class="radio-item" data-value="private"><input type="radio" name="overlay" value="private"><span class="radio-custom"></span><div><div class="radio-label">Приват</div><div class="radio-desc">Private</div></div></label>
       </div>
-
       <div class="modal-actions">
         <button class="btn btn-ghost" id="modal-cancel">Отмена</button>
         <button class="btn btn-danger" id="modal-confirm">Подтвердить</button>
       </div>
     </div>
   </div>
-
   <div class="toast" id="toast"></div>
 
-  <script>
-    // ============================================================
-    // CONFIG
-    // ============================================================
-    const SUPABASE_URL  = 'https://wogouiecoigzmxqccnsk.supabase.co';
-    const SUPABASE_ANON = 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q';
-
-    // ============================================================
-    // Init
-    // ============================================================
-    const { createClient } = supabase;
-    const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-    });
-    const SESSION_KEY = 'amoore_dev_auth';
-    const EMAIL_KEY   = 'amoore_dev_email';
-    const SESSION_TTL_MS = 6 * 60 * 60 * 1000; // 6 часов
-
-    // DOM
-    const loginScreen   = document.getElementById('login-screen');
-    const app           = document.getElementById('app');
-    const loginForm     = document.getElementById('login-form');
-    const loginError    = document.getElementById('login-error');
-    const loginBtn      = document.getElementById('login-btn');
-    const loginBtnText  = document.getElementById('login-btn-text');
-    const fullLoginBtn  = document.getElementById('full-login-btn');
-    const emailGroup    = document.getElementById('email-group');
-    const passwordGroup = document.getElementById('password-group');
-    const emailInput    = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
-    const tokenInput    = document.getElementById('token');
-    const sitesGrid     = document.getElementById('sites-grid');
-    const adminNickname = document.getElementById('admin-nickname');
-    const logoutBtn     = document.getElementById('logout-btn');
-    const closeModal    = document.getElementById('close-modal');
-    const modalSiteName = document.getElementById('modal-site-name');
-    const modalCancel   = document.getElementById('modal-cancel');
-    const modalConfirm  = document.getElementById('modal-confirm');
-    const toastEl       = document.getElementById('toast');
-    const teamList      = document.getElementById('team-list');
-    const logsTbody     = document.getElementById('logs-tbody');
-    const logsCards     = document.getElementById('logs-cards');
-
-    let currentAdmin = null;
-    let pendingCloseSiteId = null;
-    let tokenOnlyMode = false;
-
-    // ============================================================
-    // Session (localStorage + TTL 6ч, дублируем в sessionStorage для God Mode)
-    // ============================================================
-    function saveSession(data) {
-      const payload = { ...data, expires_at: Date.now() + SESSION_TTL_MS };
-      try { localStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
-      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
-      if (data.email) {
-        try { localStorage.setItem(EMAIL_KEY, data.email); } catch (_) {}
-      }
-    }
-
-    function loadSession() {
-      try {
-        const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
-        if (!raw) return null;
-        const data = JSON.parse(raw);
-        if (!data || !data.admin_id) return null;
-        if (data.expires_at && Date.now() > data.expires_at) {
-          // сессия панели истекла, но email оставляем для token-only
-          try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
-          try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
-          return null;
-        }
-        return data;
-      } catch { return null; }
-    }
-
-    function clearSession(full = false) {
-      try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
-      try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
-      if (full) {
-        try { localStorage.removeItem(EMAIL_KEY); } catch (_) {}
-      }
-    }
-
-    function rememberedEmail() {
-      try { return localStorage.getItem(EMAIL_KEY) || ''; } catch { return ''; }
-    }
-
-    function friendlyError(err) {
-      const msg = (err && err.message) ? String(err.message) : String(err || '');
-      if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg)) {
-        return 'Нет связи с Supabase. Проверьте URL/ключ в index.html и CORS.';
-      }
-      if (/invalid login credentials/i.test(msg)) return 'Неверный email или пароль';
-      if (/jwt|session|refresh/i.test(msg)) return 'Сессия истекла — войдите заново';
-      return msg || 'Ошибка входа';
-    }
-
-    // ============================================================
-    // Auth
-    // ============================================================
-    async function verifyAdmin(email, accessToken) {
-      const { data: admin, error: adminError } = await sb
-        .from('admins')
-        .select('*')
-        .eq('email', email)
-        .eq('access_token', accessToken)
-        .single();
-      if (adminError || !admin) {
-        throw new Error('Неверный токен доступа или аккаунт не найден');
-      }
-      return {
-        admin_id: admin.id,
-        email: admin.email,
-        nickname: admin.nickname,
-        name: admin.name,
-        role: admin.role,
-        access_token: accessToken
-      };
-    }
-
-    async function loginFull(email, password, accessToken) {
-      const { error: authError } = await sb.auth.signInWithPassword({ email, password });
-      if (authError) throw new Error(friendlyError(authError));
-      const session = await verifyAdmin(email, accessToken);
-      saveSession(session);
-      return session;
-    }
-
-    // Повторный вход: только токен (Supabase-сессия ещё жива)
-    async function loginTokenOnly(email, accessToken) {
-      const { data: authData } = await sb.auth.getSession();
-      if (!authData.session) {
-        throw new Error('NEED_PASSWORD');
-      }
-      const session = await verifyAdmin(email, accessToken);
-      saveSession(session);
-      return session;
-    }
-
-    function logout() {
-      clearSession(true);
-      sb.auth.signOut().catch(() => {});
-      currentAdmin = null;
-      tokenOnlyMode = false;
-      showLogin(false);
-    }
-
-    // ============================================================
-    // UI state
-    // ============================================================
-    function setLoginMode(tokenOnly) {
-      tokenOnlyMode = tokenOnly;
-      if (tokenOnly) {
-        emailGroup.style.display = 'none';
-        passwordGroup.style.display = 'none';
-        emailInput.required = false;
-        passwordInput.required = false;
-        fullLoginBtn.style.display = 'block';
-        const em = rememberedEmail();
-        if (em) emailInput.value = em;
-      } else {
-        emailGroup.style.display = '';
-        passwordGroup.style.display = '';
-        emailInput.required = true;
-        passwordInput.required = true;
-        fullLoginBtn.style.display = 'none';
-        const em = rememberedEmail();
-        if (em && !emailInput.value) emailInput.value = em;
-      }
-    }
-
-    function showLogin(preferTokenOnly) {
-      loginScreen.style.display = 'flex';
-      app.classList.remove('visible');
-      loginError.classList.remove('visible');
-      passwordInput.value = '';
-      tokenInput.value = '';
-      const em = rememberedEmail();
-      if (preferTokenOnly && em) {
-        setLoginMode(true);
-      } else {
-        setLoginMode(false);
-        if (em) emailInput.value = em;
-      }
-    }
-
-    function showApp(admin) {
-      currentAdmin = admin;
-      loginScreen.style.display = 'none';
-      app.classList.add('visible');
-      adminNickname.textContent = admin.nickname || admin.name || admin.email;
-      switchView('dashboard');
-      loadSites();
-    }
-
-    function showToast(msg, type = 'success') {
-      toastEl.textContent = msg;
-      toastEl.className = 'toast visible ' + type;
-      setTimeout(() => toastEl.classList.remove('visible'), 2800);
-    }
-
-    // ============================================================
-    // Tabs
-    // ============================================================
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => switchView(btn.dataset.view));
-    });
-
-    function switchView(name) {
-      document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.view === name);
-      });
-      document.querySelectorAll('.view').forEach(v => {
-        v.classList.toggle('active', v.id === 'view-' + name);
-      });
-      if (name === 'team') loadTeam();
-      if (name === 'logs') loadLogs();
-    }
-
-    // ============================================================
-    // Sites / Dashboard
-    // ============================================================
-    async function loadSites() {
-      sitesGrid.innerHTML = '<div class="loading-state">Загрузка сайтов…</div>';
-
-      const { data: sites, error } = await sb
-        .from('ecosystem_sites')
-        .select('*')
-        .order('id');
-
-      if (error) {
-        sitesGrid.innerHTML = `<div class="loading-state">Ошибка: ${error.message}</div>`;
-        return;
-      }
-
-      const list = sites || [];
-      const total = list.length;
-      const closed = list.filter(s => s.status === 'closed').length;
-      const open = total - closed;
-
-      document.getElementById('stat-total').textContent = total;
-      document.getElementById('stat-open').textContent = open;
-      document.getElementById('stat-closed').textContent = closed;
-
-      if (list.length === 0) {
-        sitesGrid.innerHTML = '<div class="loading-state">Сайты не найдены</div>';
-        return;
-      }
-
-      sitesGrid.innerHTML = list.map(renderSiteCard).join('');
-      bindSiteCards();
-    }
-
-    function overlayLabel(type) {
-      return { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' }[type] || type;
-    }
-
-    function renderSiteCard(site) {
-      const isOpen = site.status === 'open';
-      return `
-        <div class="site-card glass" data-id="${site.id}">
-          <div class="site-card-header">
-            <div class="site-info">
-              <h3>${esc(site.name)}</h3>
-              <a href="${esc(site.url)}" target="_blank" rel="noopener">${esc(site.url)}</a>
-            </div>
-            <div class="status-pill ${isOpen ? 'online' : 'offline'}">
-              <span class="dot"></span>
-              ${isOpen ? 'Online' : 'Offline'}
-            </div>
-          </div>
-          <div class="toggle-row">
-            <span class="toggle-label">${isOpen ? 'Открыт' : 'Закрыт'}</span>
-            <div class="toggle ${isOpen ? 'open' : 'closed'}" data-id="${site.id}" role="switch" aria-checked="${isOpen}">
-              <div class="toggle-knob"></div>
-            </div>
-          </div>
-          ${!isOpen ? `<div class="overlay-meta">Заставка: <strong>${overlayLabel(site.overlay_type)}</strong></div>` : ''}
-        </div>`;
-    }
-
-    function bindSiteCards() {
-      document.querySelectorAll('.toggle').forEach(el => {
-        el.addEventListener('click', () => {
-          const id = el.dataset.id;
-          const isOpen = el.classList.contains('open');
-          if (isOpen) {
-            pendingCloseSiteId = id;
-            const name = el.closest('.site-card').querySelector('h3').textContent;
-            modalSiteName.textContent = `Сайт «${name}» — выберите заставку`;
-            document.querySelectorAll('.radio-item').forEach((r, i) => {
-              r.classList.toggle('selected', i === 0);
-              r.querySelector('input').checked = i === 0;
-            });
-            closeModal.classList.add('visible');
-          } else {
-            openSite(id);
-          }
-        });
-      });
-    }
-
-    async function closeSite(siteId, overlayType) {
-      const { error } = await sb
-        .from('ecosystem_sites')
-        .update({ status: 'closed', overlay_type: overlayType })
-        .eq('id', siteId);
-      if (error) { showToast('Ошибка: ' + error.message, 'error'); return; }
-
-      await sb.from('audit_logs').insert({
-        admin_id: currentAdmin.admin_id,
-        action: 'close',
-        site_id: siteId,
-        overlay_type: overlayType
-      });
-      showToast('Сайт закрыт');
-      loadSites();
-    }
-
-    async function openSite(siteId) {
-      const { error } = await sb
-        .from('ecosystem_sites')
-        .update({ status: 'open' })
-        .eq('id', siteId);
-      if (error) { showToast('Ошибка: ' + error.message, 'error'); return; }
-
-      await sb.from('audit_logs').insert({
-        admin_id: currentAdmin.admin_id,
-        action: 'open',
-        site_id: siteId
-      });
-      showToast('Сайт открыт');
-      loadSites();
-    }
-
-    // Modal
-    document.querySelectorAll('.radio-item').forEach(item => {
-      item.addEventListener('click', () => {
-        document.querySelectorAll('.radio-item').forEach(r => r.classList.remove('selected'));
-        item.classList.add('selected');
-        item.querySelector('input').checked = true;
-      });
-    });
-    modalCancel.addEventListener('click', () => {
-      closeModal.classList.remove('visible');
-      pendingCloseSiteId = null;
-    });
-    modalConfirm.addEventListener('click', () => {
-      const selected = document.querySelector('input[name="overlay"]:checked');
-      if (!selected || !pendingCloseSiteId) return;
-      closeModal.classList.remove('visible');
-      closeSite(pendingCloseSiteId, selected.value);
-      pendingCloseSiteId = null;
-    });
-    closeModal.addEventListener('click', e => {
-      if (e.target === closeModal) {
-        closeModal.classList.remove('visible');
-        pendingCloseSiteId = null;
-      }
-    });
-
-    // ============================================================
-    // Team
-    // ============================================================
-    function genToken() {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-      let s = '';
-      for (let i = 0; i < 12; i++) s += chars[Math.floor(Math.random() * chars.length)];
-      return s;
-    }
-
-    document.getElementById('gen-token-btn').addEventListener('click', () => {
-      document.getElementById('new-token').value = genToken();
-    });
-
-    document.getElementById('add-admin-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('add-admin-btn');
-      btn.disabled = true;
-
-      const payload = {
-        email: document.getElementById('new-email').value.trim(),
-        name: document.getElementById('new-name').value.trim(),
-        nickname: document.getElementById('new-nickname').value.trim(),
-        role: document.getElementById('new-role').value,
-        access_token: document.getElementById('new-token').value.trim()
-      };
-
-      const { error } = await sb.from('admins').insert(payload);
-      btn.disabled = false;
-
-      if (error) {
-        showToast(error.message.includes('duplicate') ? 'Email уже существует' : error.message, 'error');
-        return;
-      }
-      showToast('Админ добавлен');
-      e.target.reset();
-      loadTeam();
-    });
-
-    async function loadTeam() {
-      teamList.innerHTML = '<div class="loading-state">Загрузка…</div>';
-
-      const { data: admins, error } = await sb
-        .from('admins')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        teamList.innerHTML = `<div class="loading-state">Ошибка: ${error.message}</div>`;
-        return;
-      }
-
-      if (!admins || admins.length === 0) {
-        teamList.innerHTML = '<div class="loading-state">Нет администраторов</div>';
-        return;
-      }
-
-      const isSuper = currentAdmin && currentAdmin.role === 'super_admin';
-
-      teamList.innerHTML = admins.map(a => {
-        const initial = (a.nickname || a.name || '?')[0].toUpperCase();
-        const canDelete = isSuper && a.id !== currentAdmin.admin_id;
-        return `
-          <div class="admin-card glass" data-id="${a.id}">
-            <div class="admin-card-info">
-              <div class="admin-avatar">${esc(initial)}</div>
-              <div class="admin-meta">
-                <h4>
-                  ${esc(a.nickname || a.name)}
-                  <span class="role-badge ${a.role}">${a.role}</span>
-                </h4>
-                <p>${esc(a.email)} · ${esc(a.name)}</p>
-              </div>
-            </div>
-            ${canDelete
-              ? `<button class="btn btn-danger-outline btn-sm delete-admin-btn" data-id="${a.id}">Удалить</button>`
-              : ''}
-          </div>`;
-      }).join('');
-
-      document.querySelectorAll('.delete-admin-btn').forEach(btn => {
-        btn.addEventListener('click', () => deleteAdmin(btn.dataset.id));
-      });
-    }
-
-    async function deleteAdmin(id) {
-      if (!confirm('Удалить этого администратора?')) return;
-      const { error } = await sb.from('admins').delete().eq('id', id);
-      if (error) { showToast('Ошибка: ' + error.message, 'error'); return; }
-      showToast('Админ удалён');
-      loadTeam();
-    }
-
-    // ============================================================
-    // Logs
-    // ============================================================
-    async function loadLogs() {
-      logsTbody.innerHTML = '<tr><td colspan="5" class="loading-state">Загрузка логов…</td></tr>';
-      logsCards.innerHTML = '';
-
-      const { data: logs, error } = await sb
-        .from('audit_logs')
-        .select('*, admins(nickname, name), ecosystem_sites(name)')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) {
-        logsTbody.innerHTML = `<tr><td colspan="5" class="loading-state">Ошибка: ${error.message}</td></tr>`;
-        return;
-      }
-
-      if (!logs || logs.length === 0) {
-        logsTbody.innerHTML = '<tr><td colspan="5" class="loading-state">Логов пока нет</td></tr>';
-        return;
-      }
-
-      logsTbody.innerHTML = logs.map(l => {
-        const who = (l.admins && (l.admins.nickname || l.admins.name)) || '—';
-        const site = (l.ecosystem_sites && l.ecosystem_sites.name) || l.site_id || '—';
-        const action = l.action === 'close' ? 'Закрыл' : 'Открыл';
-        const overlay = l.overlay_type ? overlayLabel(l.overlay_type) : '—';
-        const time = formatTime(l.created_at);
-        return `
-          <tr>
-            <td>${esc(who)}</td>
-            <td><span class="action-pill ${l.action}">${action}</span></td>
-            <td>${esc(site)}</td>
-            <td>${esc(overlay)}</td>
-            <td style="white-space:nowrap;color:var(--text-muted)">${time}</td>
-          </tr>`;
-      }).join('');
-
-      logsCards.innerHTML = logs.map(l => {
-        const who = (l.admins && (l.admins.nickname || l.admins.name)) || '—';
-        const site = (l.ecosystem_sites && l.ecosystem_sites.name) || l.site_id || '—';
-        const action = l.action === 'close' ? 'Закрыл' : 'Открыл';
-        const overlay = l.overlay_type ? overlayLabel(l.overlay_type) : '—';
-        const time = formatTime(l.created_at);
-        return `
-          <div class="log-card glass">
-            <div class="log-card-row">
-              <strong>${esc(who)}</strong>
-              <span class="action-pill ${l.action}">${action}</span>
-            </div>
-            <div class="log-card-row">
-              <span class="meta">${esc(site)}${l.overlay_type ? ' · ' + overlay : ''}</span>
-              <span class="meta">${time}</span>
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-    function formatTime(iso) {
-      if (!iso) return '—';
-      const d = new Date(iso);
-      return d.toLocaleString('ru-RU', {
-        day: '2-digit', month: '2-digit', year: '2-digit',
-        hour: '2-digit', minute: '2-digit'
-      });
-    }
-
-    // ============================================================
-    // Login form
-    // ============================================================
-    fullLoginBtn.addEventListener('click', () => {
-      setLoginMode(false);
-      loginError.classList.remove('visible');
-    });
-
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      loginError.classList.remove('visible');
-      loginBtn.disabled = true;
-      loginBtnText.innerHTML = '<span class="spinner"></span>';
-
-      const email = (emailInput.value || rememberedEmail()).trim();
-      const password = passwordInput.value;
-      const token = tokenInput.value.trim();
-
-      try {
-        if (!email) throw new Error('Укажите email');
-        if (!token) throw new Error('Укажите токен доступа');
-
-        let session;
-        if (tokenOnlyMode) {
-          try {
-            session = await loginTokenOnly(email, token);
-          } catch (err) {
-            if (err.message === 'NEED_PASSWORD') {
-              setLoginMode(false);
-              throw new Error('Сессия истекла — введите пароль');
-            }
-            throw err;
-          }
-        } else {
-          if (!password) throw new Error('Укажите пароль');
-          session = await loginFull(email, password, token);
-        }
-        showApp(session);
-      } catch (err) {
-        loginError.textContent = friendlyError(err);
-        loginError.classList.add('visible');
-      } finally {
-        loginBtn.disabled = false;
-        loginBtnText.textContent = 'Войти';
-      }
-    });
-
-    logoutBtn.addEventListener('click', logout);
-
-    // ============================================================
-    // Utils
-    // ============================================================
-    function esc(str) {
-      const d = document.createElement('div');
-      d.textContent = str == null ? '' : String(str);
-      return d.innerHTML;
-    }
-
-    // ============================================================
-    // Boot — авто-вход если сессия < 6ч и Supabase-сессия жива
-    // ============================================================
-    (async function boot() {
-      // Проверка, что ключи подставлены
-      if (!SUPABASE_URL || SUPABASE_URL.includes('YOUR_PROJECT') ||
-          !SUPABASE_ANON || SUPABASE_ANON === 'YOUR_ANON_KEY') {
-        showLogin(false);
-        loginError.textContent = 'В index.html не подставлены SUPABASE_URL / SUPABASE_ANON';
-        loginError.classList.add('visible');
-        return;
-      }
-
-      const session = loadSession();
-      if (session && session.admin_id) {
-        try {
-          const { data } = await sb.auth.getSession();
-          if (data.session) {
-            // продлеваем TTL при успешном авто-входе
-            saveSession(session);
-            showApp(session);
-            return;
-          }
-        } catch (_) {}
-        clearSession(false);
-        showLogin(true); // token-only, email запомнен
-        return;
-      }
-
-      // Есть email, но нет валидной сессии панели → token-only если auth жив
-      const em = rememberedEmail();
-      if (em) {
-        try {
-          const { data } = await sb.auth.getSession();
-          if (data.session) {
-            showLogin(true);
-            return;
-          }
-        } catch (_) {}
-      }
-      showLogin(false);
-    })();
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>

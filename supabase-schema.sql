@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.admins (
   name          TEXT NOT NULL,
   nickname      TEXT NOT NULL,
   telegram_id   TEXT,
-  role          TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('super_admin', 'admin')),
+  role          TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('super_admin', 'admin', 'moderator')),
   access_token  TEXT NOT NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
