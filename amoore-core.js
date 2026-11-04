@@ -5,8 +5,8 @@
  * Подключение (перед </body>):
  *   <script>
  *     window.AMOORE_SITE_ID = 'landing'; // или 'studio'
- *     window.AMOORE_SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
- *     window.AMOORE_SUPABASE_ANON = 'YOUR_ANON_KEY';
+ *     window.AMOORE_SUPABASE_URL = 'https://wogouiecoigzmxqccnsk.supabase.co';
+ *     window.AMOORE_SUPABASE_ANON = 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q';
  *   </script>
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
  *   <script src="/path/to/amoore-core.js"></script>
@@ -18,8 +18,8 @@
 
   // ---------- Config (можно переопределить через window) ----------
   var SITE_ID   = window.AMOORE_SITE_ID   || 'landing';
-  var SB_URL    = window.AMOORE_SUPABASE_URL  || 'https://YOUR_PROJECT.supabase.co';
-  var SB_ANON   = window.AMOORE_SUPABASE_ANON || 'YOUR_ANON_KEY';
+  var SB_URL    = window.AMOORE_SUPABASE_URL  || 'https://wogouiecoigzmxqccnsk.supabase.co';
+  var SB_ANON   = window.AMOORE_SUPABASE_ANON || 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q';
   var AUTH_KEY  = 'amoore_dev_auth';
 
   // ---------- Helpers ----------

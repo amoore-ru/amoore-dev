@@ -12,7 +12,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 
-  <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -48,7 +47,7 @@
     </div>
   </div>
 
-  <!-- ==================== DASHBOARD ==================== -->
+  <!-- ==================== APP ==================== -->
   <div class="app" id="app">
     <header class="topbar">
       <div class="topbar-brand">
@@ -58,21 +57,117 @@
           <span>Control Panel</span>
         </div>
       </div>
+
+      <nav class="topbar-tabs" id="topbar-tabs">
+        <button class="tab-btn active" data-view="dashboard">Дашборд</button>
+        <button class="tab-btn" data-view="team">Команда</button>
+        <button class="tab-btn" data-view="logs">Логи</button>
+      </nav>
+
       <div class="topbar-right">
         <div class="admin-badge">
           <span class="dot"></span>
-          Admin Mode
+          <span>Admin Mode</span>
         </div>
         <span class="admin-name" id="admin-nickname">—</span>
-        <button class="btn btn-ghost" id="logout-btn" style="padding: 8px 14px; font-size: 12px;">Выйти</button>
+        <button class="btn btn-ghost btn-sm" id="logout-btn">Выйти</button>
       </div>
     </header>
 
     <main class="main">
-      <div class="section-title">Сайты экосистемы</div>
-      <div class="sites-grid" id="sites-grid">
-        <div class="loading-state">Загрузка сайтов…</div>
+
+      <!-- ===== VIEW: Dashboard ===== -->
+      <div class="view active" id="view-dashboard">
+        <div class="stats-row" id="stats-row">
+          <div class="stat-card glass">
+            <div class="stat-value" id="stat-total">—</div>
+            <div class="stat-label">Всего сайтов</div>
+          </div>
+          <div class="stat-card glass">
+            <div class="stat-value" id="stat-open">—</div>
+            <div class="stat-label">Открыто</div>
+          </div>
+          <div class="stat-card glass danger">
+            <div class="stat-value" id="stat-closed">—</div>
+            <div class="stat-label">Закрыто</div>
+          </div>
+        </div>
+
+        <div class="section-title">Сайты экосистемы</div>
+        <div class="sites-grid" id="sites-grid">
+          <div class="loading-state">Загрузка сайтов…</div>
+        </div>
       </div>
+
+      <!-- ===== VIEW: Team ===== -->
+      <div class="view" id="view-team">
+        <div class="section-title">Добавить администратора</div>
+        <div class="team-form glass">
+          <form id="add-admin-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="new-email">Email</label>
+                <input type="email" id="new-email" placeholder="admin@amoore.ru" required>
+              </div>
+              <div class="form-group">
+                <label for="new-name">Имя</label>
+                <input type="text" id="new-name" placeholder="Иван Иванов" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="new-nickname">Никнейм</label>
+                <input type="text" id="new-nickname" placeholder="ivan" required>
+              </div>
+              <div class="form-group">
+                <label for="new-role">Роль</label>
+                <select id="new-role">
+                  <option value="admin">admin</option>
+                  <option value="super_admin">super_admin</option>
+                </select>
+              </div>
+            </div>
+            <div class="token-row" style="margin-bottom:18px">
+              <div class="form-group">
+                <label for="new-token">Токен доступа</label>
+                <input type="text" id="new-token" placeholder="Сгенерируйте или введите" required>
+              </div>
+              <button type="button" class="btn btn-ghost" id="gen-token-btn">Сгенерировать</button>
+            </div>
+            <button type="submit" class="btn btn-primary" id="add-admin-btn" style="width:auto;padding:12px 28px">
+              Добавить
+            </button>
+          </form>
+        </div>
+
+        <div class="section-title">Команда</div>
+        <div class="team-list" id="team-list">
+          <div class="loading-state">Загрузка…</div>
+        </div>
+      </div>
+
+      <!-- ===== VIEW: Logs ===== -->
+      <div class="view" id="view-logs">
+        <div class="section-title">История действий</div>
+        <div class="logs-wrap glass" style="padding:0;overflow:hidden">
+          <table class="logs-table" id="logs-table">
+            <thead>
+              <tr>
+                <th>Кто</th>
+                <th>Действие</th>
+                <th>Сайт</th>
+                <th>Заставка</th>
+                <th>Время</th>
+              </tr>
+            </thead>
+            <tbody id="logs-tbody">
+              <tr><td colspan="5" class="loading-state">Загрузка логов…</td></tr>
+            </tbody>
+          </table>
+          <div class="logs-cards" id="logs-cards"></div>
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -116,22 +211,20 @@
     </div>
   </div>
 
-  <!-- Toast -->
   <div class="toast" id="toast"></div>
 
   <script>
     // ============================================================
-    // CONFIG — замените на свои значения из Supabase
+    // CONFIG
     // ============================================================
-    const SUPABASE_URL  = 'https://wogouiecoigzmxqccnsk.supabase.co';
-    const SUPABASE_ANON = 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q';
+    const SUPABASE_URL  = 'https://YOUR_PROJECT.supabase.co';
+    const SUPABASE_ANON = 'YOUR_ANON_KEY';
 
     // ============================================================
     // Init
     // ============================================================
     const { createClient } = supabase;
     const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
-
     const SESSION_KEY = 'amoore_dev_auth';
 
     // DOM
@@ -149,47 +242,41 @@
     const modalCancel   = document.getElementById('modal-cancel');
     const modalConfirm  = document.getElementById('modal-confirm');
     const toastEl       = document.getElementById('toast');
+    const teamList      = document.getElementById('team-list');
+    const logsTbody     = document.getElementById('logs-tbody');
+    const logsCards     = document.getElementById('logs-cards');
 
     let currentAdmin = null;
     let pendingCloseSiteId = null;
 
     // ============================================================
-    // Session helpers (sessionStorage only)
+    // Session
     // ============================================================
     function saveSession(data) {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
     }
-
     function loadSession() {
       try {
         const raw = sessionStorage.getItem(SESSION_KEY);
         return raw ? JSON.parse(raw) : null;
-      } catch {
-        return null;
-      }
+      } catch { return null; }
     }
-
     function clearSession() {
       sessionStorage.removeItem(SESSION_KEY);
     }
 
     // ============================================================
-    // Auth
+    // Auth (нетронутая логика)
     // ============================================================
     async function login(email, password, accessToken) {
-      // 1. Supabase Auth
       const { data: authData, error: authError } = await sb.auth.signInWithPassword({
-        email,
-        password
+        email, password
       });
-
       if (authError) {
         throw new Error(authError.message === 'Invalid login credentials'
-          ? 'Неверный email или пароль'
-          : authError.message);
+          ? 'Неверный email или пароль' : authError.message);
       }
 
-      // 2. Проверка access_token в таблице admins
       const { data: admin, error: adminError } = await sb
         .from('admins')
         .select('*')
@@ -210,7 +297,6 @@
         role: admin.role,
         access_token: accessToken
       };
-
       saveSession(session);
       return session;
     }
@@ -232,11 +318,12 @@
       loginForm.reset();
     }
 
-    function showDashboard(admin) {
+    function showApp(admin) {
       currentAdmin = admin;
       loginScreen.style.display = 'none';
       app.classList.add('visible');
       adminNickname.textContent = admin.nickname || admin.name || admin.email;
+      switchView('dashboard');
       loadSites();
     }
 
@@ -247,7 +334,25 @@
     }
 
     // ============================================================
-    // Sites
+    // Tabs
+    // ============================================================
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchView(btn.dataset.view));
+    });
+
+    function switchView(name) {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === name);
+      });
+      document.querySelectorAll('.view').forEach(v => {
+        v.classList.toggle('active', v.id === 'view-' + name);
+      });
+      if (name === 'team') loadTeam();
+      if (name === 'logs') loadLogs();
+    }
+
+    // ============================================================
+    // Sites / Dashboard
     // ============================================================
     async function loadSites() {
       sitesGrid.innerHTML = '<div class="loading-state">Загрузка сайтов…</div>';
@@ -262,12 +367,21 @@
         return;
       }
 
-      if (!sites || sites.length === 0) {
-        sitesGrid.innerHTML = '<div class="loading-state">Сайты не найдены. Добавьте их в таблицу ecosystem_sites.</div>';
+      const list = sites || [];
+      const total = list.length;
+      const closed = list.filter(s => s.status === 'closed').length;
+      const open = total - closed;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-open').textContent = open;
+      document.getElementById('stat-closed').textContent = closed;
+
+      if (list.length === 0) {
+        sitesGrid.innerHTML = '<div class="loading-state">Сайты не найдены</div>';
         return;
       }
 
-      sitesGrid.innerHTML = sites.map(site => renderSiteCard(site)).join('');
+      sitesGrid.innerHTML = list.map(renderSiteCard).join('');
       bindSiteCards();
     }
 
@@ -281,8 +395,8 @@
         <div class="site-card glass" data-id="${site.id}">
           <div class="site-card-header">
             <div class="site-info">
-              <h3>${escapeHtml(site.name)}</h3>
-              <a href="${escapeHtml(site.url)}" target="_blank" rel="noopener">${escapeHtml(site.url)}</a>
+              <h3>${esc(site.name)}</h3>
+              <a href="${esc(site.url)}" target="_blank" rel="noopener">${esc(site.url)}</a>
             </div>
             <div class="status-pill ${isOpen ? 'online' : 'offline'}">
               <span class="dot"></span>
@@ -291,13 +405,12 @@
           </div>
           <div class="toggle-row">
             <span class="toggle-label">${isOpen ? 'Открыт' : 'Закрыт'}</span>
-            <div class="toggle ${isOpen ? 'open' : 'closed'}" data-id="${site.id}" role="switch" aria-checked="${isOpen}" title="${isOpen ? 'Закрыть' : 'Открыть'}">
+            <div class="toggle ${isOpen ? 'open' : 'closed'}" data-id="${site.id}" role="switch" aria-checked="${isOpen}">
               <div class="toggle-knob"></div>
             </div>
           </div>
           ${!isOpen ? `<div class="overlay-meta">Заставка: <strong>${overlayLabel(site.overlay_type)}</strong></div>` : ''}
-        </div>
-      `;
+        </div>`;
     }
 
     function bindSiteCards() {
@@ -306,47 +419,34 @@
           const id = el.dataset.id;
           const isOpen = el.classList.contains('open');
           if (isOpen) {
-            // Хотим закрыть → показать модалку
             pendingCloseSiteId = id;
-            const card = el.closest('.site-card');
-            const name = card.querySelector('h3').textContent;
+            const name = el.closest('.site-card').querySelector('h3').textContent;
             modalSiteName.textContent = `Сайт «${name}» — выберите заставку`;
-            // reset radios
             document.querySelectorAll('.radio-item').forEach((r, i) => {
               r.classList.toggle('selected', i === 0);
               r.querySelector('input').checked = i === 0;
             });
             closeModal.classList.add('visible');
           } else {
-            // Хотим открыть
             openSite(id);
           }
         });
       });
     }
 
-    // ============================================================
-    // Close / Open actions
-    // ============================================================
     async function closeSite(siteId, overlayType) {
       const { error } = await sb
         .from('ecosystem_sites')
         .update({ status: 'closed', overlay_type: overlayType })
         .eq('id', siteId);
+      if (error) { showToast('Ошибка: ' + error.message, 'error'); return; }
 
-      if (error) {
-        showToast('Ошибка: ' + error.message, 'error');
-        return;
-      }
-
-      // Audit log
       await sb.from('audit_logs').insert({
         admin_id: currentAdmin.admin_id,
         action: 'close',
         site_id: siteId,
         overlay_type: overlayType
       });
-
       showToast('Сайт закрыт');
       loadSites();
     }
@@ -356,25 +456,18 @@
         .from('ecosystem_sites')
         .update({ status: 'open' })
         .eq('id', siteId);
-
-      if (error) {
-        showToast('Ошибка: ' + error.message, 'error');
-        return;
-      }
+      if (error) { showToast('Ошибка: ' + error.message, 'error'); return; }
 
       await sb.from('audit_logs').insert({
         admin_id: currentAdmin.admin_id,
         action: 'open',
         site_id: siteId
       });
-
       showToast('Сайт открыт');
       loadSites();
     }
 
-    // ============================================================
-    // Modal radios
-    // ============================================================
+    // Modal
     document.querySelectorAll('.radio-item').forEach(item => {
       item.addEventListener('click', () => {
         document.querySelectorAll('.radio-item').forEach(r => r.classList.remove('selected'));
@@ -382,12 +475,10 @@
         item.querySelector('input').checked = true;
       });
     });
-
     modalCancel.addEventListener('click', () => {
       closeModal.classList.remove('visible');
       pendingCloseSiteId = null;
     });
-
     modalConfirm.addEventListener('click', () => {
       const selected = document.querySelector('input[name="overlay"]:checked');
       if (!selected || !pendingCloseSiteId) return;
@@ -395,13 +486,173 @@
       closeSite(pendingCloseSiteId, selected.value);
       pendingCloseSiteId = null;
     });
-
-    closeModal.addEventListener('click', (e) => {
+    closeModal.addEventListener('click', e => {
       if (e.target === closeModal) {
         closeModal.classList.remove('visible');
         pendingCloseSiteId = null;
       }
     });
+
+    // ============================================================
+    // Team
+    // ============================================================
+    function genToken() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      let s = '';
+      for (let i = 0; i < 12; i++) s += chars[Math.floor(Math.random() * chars.length)];
+      return s;
+    }
+
+    document.getElementById('gen-token-btn').addEventListener('click', () => {
+      document.getElementById('new-token').value = genToken();
+    });
+
+    document.getElementById('add-admin-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('add-admin-btn');
+      btn.disabled = true;
+
+      const payload = {
+        email: document.getElementById('new-email').value.trim(),
+        name: document.getElementById('new-name').value.trim(),
+        nickname: document.getElementById('new-nickname').value.trim(),
+        role: document.getElementById('new-role').value,
+        access_token: document.getElementById('new-token').value.trim()
+      };
+
+      const { error } = await sb.from('admins').insert(payload);
+      btn.disabled = false;
+
+      if (error) {
+        showToast(error.message.includes('duplicate') ? 'Email уже существует' : error.message, 'error');
+        return;
+      }
+      showToast('Админ добавлен');
+      e.target.reset();
+      loadTeam();
+    });
+
+    async function loadTeam() {
+      teamList.innerHTML = '<div class="loading-state">Загрузка…</div>';
+
+      const { data: admins, error } = await sb
+        .from('admins')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        teamList.innerHTML = `<div class="loading-state">Ошибка: ${error.message}</div>`;
+        return;
+      }
+
+      if (!admins || admins.length === 0) {
+        teamList.innerHTML = '<div class="loading-state">Нет администраторов</div>';
+        return;
+      }
+
+      const isSuper = currentAdmin && currentAdmin.role === 'super_admin';
+
+      teamList.innerHTML = admins.map(a => {
+        const initial = (a.nickname || a.name || '?')[0].toUpperCase();
+        const canDelete = isSuper && a.id !== currentAdmin.admin_id;
+        return `
+          <div class="admin-card glass" data-id="${a.id}">
+            <div class="admin-card-info">
+              <div class="admin-avatar">${esc(initial)}</div>
+              <div class="admin-meta">
+                <h4>
+                  ${esc(a.nickname || a.name)}
+                  <span class="role-badge ${a.role}">${a.role}</span>
+                </h4>
+                <p>${esc(a.email)} · ${esc(a.name)}</p>
+              </div>
+            </div>
+            ${canDelete
+              ? `<button class="btn btn-danger-outline btn-sm delete-admin-btn" data-id="${a.id}">Удалить</button>`
+              : ''}
+          </div>`;
+      }).join('');
+
+      document.querySelectorAll('.delete-admin-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteAdmin(btn.dataset.id));
+      });
+    }
+
+    async function deleteAdmin(id) {
+      if (!confirm('Удалить этого администратора?')) return;
+      const { error } = await sb.from('admins').delete().eq('id', id);
+      if (error) { showToast('Ошибка: ' + error.message, 'error'); return; }
+      showToast('Админ удалён');
+      loadTeam();
+    }
+
+    // ============================================================
+    // Logs
+    // ============================================================
+    async function loadLogs() {
+      logsTbody.innerHTML = '<tr><td colspan="5" class="loading-state">Загрузка логов…</td></tr>';
+      logsCards.innerHTML = '';
+
+      const { data: logs, error } = await sb
+        .from('audit_logs')
+        .select('*, admins(nickname, name), ecosystem_sites(name)')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        logsTbody.innerHTML = `<tr><td colspan="5" class="loading-state">Ошибка: ${error.message}</td></tr>`;
+        return;
+      }
+
+      if (!logs || logs.length === 0) {
+        logsTbody.innerHTML = '<tr><td colspan="5" class="loading-state">Логов пока нет</td></tr>';
+        return;
+      }
+
+      logsTbody.innerHTML = logs.map(l => {
+        const who = (l.admins && (l.admins.nickname || l.admins.name)) || '—';
+        const site = (l.ecosystem_sites && l.ecosystem_sites.name) || l.site_id || '—';
+        const action = l.action === 'close' ? 'Закрыл' : 'Открыл';
+        const overlay = l.overlay_type ? overlayLabel(l.overlay_type) : '—';
+        const time = formatTime(l.created_at);
+        return `
+          <tr>
+            <td>${esc(who)}</td>
+            <td><span class="action-pill ${l.action}">${action}</span></td>
+            <td>${esc(site)}</td>
+            <td>${esc(overlay)}</td>
+            <td style="white-space:nowrap;color:var(--text-muted)">${time}</td>
+          </tr>`;
+      }).join('');
+
+      logsCards.innerHTML = logs.map(l => {
+        const who = (l.admins && (l.admins.nickname || l.admins.name)) || '—';
+        const site = (l.ecosystem_sites && l.ecosystem_sites.name) || l.site_id || '—';
+        const action = l.action === 'close' ? 'Закрыл' : 'Открыл';
+        const overlay = l.overlay_type ? overlayLabel(l.overlay_type) : '—';
+        const time = formatTime(l.created_at);
+        return `
+          <div class="log-card glass">
+            <div class="log-card-row">
+              <strong>${esc(who)}</strong>
+              <span class="action-pill ${l.action}">${action}</span>
+            </div>
+            <div class="log-card-row">
+              <span class="meta">${esc(site)}${l.overlay_type ? ' · ' + overlay : ''}</span>
+              <span class="meta">${time}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleString('ru-RU', {
+        day: '2-digit', month: '2-digit', year: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
 
     // ============================================================
     // Login form
@@ -418,7 +669,7 @@
 
       try {
         const session = await login(email, password, token);
-        showDashboard(session);
+        showApp(session);
       } catch (err) {
         loginError.textContent = err.message || 'Ошибка входа';
         loginError.classList.add('visible');
@@ -433,9 +684,9 @@
     // ============================================================
     // Utils
     // ============================================================
-    function escapeHtml(str) {
+    function esc(str) {
       const d = document.createElement('div');
-      d.textContent = str;
+      d.textContent = str == null ? '' : String(str);
       return d.innerHTML;
     }
 
@@ -445,18 +696,10 @@
     (function boot() {
       const session = loadSession();
       if (session && session.admin_id) {
-        // Быстрая проверка, что сессия ещё валидна (Supabase session)
         sb.auth.getSession().then(({ data }) => {
-          if (data.session) {
-            showDashboard(session);
-          } else {
-            clearSession();
-            showLogin();
-          }
-        }).catch(() => {
-          clearSession();
-          showLogin();
-        });
+          if (data.session) showApp(session);
+          else { clearSession(); showLogin(); }
+        }).catch(() => { clearSession(); showLogin(); });
       } else {
         showLogin();
       }

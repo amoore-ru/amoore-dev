@@ -1,5 +1,5 @@
 -- ============================================================
--- amoore Dev — Supabase Schema (SQL Migration)
+-- amoore Dev v2.0 — Supabase Schema (SQL Migration)
 -- Выполнить в Supabase Dashboard → SQL Editor
 -- ============================================================
 
@@ -11,14 +11,14 @@ CREATE TABLE IF NOT EXISTS public.admins (
   nickname      TEXT NOT NULL,
   telegram_id   TEXT,
   role          TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('super_admin', 'admin')),
-  access_token  TEXT NOT NULL,          -- секретный токен, выдаётся основателем
+  access_token  TEXT NOT NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- 2. Таблица сайтов экосистемы
 CREATE TABLE IF NOT EXISTS public.ecosystem_sites (
-  id            TEXT PRIMARY KEY,       -- 'landing', 'studio' и т.д.
-  name          TEXT NOT NULL,          -- красивое название
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
   url           TEXT NOT NULL,
   status        TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
   overlay_type  TEXT NOT NULL DEFAULT 'maintenance' CHECK (overlay_type IN ('maintenance', 'crash', 'private')),
@@ -29,9 +29,9 @@ CREATE TABLE IF NOT EXISTS public.ecosystem_sites (
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   admin_id      UUID REFERENCES public.admins(id) ON DELETE SET NULL,
-  action        TEXT NOT NULL,          -- 'close' | 'open'
+  action        TEXT NOT NULL,
   site_id       TEXT REFERENCES public.ecosystem_sites(id) ON DELETE CASCADE,
-  overlay_type  TEXT,                   -- какой оверлей выбрали при закрытии
+  overlay_type  TEXT,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -43,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_site ON public.audit_logs(site_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON public.audit_logs(created_at DESC);
 
 -- ============================================================
--- Триггер обновления updated_at
+-- Триггер updated_at
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER AS $$
@@ -65,26 +65,46 @@ ALTER TABLE public.admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ecosystem_sites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
--- admins: читать может только authenticated (для проверки токена)
-CREATE POLICY "Admins: select own or service"
+-- admins
+DROP POLICY IF EXISTS "Admins: select own or service" ON public.admins;
+DROP POLICY IF EXISTS "Admins: authenticated select" ON public.admins;
+DROP POLICY IF EXISTS "Admins: authenticated insert" ON public.admins;
+DROP POLICY IF EXISTS "Admins: authenticated delete" ON public.admins;
+
+CREATE POLICY "Admins: authenticated select"
   ON public.admins FOR SELECT
   TO authenticated
   USING (true);
 
--- ecosystem_sites: публичное чтение (для amoore-core.js)
+CREATE POLICY "Admins: authenticated insert"
+  ON public.admins FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Admins: authenticated delete"
+  ON public.admins FOR DELETE
+  TO authenticated
+  USING (true);
+
+-- ecosystem_sites
+DROP POLICY IF EXISTS "Sites: public read" ON public.ecosystem_sites;
+DROP POLICY IF EXISTS "Sites: authenticated update" ON public.ecosystem_sites;
+
 CREATE POLICY "Sites: public read"
   ON public.ecosystem_sites FOR SELECT
   TO anon, authenticated
   USING (true);
 
--- ecosystem_sites: обновлять только authenticated
 CREATE POLICY "Sites: authenticated update"
   ON public.ecosystem_sites FOR UPDATE
   TO authenticated
   USING (true)
   WITH CHECK (true);
 
--- audit_logs: вставка и чтение только authenticated
+-- audit_logs
+DROP POLICY IF EXISTS "Audit: authenticated insert" ON public.audit_logs;
+DROP POLICY IF EXISTS "Audit: authenticated select" ON public.audit_logs;
+
 CREATE POLICY "Audit: authenticated insert"
   ON public.audit_logs FOR INSERT
   TO authenticated
@@ -105,9 +125,9 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
--- Пример администратора (ЗАМЕНИТЕ значения перед продакшеном)
--- 1. Создайте пользователя в Authentication → Users
--- 2. Вставьте запись сюда с тем же email и своим access_token
+-- Администратор (UPSERT — работает и при пустой, и при существующей записи)
+-- 1. Создайте пользователя в Authentication → Users (тот же email + пароль)
+-- 2. Раскомментируйте и подставьте свои значения
 -- ============================================================
 -- INSERT INTO public.admins (email, name, nickname, telegram_id, role, access_token)
 -- VALUES (
@@ -117,10 +137,16 @@ ON CONFLICT (id) DO NOTHING;
 --   '123456789',
 --   'super_admin',
 --   'AMOORE-SECRET-TOKEN-CHANGE-ME'
--- );
+-- )
+-- ON CONFLICT (email) DO UPDATE SET
+--   name         = EXCLUDED.name,
+--   nickname     = EXCLUDED.nickname,
+--   telegram_id  = EXCLUDED.telegram_id,
+--   role         = EXCLUDED.role,
+--   access_token = EXCLUDED.access_token;
 
 -- ============================================================
--- Примечание по Auth
+-- Примечание
 -- ============================================================
 -- Пароль хранится в Supabase Auth (auth.users).
 -- access_token — дополнительный секрет в таблице admins.
