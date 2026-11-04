@@ -26,13 +26,13 @@
       </div>
 
       <form id="login-form" autocomplete="off">
-        <div class="form-group">
+        <div class="form-group" id="email-group">
           <label for="email">Email</label>
           <input type="email" id="email" placeholder="founder@amoore.ru" required autocomplete="username">
         </div>
-        <div class="form-group">
+        <div class="form-group" id="password-group">
           <label for="password">Пароль</label>
-          <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+          <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
         </div>
         <div class="form-group">
           <label for="token">Токен доступа</label>
@@ -40,6 +40,9 @@
         </div>
         <button type="submit" class="btn btn-primary" id="login-btn">
           <span id="login-btn-text">Войти</span>
+        </button>
+        <button type="button" class="btn btn-ghost" id="full-login-btn" style="width:100%;margin-top:10px;display:none;font-size:12px">
+          Войти с email и паролем
         </button>
       </form>
 
@@ -224,8 +227,12 @@
     // Init
     // ============================================================
     const { createClient } = supabase;
-    const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+    });
     const SESSION_KEY = 'amoore_dev_auth';
+    const EMAIL_KEY   = 'amoore_dev_email';
+    const SESSION_TTL_MS = 6 * 60 * 60 * 1000; // 6 часов
 
     // DOM
     const loginScreen   = document.getElementById('login-screen');
@@ -234,6 +241,12 @@
     const loginError    = document.getElementById('login-error');
     const loginBtn      = document.getElementById('login-btn');
     const loginBtnText  = document.getElementById('login-btn-text');
+    const fullLoginBtn  = document.getElementById('full-login-btn');
+    const emailGroup    = document.getElementById('email-group');
+    const passwordGroup = document.getElementById('password-group');
+    const emailInput    = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const tokenInput    = document.getElementById('token');
     const sitesGrid     = document.getElementById('sites-grid');
     const adminNickname = document.getElementById('admin-nickname');
     const logoutBtn     = document.getElementById('logout-btn');
@@ -248,48 +261,72 @@
 
     let currentAdmin = null;
     let pendingCloseSiteId = null;
+    let tokenOnlyMode = false;
 
     // ============================================================
-    // Session
+    // Session (localStorage + TTL 6ч, дублируем в sessionStorage для God Mode)
     // ============================================================
     function saveSession(data) {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+      const payload = { ...data, expires_at: Date.now() + SESSION_TTL_MS };
+      try { localStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
+      if (data.email) {
+        try { localStorage.setItem(EMAIL_KEY, data.email); } catch (_) {}
+      }
     }
+
     function loadSession() {
       try {
-        const raw = sessionStorage.getItem(SESSION_KEY);
-        return raw ? JSON.parse(raw) : null;
+        const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || !data.admin_id) return null;
+        if (data.expires_at && Date.now() > data.expires_at) {
+          // сессия панели истекла, но email оставляем для token-only
+          try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
+          try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
+          return null;
+        }
+        return data;
       } catch { return null; }
     }
-    function clearSession() {
-      sessionStorage.removeItem(SESSION_KEY);
+
+    function clearSession(full = false) {
+      try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
+      try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
+      if (full) {
+        try { localStorage.removeItem(EMAIL_KEY); } catch (_) {}
+      }
+    }
+
+    function rememberedEmail() {
+      try { return localStorage.getItem(EMAIL_KEY) || ''; } catch { return ''; }
+    }
+
+    function friendlyError(err) {
+      const msg = (err && err.message) ? String(err.message) : String(err || '');
+      if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg)) {
+        return 'Нет связи с Supabase. Проверьте URL/ключ в index.html и CORS.';
+      }
+      if (/invalid login credentials/i.test(msg)) return 'Неверный email или пароль';
+      if (/jwt|session|refresh/i.test(msg)) return 'Сессия истекла — войдите заново';
+      return msg || 'Ошибка входа';
     }
 
     // ============================================================
-    // Auth (нетронутая логика)
+    // Auth
     // ============================================================
-    async function login(email, password, accessToken) {
-      const { data: authData, error: authError } = await sb.auth.signInWithPassword({
-        email, password
-      });
-      if (authError) {
-        throw new Error(authError.message === 'Invalid login credentials'
-          ? 'Неверный email или пароль' : authError.message);
-      }
-
+    async function verifyAdmin(email, accessToken) {
       const { data: admin, error: adminError } = await sb
         .from('admins')
         .select('*')
         .eq('email', email)
         .eq('access_token', accessToken)
         .single();
-
       if (adminError || !admin) {
-        await sb.auth.signOut();
         throw new Error('Неверный токен доступа или аккаунт не найден');
       }
-
-      const session = {
+      return {
         admin_id: admin.id,
         email: admin.email,
         nickname: admin.nickname,
@@ -297,25 +334,72 @@
         role: admin.role,
         access_token: accessToken
       };
+    }
+
+    async function loginFull(email, password, accessToken) {
+      const { error: authError } = await sb.auth.signInWithPassword({ email, password });
+      if (authError) throw new Error(friendlyError(authError));
+      const session = await verifyAdmin(email, accessToken);
+      saveSession(session);
+      return session;
+    }
+
+    // Повторный вход: только токен (Supabase-сессия ещё жива)
+    async function loginTokenOnly(email, accessToken) {
+      const { data: authData } = await sb.auth.getSession();
+      if (!authData.session) {
+        throw new Error('NEED_PASSWORD');
+      }
+      const session = await verifyAdmin(email, accessToken);
       saveSession(session);
       return session;
     }
 
     function logout() {
-      clearSession();
+      clearSession(true);
       sb.auth.signOut().catch(() => {});
       currentAdmin = null;
-      showLogin();
+      tokenOnlyMode = false;
+      showLogin(false);
     }
 
     // ============================================================
     // UI state
     // ============================================================
-    function showLogin() {
+    function setLoginMode(tokenOnly) {
+      tokenOnlyMode = tokenOnly;
+      if (tokenOnly) {
+        emailGroup.style.display = 'none';
+        passwordGroup.style.display = 'none';
+        emailInput.required = false;
+        passwordInput.required = false;
+        fullLoginBtn.style.display = 'block';
+        const em = rememberedEmail();
+        if (em) emailInput.value = em;
+      } else {
+        emailGroup.style.display = '';
+        passwordGroup.style.display = '';
+        emailInput.required = true;
+        passwordInput.required = true;
+        fullLoginBtn.style.display = 'none';
+        const em = rememberedEmail();
+        if (em && !emailInput.value) emailInput.value = em;
+      }
+    }
+
+    function showLogin(preferTokenOnly) {
       loginScreen.style.display = 'flex';
       app.classList.remove('visible');
       loginError.classList.remove('visible');
-      loginForm.reset();
+      passwordInput.value = '';
+      tokenInput.value = '';
+      const em = rememberedEmail();
+      if (preferTokenOnly && em) {
+        setLoginMode(true);
+      } else {
+        setLoginMode(false);
+        if (em) emailInput.value = em;
+      }
     }
 
     function showApp(admin) {
@@ -657,21 +741,43 @@
     // ============================================================
     // Login form
     // ============================================================
+    fullLoginBtn.addEventListener('click', () => {
+      setLoginMode(false);
+      loginError.classList.remove('visible');
+    });
+
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       loginError.classList.remove('visible');
       loginBtn.disabled = true;
       loginBtnText.innerHTML = '<span class="spinner"></span>';
 
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-      const token = document.getElementById('token').value.trim();
+      const email = (emailInput.value || rememberedEmail()).trim();
+      const password = passwordInput.value;
+      const token = tokenInput.value.trim();
 
       try {
-        const session = await login(email, password, token);
+        if (!email) throw new Error('Укажите email');
+        if (!token) throw new Error('Укажите токен доступа');
+
+        let session;
+        if (tokenOnlyMode) {
+          try {
+            session = await loginTokenOnly(email, token);
+          } catch (err) {
+            if (err.message === 'NEED_PASSWORD') {
+              setLoginMode(false);
+              throw new Error('Сессия истекла — введите пароль');
+            }
+            throw err;
+          }
+        } else {
+          if (!password) throw new Error('Укажите пароль');
+          session = await loginFull(email, password, token);
+        }
         showApp(session);
       } catch (err) {
-        loginError.textContent = err.message || 'Ошибка входа';
+        loginError.textContent = friendlyError(err);
         loginError.classList.add('visible');
       } finally {
         loginBtn.disabled = false;
@@ -691,19 +797,53 @@
     }
 
     // ============================================================
-    // Boot
+    // Boot — авто-вход если сессия < 6ч и Supabase-сессия жива
     // ============================================================
-    (function boot() {
+    (async function boot() {
+      // Проверка, что ключи подставлены
+      if (!SUPABASE_URL || SUPABASE_URL.includes('YOUR_PROJECT') ||
+          !SUPABASE_ANON || SUPABASE_ANON === 'YOUR_ANON_KEY') {
+        showLogin(false);
+        loginError.textContent = 'В index.html не подставлены SUPABASE_URL / SUPABASE_ANON';
+        loginError.classList.add('visible');
+        return;
+      }
+
       const session = loadSession();
       if (session && session.admin_id) {
-        sb.auth.getSession().then(({ data }) => {
-          if (data.session) showApp(session);
-          else { clearSession(); showLogin(); }
-        }).catch(() => { clearSession(); showLogin(); });
-      } else {
-        showLogin();
+        try {
+          const { data } = await sb.auth.getSession();
+          if (data.session) {
+            // продлеваем TTL при успешном авто-входе
+            saveSession(session);
+            showApp(session);
+            return;
+          }
+        } catch (_) {}
+        clearSession(false);
+        showLogin(true); // token-only, email запомнен
+        return;
       }
+
+      // Есть email, но нет валидной сессии панели → token-only если auth жив
+      const em = rememberedEmail();
+      if (em) {
+        try {
+          const { data } = await sb.auth.getSession();
+          if (data.session) {
+            showLogin(true);
+            return;
+          }
+        } catch (_) {}
+      }
+      showLogin(false);
     })();
-  </script>
+  </script><script>
+  window.AMOORE_SITE_ID = 'studio'; // ВАЖНО: здесь именно 'studio'
+  window.AMOORE_SUPABASE_URL = 'https://wogouiecoigzmxqccnsk.supabase.co';
+  window.AMOORE_SUPABASE_ANON = 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q'; // Твой ключ
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="amoore-core.js"></script>
 </body>
 </html>
