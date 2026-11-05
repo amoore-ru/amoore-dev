@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v8.0 (Clean Build)
+ * amoore-core.js — v8.1.1 (Update v1.1 — exact TZ)
  * Один скрипт для всех сайтов экосистемы. Подключение (3 строки в конце body):
  *   <script>window.AMOORE_SITE_ID = 'landing';</script>   // или 'studio'
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -10,9 +10,11 @@
  *   2. God Mode: ?god=ТОКЕН (токен проверяется на сервере) → сайт открыт + золотая плашка
  *   3. Баннер под шапкой (banner_active / banner_text)
  *   4. Новости → #news-list, секция #news скрывается при news_active = false
- *   5. Демо-чат: #chat скрывается при demo_chat_active = false
+ *      + умная очистка плейсхолдера «Загрузка…»
+ *   5. Демо-чат: #chat скрывается + жёсткая блокировка (disabled) при demo_chat_active = false
  *   6. Аналитика: INSERT в site_visits (1 раз за сессию вкладки)
  *   7. Live-обновление: Supabase Realtime + страховочный polling
+ *   8. Глобальный экспорт: window.amooreCore (config, refresh, version)
  */
 (function () {
   'use strict';
@@ -237,6 +239,37 @@
     Array.prototype.forEach.call(document.querySelectorAll('#news, [data-amoore-news-section], a[href="#news"]'), function (n) {
       n.classList.toggle('amoore-hidden', hideNews);
     });
+
+    // 2.2 Жёсткая блокировка чата: disabled на #chat-input / #chat-send + сообщение в лог
+    var chatInput = document.getElementById('chat-input');
+    var chatSend  = document.getElementById('chat-send');
+    var chatLog   = document.getElementById('chat-log');
+    if (hideChat) {
+      if (chatInput) { chatInput.disabled = true; chatInput.setAttribute('aria-disabled', 'true'); }
+      if (chatSend)  { chatSend.disabled  = true; chatSend.setAttribute('aria-disabled', 'true'); }
+      // Сообщение от бота один раз (не дублируем)
+      if (chatLog && !chatLog.querySelector('[data-amoore-off]')) {
+        var row = document.createElement('div');
+        row.className = 'chat-bubble chat-bot';
+        row.setAttribute('data-amoore-off', '1');
+        var name = document.createElement('span');
+        name.className = 'chat-name';
+        name.textContent = 'amoore';
+        var p = document.createElement('p');
+        p.textContent = 'Мой создатель забрал меня на обед. Я вернусь, как только он меня включит!';
+        row.appendChild(name);
+        row.appendChild(p);
+        chatLog.appendChild(row);
+        try { chatLog.scrollTop = chatLog.scrollHeight; } catch (e) {}
+      }
+    } else {
+      if (chatInput) { chatInput.disabled = false; chatInput.removeAttribute('aria-disabled'); }
+      if (chatSend)  { chatSend.disabled  = false; chatSend.removeAttribute('aria-disabled'); }
+      if (chatLog) {
+        var offMsg = chatLog.querySelector('[data-amoore-off]');
+        if (offMsg) offMsg.remove();
+      }
+    }
   }
 
   // ------------------------------------------------------------------ news
@@ -244,7 +277,27 @@
 
   async function renderNews() {
     var target = document.querySelector('#news-list, [data-amoore-news]');
-    if (!target || (cfg && cfg.news_active === false)) return;
+    if (!target) return;
+    // 2.3 Умная очистка: при выключенных новостях — пустой список + 1 случайный текст
+    if (cfg && cfg.news_active === false) {
+      target.textContent = '';
+      var pauses = [
+        'Редакция ушла на перерыв. Скоро вернёмся.',
+        'Новости на паузе. Но мы готовим кое-что крутое.',
+        'Тишина в эфире...'
+      ];
+      var item = document.createElement('div');
+      item.className = 'news-item glass-card';
+      var span = document.createElement('span');
+      span.textContent = pauses[Math.floor(Math.random() * pauses.length)];
+      item.appendChild(span);
+      target.appendChild(item);
+      return;
+    }
+    // Убрать «Загрузка…», если ещё висит
+    if (target.childElementCount === 1 && /загрузк/i.test((target.textContent || '').trim())) {
+      target.textContent = '';
+    }
     try {
       var res = await client.from('news')
         .select('id, title, body, type, display_date, published_at')
@@ -311,7 +364,7 @@
     var refreshNews = debounce(renderNews, 300);
     var refreshCfg = async function () {
       var c = await fetchConfig();
-      if (c) { cfg = c; applyConfig(); renderNews(); }
+      if (c) { cfg = c; window.AMOORE_CONFIG = cfg; applyConfig(); renderNews(); }
     };
     try {
       if (client.channel) {
@@ -324,6 +377,7 @@
     function tick() {
       if (document.visibilityState && document.visibilityState !== 'visible') return;
       refreshCfg();
+      renderNews();                                   // 2.4 принудительно при возврате на вкладку
     }
     setInterval(tick, POLL_MS);                     // страховка, если Realtime выключен
     document.addEventListener('visibilitychange', tick);
@@ -340,12 +394,28 @@
     });
     trackVisit();                                   // быстрый INSERT, не ждём остального
     cfg = await fetchConfig();
+    window.AMOORE_CONFIG = cfg;                     // 2.1 глобальный экспорт конфига
     applyConfig();
     await renderNews();
     startLive();
   }
 
-  window.amooreCore = { version: '8.0.0', siteId: SITE_ID, refresh: async function () { var c = await fetchConfig(); if (c) { cfg = c; applyConfig(); } return renderNews(); } };
+  function publishConfig() {
+    window.AMOORE_CONFIG = cfg;
+  }
+
+  window.amooreCore = {
+    version: '8.1.1',
+    siteId: SITE_ID,
+    getConfig: function () { return cfg ? Object.assign({}, cfg) : null; },
+    isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false); },
+    isNewsEnabled: function () { return !(cfg && cfg.news_active === false); },
+    refresh: async function () {
+      var c = await fetchConfig();
+      if (c) { cfg = c; window.AMOORE_CONFIG = cfg; applyConfig(); }
+      return renderNews();
+    }
+  };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

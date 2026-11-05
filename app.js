@@ -361,12 +361,17 @@ async function applyBannerText(site, raw) {
   const text = String(raw || '').trim().slice(0, 160);
   if (!text) return toast('Введите текст баннера', 'error');
   if (!(await patchSite(site, { banner_text: text, banner_active: true }))) return;
-  renderSites(); logAction('banner_edit', site.id); toast('Баннер применён'); loadMiniAudit();
+  renderSites(); logAction('banner_edit', site.id);
+  toast('Изменения применены на сайте!');
+  loadDashboard();
+  loadMiniAudit();
 }
 async function toggleFlag(site, column, next, name) {
   if (!(await patchSite(site, { [column]: next }))) return;
   renderSites(); logAction(`${name}_${next ? 'on' : 'off'}`, site.id);
-  toast(next ? 'Включено' : 'Выключено'); loadMiniAudit();
+  toast('Изменения применены на сайте!');
+  loadDashboard();
+  loadMiniAudit();
 }
 
 // ---- модалка «Закрыть сайт»
@@ -456,19 +461,35 @@ async function loadMiniAudit() {
 $('news-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!can('manage_news')) return toast('Недостаточно прав', 'error');
+  const btn = $('news-submit-btn');
+  if (btn.disabled) return; // защита от двойного клика
   const title = $('news-title').value.trim().slice(0, 140);
-  const body = $('news-body').value.trim();
-  if (!title || !body) return toast('Заполните заголовок и текст', 'error');
-  $('news-submit-btn').disabled = true;
-  const { error } = await sb.from('news').insert({
-    title, body, type: $('news-type').value, display_date: $('news-date').value || todayISO(), is_published: true
-  });
-  $('news-submit-btn').disabled = false;
-  if (error) return toast(friendlyError(error), 'error');
-  logAction('news_add', null, null, title);
-  toast('Опубликовано — уже на сайте');
-  e.target.reset(); $('news-date').value = todayISO();
-  loadNewsAdmin();
+  const body = $('news-body').value.trim().slice(0, 4000);
+  if (!title || title.length < 3) return toast('Заголовок: минимум 3 символа', 'error');
+  if (!body || body.length < 5) return toast('Текст: минимум 5 символов', 'error');
+  if (/<script|javascript:|on\w+=/i.test(title + body)) return toast('Недопустимые символы в тексте', 'error');
+  const prevLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Сохранение…';
+  btn.setAttribute('aria-busy', 'true');
+  try {
+    const { error } = await sb.from('news').insert({
+      title, body, type: $('news-type').value, display_date: $('news-date').value || todayISO(), is_published: true
+    });
+    if (error) {
+      toast(friendlyError(error), 'error');
+      return;
+    }
+    logAction('news_add', null, null, title);
+    toast('Опубликовано — уже на сайте');
+    e.target.reset();
+    $('news-date').value = todayISO();
+    loadNewsAdmin();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevLabel || 'Опубликовать';
+    btn.removeAttribute('aria-busy');
+  }
 });
 async function loadNewsAdmin() {
   const list = $('news-admin-list');
