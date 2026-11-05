@@ -1,20 +1,13 @@
 /**
- * amoore-core.js — v8.2.1 (news REST fallback + no hang)
- * Один скрипт для всех сайтов экосистемы. Подключение (3 строки в конце body):
- *   <script>window.AMOORE_SITE_ID = 'landing';</script>   // или 'studio'
+ * amoore-core.js — v9.0.0 (Global Update v2.0 Evolve)
+ * Подключение:
+ *   <script>window.AMOORE_SITE_ID = 'landing';</script>
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
  *   <script src="amoore-core.js"></script>
  *
- * Что делает:
- *   1. Статус сайта: closed → заставка (iOS / Telegram WebView hardened)
- *   2. God Mode: ?god=ТОКЕН (токен проверяется на сервере) → сайт открыт + золотая плашка
- *   3. Баннер под шапкой (banner_active / banner_text)
- *   4. Новости → #news-list, секция #news скрывается при news_active = false
- *      + умная очистка плейсхолдера «Загрузка…»
- *   5. Демо-чат: #chat скрывается + жёсткая блокировка (disabled) при demo_chat_active = false
- *   6. Аналитика: INSERT в site_visits (1 раз за сессию вкладки)
- *   7. Live-обновление: Supabase Realtime + страховочный polling
- *   8. Глобальный экспорт: window.amooreCore (config, refresh, version)
+ * window.AMOORE_STATE — единый state (config, news, sites, god)
+ * window.AMOORE_CONFIG — alias на state.config
+ * window.amooreCore — API (refresh, isChatEnabled, ...)
  */
 (function () {
   'use strict';
@@ -22,6 +15,15 @@
   window.__amooreCoreLoaded = true;
 
   var SITE_ID = window.AMOORE_SITE_ID || 'landing';
+  (function networkNotice() {
+    function update() {
+      var n = document.getElementById('amoore-network-notice');
+      if (!n) { n = document.createElement('div'); n.id = 'amoore-network-notice'; n.setAttribute('role', 'status'); n.setAttribute('aria-live', 'polite'); n.textContent = 'Нет связи с сервером. Проверьте интернет'; document.body.appendChild(n); }
+      n.hidden = navigator.onLine;
+    }
+    window.addEventListener('online', update); window.addEventListener('offline', update);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', update); else update();
+  })();
   var SB_URL  = window.AMOORE_SUPABASE_URL  || 'https://wogouiecoigzmxqccnsk.supabase.co';
   var SB_ANON = window.AMOORE_SUPABASE_ANON || 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q';
 
@@ -35,6 +37,30 @@
   var cfg = null;          // строка ecosystem_sites для этого сайта
   var godToken = null;     // проверенный токен или null
   var godChecked = false;
+  var newsCache = [];
+  var sitesCache = [];
+  var botOnline = null; // null = unknown; only explicit false pauses the demo chat
+
+  // Глобальный state экосистемы
+  window.AMOORE_STATE = {
+    siteId: SITE_ID,
+    config: null,
+    news: [],
+    sites: [],
+    god: false,
+    version: '9.0.0'
+  };
+  function publishState() {
+    window.AMOORE_STATE.config = cfg ? Object.assign({}, cfg) : null;
+    window.AMOORE_STATE.news = newsCache.slice();
+    window.AMOORE_STATE.sites = sitesCache.slice();
+    window.AMOORE_STATE.god = !!godToken;
+    window.AMOORE_CONFIG = cfg;
+    try {
+      window.dispatchEvent(new CustomEvent('amoore:state', { detail: window.AMOORE_STATE }));
+      window.dispatchEvent(new CustomEvent('amoore:config', { detail: cfg }));
+    } catch (e) {}
+  }
 
   // ------------------------------------------------------------------ utils
   function ls(op, key, val) {
@@ -177,12 +203,17 @@
 
   function showGodBar() {
     if (document.getElementById('amoore-god-bar')) return;
-    styleOnce('amoore-god-css', GOD_CSS);
+    styleOnce('amoore-god-css', GOD_CSS +
+      '.amoore-god-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}' +
+      '.amoore-god-btn-ghost{padding:8px 14px;min-height:40px;background:transparent;color:#e8c96a;border:1px solid rgba(212,175,55,.45);border-radius:8px;font:600 13px Manrope,system-ui,sans-serif;cursor:pointer;text-decoration:none}');
     var bar = el('div', 'amoore-god-bar',
-      '<span><strong>Режим Админа:</strong> сайт закрыт для всех</span>' +
-      '<button class="amoore-god-btn" type="button">Открыть сайт</button>');
+      '<span><strong>God Mode:</strong> сайт закрыт для посетителей</span>' +
+      '<div class="amoore-god-actions">' +
+      '<button class="amoore-god-btn" type="button" data-act="open">Открыть сайт</button>' +
+      '<a class="amoore-god-btn-ghost" href="https://amoore-dev.pages.dev/" target="_blank" rel="noopener">В админку</a>' +
+      '</div>');
     bar.id = 'amoore-god-bar';
-    bar.querySelector('button').addEventListener('click', async function () {
+    bar.querySelector('[data-act=open]').addEventListener('click', async function () {
       var btn = this; btn.disabled = true;
       try {
         var r = await client.rpc('god_open_site', { p_token: godToken, p_site: SITE_ID });
@@ -190,7 +221,7 @@
       } catch (e) {}
       btn.disabled = false; btn.textContent = 'Нет прав';
     });
-    document.body.prepend(bar);              // prepend + relative: контент сдвигается, шапка не перекрыта
+    document.body.prepend(bar);
   }
   function hideGodBar() {
     var b = document.getElementById('amoore-god-bar');
@@ -232,38 +263,57 @@
   function applyVisibility() {
     styleOnce('amoore-hide-css', [
       '.amoore-hidden{display:none!important}',
-      '.amoore-chat-offline #chat-suggestions{opacity:.55;pointer-events:none}',
-      '.amoore-news-paused .section-lead{opacity:.7}'
+      '.amoore-chat-offline #chat-input,.amoore-chat-offline #chat-send{opacity:.55}',
+      '.amoore-news-paused .section-lead{opacity:.75}'
     ].join(''));
 
-    var hideChat = !!cfg && cfg.demo_chat_active === false;
-    var hideNews = !!cfg && cfg.news_active === false;
+    var chatOff = (!!cfg && cfg.demo_chat_active === false) || botOnline === false;
+    var newsOff = !!cfg && cfg.news_active === false;
 
-    // Нав-ссылки можно приглушить, но сами секции #chat / #news остаются видимыми —
-    // иначе пользователь не видит офлайн-ответы бота и паузу новостей.
     Array.prototype.forEach.call(document.querySelectorAll('a[href="#chat"]'), function (n) {
-      n.classList.toggle('amoore-hidden', hideChat);
+      n.classList.toggle('amoore-hidden', chatOff);
     });
     Array.prototype.forEach.call(document.querySelectorAll('a[href="#news"]'), function (n) {
-      n.classList.toggle('amoore-hidden', hideNews);
+      n.classList.toggle('amoore-hidden', newsOff);
     });
 
     var chatRoot = document.getElementById('chat') || document.querySelector('[data-amoore-chat]');
     if (chatRoot) {
-      chatRoot.classList.toggle('amoore-chat-offline', hideChat);
-      chatRoot.setAttribute('data-amoore-chat-enabled', hideChat ? '0' : '1');
+      chatRoot.classList.toggle('amoore-chat-offline', chatOff);
+      chatRoot.setAttribute('data-amoore-chat-enabled', chatOff ? '0' : '1');
+      var chatInput = document.getElementById('chat-input');
+      var chatSend = document.getElementById('chat-send');
+      var chatLog = document.getElementById('chat-log');
+      if (chatOff) {
+        if (chatInput) { chatInput.disabled = true; chatInput.setAttribute('aria-disabled', 'true'); chatInput.placeholder = 'Чат на паузе'; }
+        if (chatSend) { chatSend.disabled = true; chatSend.setAttribute('aria-disabled', 'true'); }
+        if (chatLog && !chatLog.querySelector('[data-amoore-off]')) {
+          var row = document.createElement('div');
+          row.className = 'chat-bubble chat-bot';
+          row.setAttribute('data-amoore-off', '1');
+          var name = document.createElement('span'); name.className = 'chat-name'; name.textContent = 'amoore';
+          var p = document.createElement('p');
+          p.textContent = 'Я ушел на перезагрузку. Скоро вернусь!';
+          row.appendChild(name); row.appendChild(p);
+          chatLog.appendChild(row);
+          try { chatLog.scrollTop = chatLog.scrollHeight; } catch (e) {}
+        }
+      } else {
+        if (chatInput) { chatInput.disabled = false; chatInput.removeAttribute('aria-disabled'); if (chatInput.placeholder === 'Чат на паузе') chatInput.placeholder = 'Напишите сообщение…'; }
+        if (chatSend) { chatSend.disabled = false; chatSend.removeAttribute('aria-disabled'); }
+        if (chatLog) {
+          var off = chatLog.querySelector('[data-amoore-off]');
+          if (off) off.remove();
+        }
+      }
     }
 
     var newsRoot = document.getElementById('news') || document.querySelector('[data-amoore-news-section]');
     if (newsRoot) {
-      newsRoot.classList.toggle('amoore-news-paused', hideNews);
-      newsRoot.setAttribute('data-amoore-news-enabled', hideNews ? '0' : '1');
+      newsRoot.classList.toggle('amoore-news-paused', newsOff);
+      newsRoot.setAttribute('data-amoore-news-enabled', newsOff ? '0' : '1');
     }
-
-    // Сообщаем демо-чату о смене состояния (кастомное событие)
-    try {
-      window.dispatchEvent(new CustomEvent('amoore:config', { detail: cfg ? Object.assign({}, cfg) : null }));
-    } catch (e) {}
+    publishState();
   }
 
   // ------------------------------------------------------------------ news
@@ -312,18 +362,13 @@
 
     // Тумблер новостей выключен
     if (cfg && cfg.news_active === false) {
-      var pauses = [
-        'Редакция ушла на перерыв. Скоро вернёмся.',
-        'Новости на паузе. Но мы готовим кое-что крутое.',
-        'Тишина в эфире...'
-      ];
-      setPlaceholder(pauses[Math.floor(Math.random() * pauses.length)], false);
+      setPlaceholder('Редакция готовит материалы. Загляните позже', false);
       return;
     }
 
-    // Не мигаем «Обновляем…», если уже есть карточки новостей
+    // Skeleton cards avoid a blank/lagging state during the first fetch.
     if (!target.querySelector('[data-type]')) {
-      setPlaceholder('Обновляем ленту…', false);
+      target.innerHTML = '<div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div><div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div><div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div>';
     }
 
     // 1) Пробуем supabase-js
@@ -385,7 +430,10 @@
           throw e2;
         }
       }
+      newsCache = items || [];
+      publishState();
       paintItems(items);
+      applySeo();
     } catch (e) {
       if (!target.querySelector('[data-type]')) {
         var msg = (e && e.message === 'timeout')
@@ -407,6 +455,77 @@
     try { client.from('site_visits').insert({ site_id: SITE_ID }).then(function () {}, function () {}); } catch (e) {}
   }
 
+  // ------------------------------------------------------------------ ecosystem cards + SEO
+  async function fetchSites() {
+    try {
+      if (client) {
+        var r = await client.from('ecosystem_sites').select('id,name,url,status').order('id');
+        if (r && !r.error && r.data) return r.data;
+      }
+      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=id,name,url,status&order=id';
+      var res = await fetch(url, {
+        headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Accept': 'application/json' }
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (e) { return []; }
+  }
+
+  function renderEcosystem() {
+    var grid = document.querySelector('#ecosystem .eco-grid, [data-amoore-ecosystem]');
+    if (!grid || !sitesCache.length) return;
+    // Не трогаем, если уже есть data-amoore-dynamic
+    var existing = grid.querySelectorAll('[data-amoore-site]');
+    if (existing.length === sitesCache.length) {
+      // refresh links/names
+    }
+    var frag = document.createDocumentFragment();
+    sitesCache.forEach(function (s) {
+      if (!s || !s.id) return;
+      var art = document.createElement('article');
+      art.className = 'eco-card glass-card reveal';
+      art.setAttribute('data-amoore-site', s.id);
+      var icon = document.createElement('div');
+      icon.className = 'eco-card-icon';
+      icon.textContent = s.id === 'landing' ? '✦' : (s.id === 'studio' ? '◇' : '◆');
+      var h3 = document.createElement('h3');
+      h3.textContent = s.name || s.id;
+      var p = document.createElement('p');
+      p.textContent = s.status === 'open' ? 'Онлайн' : 'На обслуживании';
+      var a = document.createElement('a');
+      a.className = 'eco-link';
+      a.href = s.url || '#';
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = 'Открыть →';
+      art.appendChild(icon); art.appendChild(h3); art.appendChild(p); art.appendChild(a);
+      frag.appendChild(art);
+    });
+    if (frag.childNodes.length) {
+      grid.textContent = '';
+      grid.appendChild(frag);
+    }
+  }
+
+  function applySeo() {
+    if (!cfg) return;
+    try {
+      var name = cfg.name || 'amoore';
+      if (cfg.seo_title) document.title = cfg.seo_title;
+      else document.title = name + ' | AI companion';
+      var desc = cfg.seo_description || cfg.banner_text || '';
+      if (desc) {
+        var m = document.querySelector('meta[name="description"]');
+        if (!m) {
+          m = document.createElement('meta');
+          m.setAttribute('name', 'description');
+          document.head.appendChild(m);
+        }
+        m.setAttribute('content', String(desc).slice(0, 180));
+      }
+    } catch (e) {}
+  }
+
   // ------------------------------------------------------------------ config + live
   async function fetchConfig() {
     try {
@@ -424,6 +543,19 @@
       return arr && arr[0] ? arr[0] : null;
     } catch (e) { return null; }
   }
+  async function fetchBotStatus() {
+    try {
+      if (client) {
+        var r = await client.from('bot_status').select('is_online').eq('id', 'main').maybeSingle();
+        if (r && !r.error && r.data) { botOnline = r.data.is_online !== false; return botOnline; }
+      }
+      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/bot_status?select=is_online&id=eq.main';
+      var res = await fetch(url, { headers: { apikey: SB_ANON, Authorization: 'Bearer ' + SB_ANON, Accept: 'application/json' }, signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined });
+      if (res.ok) { var rows = await res.json(); if (rows && rows[0]) botOnline = rows[0].is_online !== false; }
+    } catch (e) { /* Keep last known status; do not falsely mark the bot offline on transient network loss. */ }
+    return botOnline;
+  }
+
   function applyConfig() {
     applyStatus();
     applyBanner();
@@ -437,7 +569,11 @@
     var refreshNews = debounce(renderNews, 300);
     var refreshCfg = async function () {
       var c = await fetchConfig();
-      if (c) { cfg = c; window.AMOORE_CONFIG = cfg; applyConfig(); renderNews(); }
+      await fetchBotStatus();
+      if (c) { cfg = c; publishState(); applyConfig(); applySeo(); renderNews(); }
+      else applyVisibility();
+      var s = await fetchSites();
+      if (s && s.length) { sitesCache = s; publishState(); renderEcosystem(); }
     };
     try {
       if (client.channel) {
@@ -472,15 +608,20 @@
     }
     trackVisit();
     cfg = await fetchConfig();
-    window.AMOORE_CONFIG = cfg;
+    await fetchBotStatus();
+    sitesCache = await fetchSites();
+    publishState();
     applyConfig();
+    applySeo();
+    renderEcosystem();
     await renderNews();
     if (client) startLive();
     else {
-      // без supabase-js — простой polling REST
       setInterval(function () {
         if (document.visibilityState && document.visibilityState !== 'visible') return;
         renderNews();
+        fetchBotStatus().then(applyVisibility);
+        fetchSites().then(function (s) { sitesCache = s; publishState(); renderEcosystem(); });
       }, POLL_MS);
     }
   }
@@ -490,14 +631,19 @@
   }
 
   window.amooreCore = {
-    version: '8.2.1',
+    version: '9.0.0',
     siteId: SITE_ID,
     getConfig: function () { return cfg ? Object.assign({}, cfg) : null; },
-    isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false); },
+    isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false) && botOnline !== false; },
     isNewsEnabled: function () { return !(cfg && cfg.news_active === false); },
     refresh: async function () {
       var c = await fetchConfig();
-      if (c) { cfg = c; window.AMOORE_CONFIG = cfg; applyConfig(); }
+      await fetchBotStatus();
+      if (c) { cfg = c; publishState(); applyConfig(); applySeo(); }
+      else applyVisibility();
+      sitesCache = await fetchSites();
+      publishState();
+      renderEcosystem();
       return renderNews();
     }
   };

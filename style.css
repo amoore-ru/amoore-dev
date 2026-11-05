@@ -1700,3 +1700,40 @@ input, select, textarea, .banner-input { font-size: 16px !important; }   /* iOS 
   }
   .glass, .modal, .topbar { background: rgba(14, 20, 40, 0.96) !important; }
 }
+
+
+/* v2 visits mini bars */
+.visit-row{display:grid;grid-template-columns:80px 1fr 36px;gap:8px;align-items:center;font-size:12px;margin:4px 0}
+.visit-bar{height:8px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden}
+.visit-bar i{display:block;height:100%;background:linear-gradient(90deg,#d4af37,#f0d78c);border-radius:99px;transition:width .6s cubic-bezier(.22,1,.36,1)}
+
+/* v2 admin */
+.glass, .admin-card, .toggle-row { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.btn, .toggle { transition: transform .3s cubic-bezier(.22,1,.36,1); }
+input, textarea, select { font-size: 16px; }
+
+
+/* v0.3 hardening: network notice, touch targets and safe-area coverage */
+#amoore-network-notice { position: fixed; z-index: 99999; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 24px)); padding: 12px 16px; border: 1px solid rgba(248,113,113,.5); border-radius: 14px; background: #35151b; color: #fff; box-shadow: 0 12px 36px rgba(0,0,0,.35); font: 600 14px/1.4 var(--font); text-align: center; }
+#amoore-network-notice[hidden] { display: none; }
+@media (max-width: 768px), (hover: none) and (pointer: coarse) { .btn, .tab-btn, .burger, .toggle { min-height: 44px; } .toast { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); } }
+
+.global-search-wrap { position: relative; width: clamp(190px, 25vw, 340px); }
+.global-search-wrap input { width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); color: var(--text); font: 500 13px var(--font); outline: none; }
+.global-search-results { position: absolute; z-index: 1000; top: calc(100% + 8px); right: 0; width: min(380px, calc(100vw - 24px)); max-height: min(60vh, 420px); overflow: auto; padding: 6px; border: 1px solid var(--border-strong); border-radius: 14px; background: var(--bg-elevated); box-shadow: var(--shadow); }
+.global-search-results[hidden] { display: none; }
+.global-search-result { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; min-height: 44px; padding: 9px 11px; border: 0; border-radius: 9px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.global-search-result:hover { background: var(--gold-dim); }
+.global-search-result small,.global-search-empty { color: var(--text-muted); font-size: 12px; }
+.global-search-empty { padding: 14px; }
+@media(max-width:768px) { .global-search-wrap { width: min(42vw, 220px); } .global-search-wrap input { font-size:16px; } }
+
+.skeleton-stack { display:grid; gap:10px; padding:12px; }
+.skeleton-stack i { display:block; height:48px; border-radius:12px; background:linear-gradient(90deg,rgba(140,150,170,.10),rgba(170,180,200,.22),rgba(140,150,170,.10)); background-size:200% 100%; animation:amoore-skeleton 1.25s ease-in-out infinite; }
+@keyframes amoore-skeleton { to { background-position:-200% 0; } }
+@media(prefers-reduced-motion:reduce) { .skeleton-stack i { animation:none; } }
+
+/* v0.4 premium polish */
+:root{scroll-padding-top:80px}button,.btn,.toggle,.site-card,.eco-card,.news-item{transition:transform .28s cubic-bezier(.34,1.56,.64,1),box-shadow .28s ease,filter .2s ease}button:active,.btn:active{transform:scale(.97)}@media(hover:hover){.site-card:hover,.eco-card:hover,.news-item:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(20,15,35,.12)}}.skeleton,.news-skeleton{display:block;border-radius:12px;background:linear-gradient(90deg,rgba(130,130,145,.10),rgba(130,130,145,.20),rgba(130,130,145,.10));background-size:200% 100%;animation:amoore-shimmer 1.35s ease-in-out infinite}.skeleton-line{height:14px;width:min(100%,360px);margin:10px 0}.news-skeleton{padding:18px;margin:10px 0;min-height:112px}.news-skeleton i,.news-skeleton b,.news-skeleton span{display:block;height:10px;border-radius:8px;background:rgba(130,130,145,.16);margin:8px 0}.news-skeleton i{width:22%}.news-skeleton b{width:58%;height:16px}.news-skeleton span{width:88%}@keyframes amoore-shimmer{to{background-position:-200% 0}}.onboarding-card{display:flex;gap:18px;align-items:center;justify-content:space-between;padding:20px;margin:0 0 22px;border:1px solid rgba(169,139,76,.35)}.onboarding-checks{display:grid;gap:7px;margin-top:12px}.onboarding-check{display:grid;grid-template-columns:22px minmax(110px,auto) 1fr;gap:8px;align-items:center;font-size:13px}.onboarding-check span{font-weight:800;color:#55b88a}.onboarding-check small{opacity:.72}.onboarding-actions{display:flex;flex-wrap:wrap;gap:8px}.amoore-faq{display:grid;gap:10px;max-width:860px;margin:22px auto}.amoore-faq details{border:1px solid var(--border,rgba(130,130,145,.22));border-radius:16px;padding:16px 18px;background:var(--card,rgba(255,255,255,.04))}.amoore-faq summary{cursor:pointer;font-weight:650;list-style:none}.amoore-faq summary::-webkit-details-marker{display:none}.amoore-faq summary:after{content:'+';float:right;transition:transform .25s}.amoore-faq details[open] summary:after{transform:rotate(45deg)}.amoore-faq p{margin:12px 0 0;opacity:.82;line-height:1.65}.live-chat-tg:hover{box-shadow:0 0 0 5px rgba(42,171,238,.12),0 0 28px rgba(42,171,238,.35);filter:brightness(1.08)}.live-chat-tg:hover:before{animation:amoore-telegram-wiggle .55s ease-in-out}@keyframes amoore-telegram-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-13deg)}75%{transform:rotate(13deg)}}input,textarea,select{font-size:16px}@media(max-width:680px){.onboarding-card{display:block}.onboarding-actions{margin-top:14px}.onboarding-check{grid-template-columns:22px 1fr}.onboarding-check small{grid-column:2}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+.toggle-knob{transition:transform .42s cubic-bezier(.34,1.56,.64,1)}.skeleton-stack{display:grid;gap:10px;padding:12px}.skeleton-stack i{display:block;height:48px;border-radius:12px;background:linear-gradient(90deg,rgba(140,150,170,.10),rgba(170,180,200,.22),rgba(140,150,170,.10));background-size:200% 100%;animation:amoore-shimmer 1.35s ease-in-out infinite}.main,.app-shell{padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}@media(prefers-reduced-motion:reduce){.skeleton-stack i{animation:none}}

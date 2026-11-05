@@ -44,6 +44,21 @@ const NEWS_TYPES = { news: 'Новость', patch: 'Патч', soon: 'Скор�
 const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
 
 const $ = (id) => document.getElementById(id);
+// Network state is explicit: never leave the operator with an unexplained blank panel.
+(function installNetworkNotice() {
+  const show = () => {
+    let node = document.getElementById('amoore-network-notice');
+    if (!node) {
+      node = document.createElement('div'); node.id = 'amoore-network-notice';
+      node.setAttribute('role', 'status'); node.setAttribute('aria-live', 'polite');
+      node.textContent = 'Нет связи с сервером. Проверьте интернет';
+      document.body.appendChild(node);
+    }
+    node.hidden = navigator.onLine;
+  };
+  window.addEventListener('online', show); window.addEventListener('offline', show);
+  document.addEventListener('DOMContentLoaded', show); show();
+})();
 let me = null;                 // текущий админ
 let sitesCache = [];
 let pendingCloseSiteId = null;
@@ -72,7 +87,10 @@ function fmtDateTime(iso, short) {
 function friendlyError(err) {
   const msg = String(err?.message || err || '');
   if (/no permission|only super_admin|cannot (demote|delete)/i.test(msg)) return 'Недостаточно прав для этого действия';
-  if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Нет связи с Supabase';
+  if (/failed to fetch|networkerror|load failed|timeout/i.test(msg)) {
+    const notice = $('amoore-network-notice'); if (notice) notice.hidden = false;
+    return 'Нет связи с сервером. Проверьте интернет';
+  }
   if (/invalid login credentials/i.test(msg)) return 'Неверный email или пароль';
   if (/row-level security|violates row-level|permission denied/i.test(msg)) return 'Недостаточно прав (RLS)';
   if (/column .* does not exist|schema cache|could not find|function .* does not exist/i.test(msg)) return 'База не обновлена — выполните SQL-миграцию (shared/sql/001_amoore_schema.sql)';
@@ -85,7 +103,7 @@ function toast(msg, type = 'success') {
   t.textContent = msg;
   t.className = 'toast visible ' + type;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('visible'), 2800);
+  toastTimer = setTimeout(() => t.classList.remove('visible'), 3000);
 }
 async function copyText(text) {
   try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch (_) {}
@@ -203,6 +221,7 @@ function showApp(session) {
   switchView('dashboard');
 }
 const VIEW_RULES = {
+  leads: () => can('view_logs') || isSuper(),
   dashboard: () => true,
   media:     () => can('manage_media'),
   team:      () => isSuper() || can('manage_admins'),
@@ -215,6 +234,7 @@ function applyRoleUI() {
   $('add-site-btn').style.display = can('manage_sites') ? '' : 'none';
   $('add-admin-wrap').style.display = can('manage_admins') ? '' : 'none';
   $('mini-audit-widget').style.display = can('view_logs') ? '' : 'none';
+  if ($('telegram-broadcast-btn')) $('telegram-broadcast-btn').style.display = isSuper() ? '' : 'none';
   const sel = $('new-role');
   sel.innerHTML = ['moderator', 'admin'].concat(isSuper() ? ['super_admin'] : []).map(r => `<option value="${r}">${r}</option>`).join('');
 }
@@ -229,6 +249,7 @@ function switchView(name) {
   if (name === 'media') loadMedia();
   if (name === 'team') loadTeam();
   if (name === 'logs') loadLogs();
+  if (name === 'leads') loadLeads();
 }
 $('burger').addEventListener('click', () => {
   const open = $('topbar-tabs').classList.toggle('open');
@@ -236,17 +257,85 @@ $('burger').addEventListener('click', () => {
 });
 document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 
+// ======================================================================= глобальный поиск по новостям, сайтам и администраторам
+(function installGlobalSearch() {
+  const input = $('global-search'), panel = $('global-search-results');
+  if (!input || !panel) return;
+  let timer = 0, requestId = 0;
+  const close = () => { panel.hidden = true; panel.innerHTML = ''; };
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) return close();
+    timer = setTimeout(async () => {
+      const id = ++requestId;
+      panel.hidden = false; panel.innerHTML = '<div class="global-search-empty">Ищем…</div>';
+      const safeQuery = q.replace(/[\\%_,().]/g, ' ').trim();
+      const pattern = `%${safeQuery}%`;
+      try {
+        const jobs = [
+          sb.from('news').select('id,title').ilike('title', pattern).limit(6),
+          sb.from('ecosystem_sites').select('id,name,url').ilike('name', pattern).limit(6),
+          sb.from('admins').select('id,nickname,email,role').ilike('nickname', pattern).limit(6)
+        ];
+        const results = await Promise.all(jobs);
+        if (id !== requestId) return;
+        const [news, sites, admins] = results;
+        const rows = [];
+        if (!news.error) (news.data || []).forEach(x => rows.push({ kind:'news', label:x.title || 'Без заголовка', meta:'Новость', view:'dashboard' }));
+        if (!sites.error) (sites.data || []).forEach(x => rows.push({ kind:'site', label:x.name || x.id, meta:'Сайт · ' + x.id, view:'dashboard' }));
+        if (!admins.error && isSuper()) (admins.data || []).forEach(x => rows.push({ kind:'admin', label:x.nickname || x.email, meta:'Администратор · ' + x.role, view:'team' }));
+        if (!rows.length) { panel.innerHTML = '<div class="global-search-empty">Ничего не найдено</div>'; return; }
+        panel.innerHTML = rows.map((x,i) => `<button type="button" class="global-search-result" data-view="${x.view}" role="option"><span>${esc(x.label)}</span><small>${esc(x.meta)}</small></button>`).join('');
+      } catch (err) {
+        if (id === requestId) panel.innerHTML = `<div class="global-search-empty">${esc(friendlyError(err))}</div>`;
+      }
+    }, 220);
+  });
+  panel.addEventListener('click', e => {
+    const row = e.target.closest('.global-search-result'); if (!row) return;
+    switchView(row.dataset.view); close(); input.value = '';
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.global-search-wrap')) close(); });
+  input.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+})();
+
 // ======================================================================= дашборд
 function loadDashboard() {
   loadSites();
   loadVisits();
   if (can('view_logs')) loadMiniAudit();
   if (can('manage_news')) loadNewsAdmin();
+  loadOnboarding();
 }
+
+async function loadOnboarding() {
+  const card = $('onboarding-card'); if (!card) return;
+  card.hidden = false;
+  const host = $('onboarding-checks');
+  host.innerHTML = '<div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div>';
+  const checks = [];
+  for (const table of ['admins','ecosystem_sites','news']) {
+    try { const { error } = await sb.from(table).select('id', { count: 'exact', head: true }); checks.push({label:`Таблица ${table}`,ok:!error,detail:error?friendlyError(error):'доступна'}); }
+    catch (e) { checks.push({label:`Таблица ${table}`,ok:false,detail:friendlyError(e)}); }
+  }
+  try { const {data,error}=await sb.from('bot_status').select('is_online').eq('id','main').maybeSingle(); checks.push({label:'Telegram-бот',ok:!error,detail:error?'таблица bot_status не найдена':(data?.is_online===false?'Офлайн · техобслуживание':'Онлайн')}); }
+  catch(e){checks.push({label:'Telegram-бот',ok:false,detail:friendlyError(e)});}
+  const [admins,news] = await Promise.all([
+    sb.from('admins').select('id',{count:'exact',head:true}),
+    sb.from('news').select('id',{count:'exact',head:true})
+  ]);
+  const needsSetup = !!admins.error || (admins.count||0) <= 1 || !!news.error || (news.count||0) === 0;
+  card.hidden = !needsSetup && checks.every(x=>x.ok);
+  host.innerHTML = checks.map(x=>`<div class="onboarding-check"><span>${x.ok?'✓':'!'}</span><b>${esc(x.label)}</b><small>${esc(x.detail)}</small></div>`).join('') + `<p class="widget-meta">${news.error?'Не удалось проверить новости.':(news.count||0)===0?'Новости ещё не опубликованы.':`${news.count} новостей в базе.`}</p>`;
+}
+$('onboarding-news')?.addEventListener('click',()=>{const f=$('news-title');f?.focus();f?.scrollIntoView({behavior:'smooth',block:'center'});});
+$('onboarding-refresh')?.addEventListener('click',loadOnboarding);
+$('onboarding-god')?.addEventListener('click',()=>{const landing=sitesCache.find(x=>x.id===LANDING_ID);if(!landing?.url||!me?.access_token)return toast('Не найден лендинг или токен God Mode','error');const u=new URL(landing.url);u.searchParams.set('god',me.access_token);window.open(u.href,'_blank','noopener,noreferrer');});
 
 async function loadSites() {
   const grid = $('sites-grid');
-  grid.innerHTML = '<div class="loading-state">Загрузка…</div>';
+  grid.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div>';
   const { data, error } = await sb.from('ecosystem_sites').select('*').order('id');
   if (error) { grid.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   sitesCache = data || [];
@@ -267,7 +356,7 @@ function renderSites() {
   $('stat-total').textContent = sitesCache.length;
   $('stat-open').textContent = sitesCache.filter(s => s.status === 'open').length;
   $('stat-closed').textContent = sitesCache.filter(s => s.status !== 'open').length;
-  if (!sitesCache.length) { grid.innerHTML = '<div class="loading-state">Нет сайтов</div>'; return; }
+  if (!sitesCache.length) { grid.innerHTML = '<div class="loading-state">Здесь пока пусто. Добавьте первый сайт экосистемы.</div>'; return; }
   grid.innerHTML = sitesCache.map(site => {
     const id = esc(site.id);
     const isOpen = site.status === 'open';
@@ -407,14 +496,24 @@ $('site-form').addEventListener('submit', async (e) => {
   let url = $('site-new-url').value.trim();
   if (!/^[a-z0-9][a-z0-9_-]{1,31}$/.test(id)) return toast('ID: латиница, цифры, - и _ (2–32 символа)', 'error');
   if (!name) return toast('Введите название', 'error');
+  if (/[<>]/.test(name)) return toast('Название не должно содержать HTML-разметку', 'error');
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
   try { url = new URL(url).href; } catch { return toast('Некорректный URL', 'error'); }
-  $('site-save').disabled = true;
-  const { error } = await sb.from('ecosystem_sites').insert({ id, name, url, status: 'open', overlay_type: 'maintenance' });
-  $('site-save').disabled = false;
-  if (error) return toast(friendlyError(error), 'error');
-  logAction('site_add', id);
-  hideSiteModal(); toast('Сайт добавлен'); loadSites();
+  const saveButton = $('site-save');
+  if (saveButton.disabled) return;
+  saveButton.disabled = true;
+  saveButton.setAttribute('aria-busy', 'true');
+  try {
+    const { error } = await sb.from('ecosystem_sites').insert({ id, name, url, status: 'open', overlay_type: 'maintenance' });
+    if (error) return toast(friendlyError(error), 'error');
+    logAction('site_add', id);
+    hideSiteModal(); toast('Сайт добавлен'); loadSites();
+  } catch (err) {
+    toast(friendlyError(err), 'error');
+  } finally {
+    saveButton.disabled = false;
+    saveButton.removeAttribute('aria-busy');
+  }
 });
 async function deleteSite(site) {
   if (!can('manage_sites')) return toast('Недостаточно прав', 'error');
@@ -428,15 +527,36 @@ async function deleteSite(site) {
 
 async function loadVisits() {
   try {
-    const since = new Date(Date.now() - 864e5).toISOString();
-    const { data, error } = await sb.from('site_visits').select('site_id').gte('created_at', since).limit(10000);
+    const since = new Date(Date.now() - 7 * 864e5).toISOString();
+    const { data, error } = await sb.from('site_visits').select('site_id, created_at').gte('created_at', since).limit(10000);
     if (error) throw error;
     const map = {};
-    (data || []).forEach(r => { map[r.site_id] = (map[r.site_id] || 0) + 1; });
-    $('stat-visits').textContent = (data || []).length;
-    $('visits-breakdown').textContent = Object.keys(map).length
-      ? Object.entries(map).map(([k, v]) => `${k}: ${v}`).join(' · ') : 'нет данных';
-  } catch { $('stat-visits').textContent = '—'; }
+    (data || []).forEach(v => { map[v.site_id] = (map[v.site_id] || 0) + 1; });
+    const total = (data || []).length;
+    const el = $('stat-visits');
+    if (el) {
+      el.textContent = '0';
+      let n = 0;
+      const step = Math.max(1, Math.floor(total / 24));
+      const timer = setInterval(() => {
+        n = Math.min(total, n + step);
+        el.textContent = String(n);
+        if (n >= total) clearInterval(timer);
+      }, 30);
+    }
+    const breakdown = $('visits-breakdown');
+    if (breakdown) {
+      const max = Math.max(1, ...Object.values(map), 1);
+      breakdown.innerHTML = Object.keys(map).length
+        ? Object.entries(map).map(([k, v]) => {
+            const pct = Math.round((v / max) * 100);
+            return `<div class="visit-row"><span>${esc(k)}</span><span class="visit-bar"><i style="width:${pct}%"></i></span><b>${v}</b></div>`;
+          }).join('')
+        : '<span class="muted">нет данных за 7 дней</span>';
+    }
+  } catch (e) {
+    if ($('stat-visits')) $('stat-visits').textContent = '—';
+  }
 }
 
 // логи и справочники: без embed-join'ов (не зависят от внешних ключей)
@@ -499,10 +619,10 @@ $('news-form').addEventListener('submit', async (e) => {
 });
 async function loadNewsAdmin() {
   const list = $('news-admin-list');
-  list.innerHTML = '<div class="loading-state">Загрузка…</div>';
+  list.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка новостей"><i></i><i></i><i></i></div>';
   const { data, error } = await sb.from('news').select('id, title, body, type, display_date, published_at').order('published_at', { ascending: false }).limit(10);
   if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
-  if (!data?.length) { list.innerHTML = '<div class="loading-state">Нет новостей</div>'; return; }
+  if (!data?.length) { list.innerHTML = '<div class="loading-state">Здесь пока пусто. Добавьте первую новость.</div>'; return; }
   list.innerHTML = data.map(n => `
     <div class="admin-card glass news-card">
       <div class="admin-card-info"><div class="admin-meta">
@@ -522,6 +642,103 @@ $('news-admin-list').addEventListener('click', async (e) => {
   loadNewsAdmin();
 });
 
+
+
+// ======================================================================= bot status + leads (v2.0.2)
+async function loadBotStatus() {
+  const line = $('bot-status-line');
+  const hb = $('bot-hb-line');
+  if (!line) return;
+  try {
+    const { data, error } = await sb.from('bot_status').select('*').eq('id', 'main').maybeSingle();
+    if (error) throw error;
+    const online = data ? data.is_online !== false : true;
+    line.textContent = online ? 'Статус: Онлайн' : 'Статус: Офлайн (техобслуживание)';
+    line.style.color = online ? '#7dcea0' : '#e8a0a0';
+    if (hb) {
+      hb.textContent = data && data.last_heartbeat
+        ? 'Пульс: ' + new Date(data.last_heartbeat).toLocaleString('ru-RU')
+        : 'Пульс: ещё не было';
+    }
+    const btn = $('bot-toggle-btn');
+    if (btn) btn.textContent = online ? 'Выключить бота' : 'Включить бота';
+  } catch (e) {
+    line.textContent = 'Статус: нет данных (запустите SQL 002_v202)';
+  }
+}
+
+async function toggleBotOnline() {
+  if (!isSuper() && !can('manage_sites')) return toast('Недостаточно прав', 'error');
+  try {
+    const { data } = await sb.from('bot_status').select('is_online').eq('id', 'main').maybeSingle();
+    const next = !(data && data.is_online !== false);
+    const { error } = await sb.from('bot_status').upsert({ id: 'main', is_online: next, updated_at: new Date().toISOString() });
+    if (error) return toast(friendlyError(error), 'error');
+    toast(next ? 'Бот включён' : 'Бот на техобслуживании');
+    loadBotStatus();
+  } catch (e) { toast('Ошибка', 'error'); }
+}
+
+async function sendBotTest() {
+  if (!isSuper()) return toast('Только super_admin', 'error');
+  try {
+    const { error } = await sb.functions.invoke('send-telegram', { body: { message: '✅ Тест из amoore Dev — бот на связи.' } });
+    if (error) return toast(friendlyError(error), 'error');
+    toast('Тестовое сообщение отправлено');
+  } catch (e) {
+    toast('Edge Function send-telegram недоступна', 'error');
+  }
+}
+
+async function downloadBotLogsCsv() {
+  if (!isSuper() && !can('view_logs')) return toast('Недостаточно прав', 'error');
+  try {
+    const { data, error } = await sb.from('bot_logs').select('*').order('created_at', { ascending: false }).limit(500);
+    if (error) return toast(friendlyError(error), 'error');
+    const rows = data || [];
+    const header = 'id,created_at,status,message,error_text,source';
+    const escCsv = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const body = rows.map(r => [r.id, r.created_at, r.status, r.message, r.error_text, r.source].map(escCsv).join(',')).join('\n');
+    const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'bot-logs.csv';
+    a.click();
+    toast('CSV скачан');
+  } catch (e) { toast('Не удалось выгрузить', 'error'); }
+}
+
+async function loadLeads() {
+  const list = $('leads-list');
+  if (!list) return;
+  list.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка заявок"><i></i><i></i><i></i></div>';
+  const { data, error } = await sb.from('leads').select('*').order('created_at', { ascending: false }).limit(50);
+  if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
+  if (!data?.length) { list.innerHTML = '<div class="loading-state">Здесь пока пусто. Новые заявки появятся после отправки формы.</div>'; return; }
+  list.innerHTML = data.map(l => `
+    <div class="admin-card glass" data-lead="${esc(l.id)}">
+      <div class="admin-card-info">
+        <h4>${esc(l.name || 'Без имени')} <span class="role-badge ${l.status === 'done' ? 'admin' : 'moderator'}">${esc(l.status || 'new')}</span></h4>
+        <p>${esc(l.contact || '')}</p>
+        <p class="muted">${esc((l.message || '').slice(0, 200))}</p>
+        <p class="muted" style="font-size:12px">${esc(fmtDate(l.created_at))}</p>
+      </div>
+      ${l.status !== 'done' ? `<button type="button" class="btn btn-ghost btn-sm lead-done" data-id="${esc(l.id)}">Обработана</button>` : ''}
+    </div>`).join('');
+}
+
+if ($('bot-toggle-btn')) $('bot-toggle-btn').addEventListener('click', toggleBotOnline);
+if ($('bot-test-btn')) $('bot-test-btn').addEventListener('click', sendBotTest);
+if ($('bot-logs-csv')) $('bot-logs-csv').addEventListener('click', downloadBotLogsCsv);
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('.lead-done');
+  if (!b) return;
+  const { error } = await sb.from('leads').update({ status: 'done' }).eq('id', b.dataset.id);
+  if (error) toast(friendlyError(error), 'error');
+  else { toast('Отмечено'); loadLeads(); }
+});
+
+
 // ======================================================================= медиа
 const dz = $('dropzone');
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
@@ -529,23 +746,31 @@ dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
 dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); if (e.dataTransfer.files?.[0]) uploadMedia(e.dataTransfer.files[0]); });
 $('media-file').addEventListener('change', (e) => { if (e.target.files?.[0]) uploadMedia(e.target.files[0]); e.target.value = ''; });
 
+let mediaUploadInFlight = false;
 async function uploadMedia(file) {
   if (!can('manage_media')) return toast('Недостаточно прав', 'error');
-  if (!/^image\//.test(file.type)) return toast('Можно загружать только картинки', 'error');
-  if (file.size > 5 * 1024 * 1024) return toast('Файл больше 5 МБ', 'error');
+  if (mediaUploadInFlight) return;
+  const okType = /^image\//.test(file.type) || file.type === 'application/pdf' || file.type === 'application/json' || /\.(pdf|json)$/i.test(file.name || '');
+  if (!okType) return toast('Можно: изображения, PDF, JSON', 'error');
+  if (file.size > 12 * 1024 * 1024) return toast('Файл больше 12 МБ', 'error');
+  mediaUploadInFlight = true;
+  const dz = $('dropzone'); if (dz) dz.setAttribute('aria-busy', 'true');
   const path = `${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
-  const { error } = await sb.storage.from('media').upload(path, file, { upsert: false, contentType: file.type });
-  if (error) return toast(friendlyError(error), 'error');
-  logAction('media_upload', null, null, path);
-  toast('Загружено'); loadMedia();
+  try {
+    const { error } = await sb.storage.from('media').upload(path, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
+    if (error) return toast(friendlyError(error), 'error');
+    logAction('media_upload', null, null, path);
+    toast('Загружено'); await loadMedia();
+  } catch (err) { toast(friendlyError(err), 'error'); }
+  finally { mediaUploadInFlight = false; if (dz) dz.removeAttribute('aria-busy'); }
 }
 async function loadMedia() {
   const grid = $('media-grid');
-  grid.innerHTML = '<div class="loading-state">Загрузка…</div>';
+  grid.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка медиа"><i></i><i></i><i></i></div>';
   const { data, error } = await sb.storage.from('media').list('', { limit: 60, sortBy: { column: 'created_at', order: 'desc' } });
   if (error) { grid.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   const files = (data || []).filter(f => f.name && !f.name.endsWith('/') && f.name !== '.emptyFolderPlaceholder');
-  if (!files.length) { grid.innerHTML = '<div class="loading-state">Пусто</div>'; return; }
+  if (!files.length) { grid.innerHTML = '<div class="loading-state">Медиатека пока пуста. Загрузите первое изображение.</div>'; return; }
   grid.innerHTML = files.map(f => {
     const url = sb.storage.from('media').getPublicUrl(f.name).data.publicUrl;
     return `<div class="media-item glass"><img src="${esc(url)}" alt="" loading="lazy">
@@ -560,6 +785,18 @@ $('media-grid').addEventListener('click', async (e) => {
 });
 
 // ======================================================================= настройки: бэкап
+if ($('telegram-broadcast-btn')) $('telegram-broadcast-btn').addEventListener('click', async () => {
+  if (!isSuper()) return toast('Только super_admin может отправлять рассылки', 'error');
+  const btn=$('telegram-broadcast-btn'), message=$('telegram-broadcast-text').value.trim();
+  if (!message) return toast('Введите текст сообщения', 'error');
+  if (btn.disabled) return;
+  if (!confirm('Отправить это сообщение всем активным пользователям amoore-ai?')) return;
+  btn.disabled=true; btn.setAttribute('aria-busy','true'); const old=btn.textContent; btn.textContent='Отправка…';
+  try { const {data,error}=await sb.functions.invoke('send-telegram',{body:{action:'broadcast',message}}); if(error) throw error; toast(`Рассылка завершена: ${data.sent} отправлено, ${data.failed} ошибок`,data.failed?'error':'success'); }
+  catch(e){toast(friendlyError(e),'error');}
+  finally{btn.disabled=false;btn.removeAttribute('aria-busy');btn.textContent=old;}
+});
+
 $('backup-btn').addEventListener('click', async () => {
   if (!can('download_backup')) return toast('Недостаточно прав', 'error');
   const btn = $('backup-btn'), label = $('backup-btn-text');
@@ -605,9 +842,10 @@ $('add-admin-form').addEventListener('submit', async (e) => {
 
 async function loadTeam() {
   const list = $('team-list');
-  list.innerHTML = '<div class="loading-state">Загрузка…</div>';
+  list.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка команды"><i></i><i></i><i></i></div>';
   const { data, error } = await sb.from('admins').select('id, email, name, nickname, role, permissions').order('created_at');
   if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
+  if (!data?.length) { list.innerHTML = '<div class="loading-state">Пока нет добавленных администраторов</div>'; return; }
   list.innerHTML = (data || []).map(a => {
     const self = a.id === me.admin_id;
     return `<div class="admin-card glass team-card">
@@ -698,14 +936,14 @@ function logRow(l, names, sites, full) {
 async function loadLogs() {
   if (!can('view_logs')) return;
   const tbody = $('logs-tbody'), cards = $('logs-cards');
-  tbody.innerHTML = '<tr><td colspan="5" class="loading-state">Загрузка…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5"><div class="skeleton-stack" aria-label="Загрузка логов"><i></i><i></i><i></i></div></td></tr>';
   const [{ data: logs, error }, names, sres] = await Promise.all([
     sb.from('audit_logs').select('admin_id, action, site_id, overlay_type, details, created_at').order('created_at', { ascending: false }).limit(100),
     adminMap(),
     sb.from('ecosystem_sites').select('id, name')
   ]);
   if (error) { tbody.innerHTML = `<tr><td colspan="5">${esc(friendlyError(error))}</td></tr>`; return; }
-  if (!logs?.length) { tbody.innerHTML = '<tr><td colspan="5" class="loading-state">Пусто</td></tr>'; cards.innerHTML = ''; return; }
+  if (!logs?.length) { tbody.innerHTML = '<tr><td colspan="5" class="loading-state">История пока пуста. Действия появятся здесь.</td></tr>'; cards.innerHTML = '<div class="loading-state">История пока пуста.</div>'; return; }
   const sites = Object.fromEntries((sres.data || []).map(s => [s.id, s.name]));
   tbody.innerHTML = logs.map(l => {
     const r = logRow(l, names, sites, true);
