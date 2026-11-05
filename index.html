@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
-  <title>amoore Dev — Mission Control v7</title>
+  <title>amoore Dev — Mission Control</title>
   <meta name="theme-color" content="#070b16">
   <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=8">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -77,7 +77,7 @@
             <div class="stat-value" id="stat-visits" style="margin-top:8px">—</div>
             <div class="widget-meta" id="visits-breakdown">landing / studio</div>
           </div>
-          <div class="widget glass widget-feed">
+          <div class="widget glass widget-feed" id="mini-audit-widget">
             <div class="widget-title">Последние действия</div>
             <div id="mini-audit" class="mini-audit">Загрузка…</div>
           </div>
@@ -141,13 +141,10 @@
         <div class="team-form glass backup-card">
           <div>
             <h3>Скачать данные</h3>
-            <p class="widget-meta" style="margin:0">Таблицы ecosystem_sites и news одним файлом amoore-backup.json.</p>
+            <p class="widget-meta" style="margin:0">Сайты, новости и пользователи (без токенов доступа) одним JSON-файлом.</p>
           </div>
           <button type="button" class="btn btn-ghost" id="backup-btn"><span id="backup-btn-text">Скачать резервную копию (JSON)</span></button>
         </div>
-
-        <div class="section-title">Feature Flags</div>
-        <div id="flags-list" class="team-list"><div class="loading-state">Загрузка…</div></div>
       </div>
 
       <!-- TEAM -->
@@ -170,9 +167,10 @@
               </div>
             </div>
             <div class="token-row" style="margin-bottom:18px">
-              <div class="form-group"><label>Токен</label><input type="text" id="new-token" required></div>
+              <div class="form-group"><label>Токен</label><input type="text" id="new-token" required autocomplete="off" autocapitalize="none" spellcheck="false"></div>
               <button type="button" class="btn btn-ghost" id="gen-token-btn">Сгенерировать</button>
             </div>
+            <p class="widget-meta" style="margin:0 0 14px">Для входа email также нужно создать в Supabase → Authentication → Users (email + пароль).</p>
             <button type="submit" class="btn btn-primary" id="add-admin-btn" style="width:auto;padding:12px 28px">Добавить</button>
           </form>
         </div>
@@ -242,13 +240,8 @@
     <div class="modal glass sheet">
       <h2>Настройки прав</h2>
       <p id="perms-user-label">Пользователь</p>
-      <div class="perms-list" id="perms-list">
-        <label class="perm-row"><span>Может закрывать/открывать сайты</span><div class="toggle closed" data-key="toggle_sites"><div class="toggle-knob"></div></div></label>
-        <label class="perm-row"><span>Может добавлять новости</span><div class="toggle closed" data-key="manage_news"><div class="toggle-knob"></div></div></label>
-        <label class="perm-row"><span>Может смотреть логи</span><div class="toggle closed" data-key="view_logs"><div class="toggle-knob"></div></div></label>
-        <label class="perm-row"><span>Может добавлять админов</span><div class="toggle closed" data-key="manage_admins"><div class="toggle-knob"></div></div></label>
-      </div>
-      <p class="widget-meta" style="margin:12px 0 0">Пустые права = дефолт роли. Сохранение записывает JSONB в admins.permissions.</p>
+      <div class="perms-list" id="perms-list"></div>
+      <p class="widget-meta" style="margin:12px 0 0">Сохраняются только отличия от прав роли. «Сброс к роли» возвращает стандартные права.</p>
       <div class="modal-actions" style="margin-top:20px">
         <button class="btn btn-ghost" id="perms-reset">Сброс к роли</button>
         <button class="btn btn-primary" id="perms-save" style="width:auto;flex:1">Сохранить</button>
@@ -257,6 +250,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

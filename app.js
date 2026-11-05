@@ -1,86 +1,95 @@
-// amoore Dev Mission Control v7.0 — Smart Toggles
+// amoore Dev — Mission Control (Clean Build v1.0)
+// Единый скрипт: авторизация (Supabase Auth + токен, сессия 6 ч), дашборд, новости, медиа, команда, логи, настройки.
 const SUPABASE_URL  = 'https://wogouiecoigzmxqccnsk.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q';
 
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
 });
 
 const SESSION_KEY = 'amoore_dev_auth';
 const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
+const LANDING_ID = 'landing';
 
-const ROLE_DEFAULTS = {
-  super_admin: { toggle_sites: true, manage_news: true, view_logs: true, manage_admins: true },
-  admin:       { toggle_sites: true, manage_news: true, view_logs: true, manage_admins: false },
-  moderator:   { toggle_sites: false, manage_news: false, view_logs: false, manage_admins: false }
+// ---- права: ключи совпадают с SQL (role_default_perm / has_perm) ----
+const PERMS = [
+  ['toggle_status',  'Открывать и закрывать сайты'],
+  ['toggle_banner',  'Управлять баннером'],
+  ['toggle_chat',    'Включать и выключать демо-чат'],
+  ['toggle_news',    'Включать и выключать блок новостей'],
+  ['manage_news',    'Добавлять и удалять новости'],
+  ['manage_media',   'Загружать медиа'],
+  ['view_logs',      'Смотреть логи'],
+  ['manage_sites',   'Добавлять и удалять сайты'],
+  ['manage_admins',  'Добавлять пользователей'],
+  ['download_backup','Скачивать резервную копию']
+];
+const PERM_KEYS = PERMS.map(p => p[0]);
+const ADMIN_DEFAULT = ['toggle_status', 'toggle_banner', 'toggle_chat', 'toggle_news', 'manage_news', 'manage_media', 'view_logs'];
+const roleDefault = (role, key) => role === 'super_admin' ? true : role === 'admin' ? ADMIN_DEFAULT.includes(key) : false;
+
+const ACTION_LABELS = {
+  close: 'Закрыл сайт', open: 'Открыл сайт',
+  banner_on: 'Включил баннер', banner_off: 'Выключил баннер', banner_edit: 'Изменил баннер',
+  chat_on: 'Включил демо-чат', chat_off: 'Выключил демо-чат',
+  news_on: 'Включил новости', news_off: 'Выключил новости',
+  news_add: 'Добавил новость', news_delete: 'Удалил новость',
+  site_add: 'Добавил сайт', site_delete: 'Удалил сайт',
+  admin_add: 'Добавил пользователя', admin_delete: 'Удалил пользователя',
+  role_change: 'Сменил роль', perms_change: 'Изменил права', media_upload: 'Загрузил медиа', backup: 'Скачал бэкап'
 };
+const OVERLAY_LABELS = { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' };
+const NEWS_TYPES = { news: 'Новость', patch: 'Патч', soon: 'Скоро' };
+const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
 
 const $ = (id) => document.getElementById(id);
-let currentAdmin = null;
+let me = null;                 // текущий админ
+let sitesCache = [];
 let pendingCloseSiteId = null;
 let tokenOnlyMode = false;
-let permsTargetId = null;
+let permsTarget = null;        // { id, role }
 let permsDraft = null;
 
-function saveSession(data) {
-  const payload = { ...data, expires_at: Date.now() + SESSION_TTL_MS };
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
-  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
-  if (data.email) try { localStorage.setItem(EMAIL_KEY, data.email); } catch (_) {}
-}
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (!data?.admin_id) return null;
-    if (data.expires_at && Date.now() > data.expires_at) {
-      try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
-      try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
-      return null;
-    }
-    return data;
-  } catch { return null; }
-}
-function clearSession(full = false) {
-  try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
-  try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
-  if (full) try { localStorage.removeItem(EMAIL_KEY); } catch (_) {}
-}
-function rememberedEmail() {
-  try { return localStorage.getItem(EMAIL_KEY) || ''; } catch { return ''; }
-}
-function friendlyError(err) {
-  const msg = String(err?.message || err || '');
-  if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Нет связи с Supabase. Проверьте URL/ключ.';
-  if (/invalid login credentials/i.test(msg)) return 'Неверный email или пароль';
-  if (/column .* does not exist|schema cache|could not find the/i.test(msg)) return 'В БД нет новых колонок — выполните SQL-миграцию v7';
-  if (/row-level security|violates row-level/i.test(msg)) return 'Недостаточно прав в БД (RLS). Проверьте SQL-миграцию v7';
-  return msg || 'Ошибка';
-}
-function esc(str) {
+// ======================================================================= utils
+function esc(v) {
   const d = document.createElement('div');
-  d.textContent = str == null ? '' : String(str);
+  d.textContent = v == null ? '' : String(v);
   return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-function todayISO() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
+const pad2 = (n) => String(n).padStart(2, '0');
+function todayISO() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 function fmtDate(v) {
-  // 'YYYY-MM-DD' -> 'ДД.ММ.ГГГГ' (без сдвига часовых поясов); произвольный текст — как есть
   if (!v) return '';
   const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}.${m[2]}.${m[1]}` : String(v);
 }
+function fmtDateTime(iso, short) {
+  return new Date(iso).toLocaleString('ru-RU', short
+    ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }
+    : { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function friendlyError(err) {
+  const msg = String(err?.message || err || '');
+  if (/no permission|only super_admin|cannot (demote|delete)/i.test(msg)) return 'Недостаточно прав для этого действия';
+  if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Нет связи с Supabase';
+  if (/invalid login credentials/i.test(msg)) return 'Неверный email или пароль';
+  if (/row-level security|violates row-level|permission denied/i.test(msg)) return 'Недостаточно прав (RLS)';
+  if (/column .* does not exist|schema cache|could not find|function .* does not exist/i.test(msg)) return 'База не обновлена — выполните SQL-миграцию (shared/sql/001_amoore_schema.sql)';
+  if (/duplicate|already exists|unique/i.test(msg)) return 'Такая запись уже существует';
+  return msg || 'Ошибка';
+}
+let toastTimer = 0;
+function toast(msg, type = 'success') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast visible ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('visible'), 2800);
+}
 async function copyText(text) {
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; } } catch (_) {}
   try {
-    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
-  } catch (_) {}
-  try { // fallback: iOS / http / старые WebView
     const ta = document.createElement('textarea');
     ta.value = text; ta.setAttribute('readonly', '');
     ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
@@ -91,70 +100,81 @@ async function copyText(text) {
     return ok;
   } catch (_) { return false; }
 }
-const ACTION_LABELS = {
-  close: 'Закрыл', open: 'Открыл',
-  banner_on: 'Включил баннер', banner_off: 'Выключил баннер', banner_edit: 'Изменил баннер',
-  chat_on: 'Включил чат', chat_off: 'Выключил чат', site_add: 'Добавил сайт'
-};
-async function logAction(action, siteId, overlay = null) {
+function genToken(len = 24) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const buf = new Uint32Array(len);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, n => chars[n % chars.length]).join('');
+}
+async function logAction(action, siteId = null, overlay = null, details = null) {
   try {
-    await sb.from('audit_logs').insert({ admin_id: currentAdmin.admin_id, action, site_id: siteId, overlay_type: overlay });
+    await sb.from('audit_logs').insert({ admin_id: me.admin_id, action, site_id: siteId, overlay_type: overlay, details });
   } catch (_) {}
 }
-function showToast(msg, type = 'success') {
-  const el = $('toast');
-  el.textContent = msg;
-  el.className = 'toast visible ' + type;
-  setTimeout(() => el.classList.remove('visible'), 2800);
-}
 
+// ======================================================================= права
 function resolvePermissions(role, custom) {
-  const base = { ...(ROLE_DEFAULTS[role] || ROLE_DEFAULTS.moderator) };
-  if (custom && typeof custom === 'object') {
-    ['toggle_sites', 'manage_news', 'view_logs', 'manage_admins'].forEach(k => {
-      if (typeof custom[k] === 'boolean') base[k] = custom[k];
-    });
-  }
-  return base;
+  const out = {};
+  PERM_KEYS.forEach(k => {
+    out[k] = role === 'super_admin' ? true
+      : (custom && typeof custom[k] === 'boolean') ? custom[k] : roleDefault(role, k);
+  });
+  return out;
 }
-function can(key) {
-  if (!currentAdmin) return false;
-  const p = currentAdmin.permissions_resolved || resolvePermissions(currentAdmin.role, currentAdmin.permissions);
-  return !!p[key];
-}
-function isSuper() { return currentAdmin?.role === 'super_admin'; }
+const can = (key) => !!me && !!me.perms[key];
+const isSuper = () => me?.role === 'super_admin';
 
-async function verifyAdmin(email, accessToken) {
-  const { data: admin, error } = await sb.from('admins').select('*')
-    .eq('email', email).eq('access_token', accessToken).single();
-  if (error || !admin) throw new Error('Неверный токен или аккаунт не найден');
-  const resolved = resolvePermissions(admin.role, admin.permissions);
+// ======================================================================= сессия (6 часов, localStorage + токен)
+function saveSession(data, expiresAt) {
+  const payload = { ...data, expires_at: expiresAt || Date.now() + SESSION_TTL_MS };
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(payload)); } catch (_) {}
+  if (data.email) try { localStorage.setItem(EMAIL_KEY, data.email); } catch (_) {}
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d?.admin_id) return null;
+    if (d.expires_at && Date.now() > d.expires_at) { clearSession(false); return null; }
+    return d;
+  } catch { return null; }
+}
+function clearSession(full) {
+  try { localStorage.removeItem(SESSION_KEY); sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
+  if (full) try { localStorage.removeItem(EMAIL_KEY); } catch (_) {}
+}
+const rememberedEmail = () => { try { return localStorage.getItem(EMAIL_KEY) || ''; } catch { return ''; } };
+
+// токен проверяется на сервере (rpc verify_admin), колонка access_token клиенту не отдаётся
+async function verifyAdmin(accessToken) {
+  const { data, error } = await sb.rpc('verify_admin', { p_token: accessToken });
+  if (error) throw error;
+  if (!data) throw new Error('Неверный токен или аккаунт не найден');
   return {
-    admin_id: admin.id,
-    email: admin.email,
-    nickname: admin.nickname,
-    name: admin.name,
-    role: admin.role,
-    access_token: accessToken,
-    permissions: admin.permissions || null,
-    permissions_resolved: resolved
+    admin_id: data.id, email: data.email, nickname: data.nickname, name: data.name,
+    role: data.role, permissions: data.permissions || null, access_token: accessToken
   };
 }
-async function loginFull(email, password, accessToken) {
+async function loginFull(email, password, token) {
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw new Error(friendlyError(error));
-  const session = await verifyAdmin(email, accessToken);
-  saveSession(session);
-  return session;
+  try {
+    const s = await verifyAdmin(token);
+    saveSession(s);
+    return s;
+  } catch (e) { await sb.auth.signOut().catch(() => {}); throw e; }
 }
-async function loginTokenOnly(email, accessToken) {
+async function loginTokenOnly(token) {
   const { data } = await sb.auth.getSession();
   if (!data.session) throw new Error('NEED_PASSWORD');
-  const session = await verifyAdmin(email, accessToken);
-  saveSession(session);
-  return session;
+  const s = await verifyAdmin(token);
+  saveSession(s);
+  return s;
 }
 
+// ======================================================================= экраны
 function setLoginMode(tokenOnly) {
   tokenOnlyMode = tokenOnly;
   $('email-group').style.display = tokenOnly ? 'none' : '';
@@ -173,145 +193,122 @@ function showLogin(preferTokenOnly) {
   $('token').value = '';
   setLoginMode(!!(preferTokenOnly && rememberedEmail()));
 }
-function showApp(admin) {
-  currentAdmin = admin;
-  currentAdmin.permissions_resolved = resolvePermissions(admin.role, admin.permissions);
+function showApp(session) {
+  me = { ...session, perms: resolvePermissions(session.role, session.permissions) };
   $('login-screen').style.display = 'none';
   $('app').classList.add('visible');
-  $('admin-nickname').textContent = admin.nickname || admin.name || admin.email;
-  applyRoleUI();
+  $('admin-nickname').textContent = me.nickname || me.name || me.email;
   if ($('news-date') && !$('news-date').value) $('news-date').value = todayISO();
+  applyRoleUI();
   switchView('dashboard');
-  loadDashboard();
 }
+const VIEW_RULES = {
+  dashboard: () => true,
+  media:     () => can('manage_media'),
+  team:      () => isSuper() || can('manage_admins'),
+  logs:      () => can('view_logs'),
+  settings:  () => can('download_backup')
+};
 function applyRoleUI() {
-  const map = {
-    dashboard: true,
-    media: isSuper() || can('manage_news') || currentAdmin?.role === 'admin',
-    settings: isSuper(),
-    team: isSuper() || can('manage_admins'),
-    logs: can('view_logs')
-  };
-  // media: super + admin by default
-  map.media = isSuper() || currentAdmin?.role === 'admin';
-  Object.keys(map).forEach(k => {
-    const btn = $('tab-' + k);
-    if (btn) btn.style.display = map[k] ? '' : 'none';
-  });
-  const newsBlock = $('news-dashboard-block');
-  if (newsBlock) newsBlock.style.display = can('manage_news') ? '' : 'none';
-  const addSiteBtn = $('add-site-btn');
-  if (addSiteBtn) addSiteBtn.style.display = isSuper() ? '' : 'none';
-  const addWrap = $('add-admin-wrap');
-  if (addWrap) addWrap.style.display = can('manage_admins') ? '' : 'none';
+  Object.keys(VIEW_RULES).forEach(k => { const b = $('tab-' + k); if (b) b.style.display = VIEW_RULES[k]() ? '' : 'none'; });
+  $('news-dashboard-block').style.display = can('manage_news') ? '' : 'none';
+  $('add-site-btn').style.display = can('manage_sites') ? '' : 'none';
+  $('add-admin-wrap').style.display = can('manage_admins') ? '' : 'none';
+  $('mini-audit-widget').style.display = can('view_logs') ? '' : 'none';
+  const sel = $('new-role');
+  sel.innerHTML = ['moderator', 'admin'].concat(isSuper() ? ['super_admin'] : []).map(r => `<option value="${r}">${r}</option>`).join('');
 }
-
 function switchView(name) {
-  if (name === 'team' && !(isSuper() || can('manage_admins'))) name = 'dashboard';
-  if (name === 'settings' && !isSuper()) name = 'dashboard';
-  if (name === 'logs' && !can('view_logs')) name = 'dashboard';
-  if (name === 'media' && !(isSuper() || currentAdmin?.role === 'admin')) name = 'dashboard';
+  if (!VIEW_RULES[name] || !VIEW_RULES[name]()) name = 'dashboard';
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
-  $('topbar-tabs')?.classList.remove('open');
-  $('burger')?.setAttribute('aria-expanded', 'false');
+  $('topbar-tabs').classList.remove('open');
+  $('burger').setAttribute('aria-expanded', 'false');
+  window.scrollTo(0, 0);
   if (name === 'dashboard') loadDashboard();
   if (name === 'media') loadMedia();
-  if (name === 'settings') loadFlags();
   if (name === 'team') loadTeam();
   if (name === 'logs') loadLogs();
 }
-
-$('burger')?.addEventListener('click', () => {
-  const tabs = $('topbar-tabs');
-  const open = tabs.classList.toggle('open');
+$('burger').addEventListener('click', () => {
+  const open = $('topbar-tabs').classList.toggle('open');
   $('burger').setAttribute('aria-expanded', open ? 'true' : 'false');
 });
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => switchView(btn.dataset.view));
-});
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 
-async function loadDashboard() {
+// ======================================================================= дашборд
+function loadDashboard() {
   loadSites();
   loadVisits();
-  loadMiniAudit();
+  if (can('view_logs')) loadMiniAudit();
   if (can('manage_news')) loadNewsAdmin();
 }
-
-let sitesCache = [];
-const OVERLAY_LABELS = { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' };
-const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
 
 async function loadSites() {
   const grid = $('sites-grid');
   grid.innerHTML = '<div class="loading-state">Загрузка…</div>';
-  const { data: sites, error } = await sb.from('ecosystem_sites').select('*').order('id');
+  const { data, error } = await sb.from('ecosystem_sites').select('*').order('id');
   if (error) { grid.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
-  sitesCache = sites || [];
+  sitesCache = data || [];
   renderSites();
+}
+
+function toggleRow(site, act, label, sub, on, allowed, style) {
+  const cls = style === 'oc' ? (on ? 'open' : 'closed') : (on ? 'on' : 'off');
+  return `<div class="toggle-row">
+    <div class="toggle-text"><span class="toggle-label">${label}</span>
+      <span class="toggle-sub">${sub}${allowed ? '' : ' · нет прав'}</span></div>
+    <div class="toggle ${cls}${allowed ? '' : ' disabled'}" data-act="${act}" data-id="${esc(site.id)}" role="switch" tabindex="0" aria-checked="${on}" aria-label="${label}"><div class="toggle-knob"></div></div>
+  </div>`;
 }
 
 function renderSites() {
   const grid = $('sites-grid');
-  const list = sitesCache;
-  $('stat-total').textContent = list.length;
-  $('stat-closed').textContent = list.filter(s => s.status === 'closed').length;
-  $('stat-open').textContent = list.filter(s => s.status === 'open').length;
-  if (!list.length) { grid.innerHTML = '<div class="loading-state">Нет сайтов</div>'; return; }
-  const locked = !can('toggle_sites');
-  const dis = locked ? ' disabled' : '';
-  grid.innerHTML = list.map(site => {
+  $('stat-total').textContent = sitesCache.length;
+  $('stat-open').textContent = sitesCache.filter(s => s.status === 'open').length;
+  $('stat-closed').textContent = sitesCache.filter(s => s.status !== 'open').length;
+  if (!sitesCache.length) { grid.innerHTML = '<div class="loading-state">Нет сайтов</div>'; return; }
+  grid.innerHTML = sitesCache.map(site => {
     const id = esc(site.id);
     const isOpen = site.status === 'open';
     const bannerOn = site.banner_active === true;
-    const chatOn = site.demo_chat_active === true;
+    const chatOn = site.demo_chat_active !== false;
+    const newsOn = site.news_active !== false;
+    const isLanding = site.id === LANDING_ID;
+    const bannerAllowed = can('toggle_banner');
     return `<div class="site-card glass" data-id="${id}">
       <div class="site-card-header">
         <div class="site-info"><h3>${esc(site.name)}</h3>
-          <a href="${esc(site.url)}" target="_blank" rel="noopener">${esc(site.url)}</a></div>
+          <a href="${esc(site.url)}" target="_blank" rel="noopener noreferrer">${esc(site.url)}</a></div>
         <div class="site-card-side">
           <div class="status-pill ${isOpen ? 'online' : 'offline'}"><span class="dot"></span>${isOpen ? 'Online' : 'Offline'}</div>
-          ${isSuper() ? `<button type="button" class="btn-trash" data-act="delete" data-id="${id}" title="Удалить сайт" aria-label="Удалить сайт">${TRASH_SVG}</button>` : ''}
+          ${can('manage_sites') ? `<button type="button" class="btn-trash" data-act="delete" data-id="${id}" title="Удалить сайт" aria-label="Удалить сайт">${TRASH_SVG}</button>` : ''}
         </div>
       </div>
       <div class="toggle-list">
-        <div class="toggle-row">
-          <div class="toggle-text"><span class="toggle-label">Статус сайта</span>
-            <span class="toggle-sub">${isOpen ? 'Открыт' : 'Закрыт'}${locked ? ' · нет прав' : ''}</span></div>
-          <div class="toggle ${isOpen ? 'open' : 'closed'}${dis}" data-act="status" data-id="${id}" role="switch" aria-checked="${isOpen}" aria-label="Статус сайта"><div class="toggle-knob"></div></div>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-text"><span class="toggle-label">Глобальный баннер</span>
-            <span class="toggle-sub">${bannerOn ? 'Показывается' : 'Выключен'}</span></div>
-          <div class="toggle ${bannerOn ? 'on' : 'off'}${dis}" data-act="banner" data-id="${id}" role="switch" aria-checked="${bannerOn}" aria-label="Глобальный баннер"><div class="toggle-knob"></div></div>
-        </div>
+        ${toggleRow(site, 'status', 'Статус сайта', isOpen ? 'Открыт' : 'Закрыт', isOpen, can('toggle_status'), 'oc')}
+        ${toggleRow(site, 'banner', 'Баннер', bannerOn ? 'Показывается' : 'Выключен', bannerOn, bannerAllowed)}
         ${bannerOn ? `<div class="banner-edit">
-          <input type="text" class="banner-input" maxlength="160" value="${esc(site.banner_text || '')}" placeholder="Например: Сайт на профилактике" aria-label="Текст баннера"${locked ? ' disabled' : ''}>
-          <button type="button" class="btn btn-ghost btn-sm" data-act="banner-apply" data-id="${id}"${locked ? ' disabled' : ''}>Применить</button>
+          <input type="text" class="banner-input" maxlength="160" value="${esc(site.banner_text || '')}" placeholder="Текст баннера" aria-label="Текст баннера"${bannerAllowed ? '' : ' disabled'}>
+          <button type="button" class="btn btn-ghost btn-sm" data-act="banner-apply" data-id="${id}"${bannerAllowed ? '' : ' disabled'}>Применить</button>
         </div>` : ''}
-        <div class="toggle-row">
-          <div class="toggle-text"><span class="toggle-label">Демо-чат</span>
-            <span class="toggle-sub">${chatOn ? 'Виден на лендинге' : 'Скрыт'}</span></div>
-          <div class="toggle ${chatOn ? 'on' : 'off'}${dis}" data-act="chat" data-id="${id}" role="switch" aria-checked="${chatOn}" aria-label="Демо-чат"><div class="toggle-knob"></div></div>
-        </div>
+        ${isLanding ? toggleRow(site, 'chat', 'Демо-чат', chatOn ? 'Виден на сайте' : 'Скрыт', chatOn, can('toggle_chat')) : ''}
+        ${isLanding ? toggleRow(site, 'news', 'Новости', newsOn ? 'Виден на сайте' : 'Скрыт', newsOn, can('toggle_news')) : ''}
       </div>
       ${!isOpen ? `<div class="overlay-meta">Заставка: <strong>${esc(OVERLAY_LABELS[site.overlay_type] || site.overlay_type)}</strong></div>` : ''}
     </div>`;
   }).join('');
 }
 
-// Один делегированный обработчик на всю сетку сайтов
-$('sites-grid')?.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-act]');
-  if (!el || el.disabled) return;
+const PERM_FOR_ACT = { status: 'toggle_status', banner: 'toggle_banner', 'banner-apply': 'toggle_banner', chat: 'toggle_chat', news: 'toggle_news' };
+
+function onSiteAction(el) {
+  if (el.classList.contains('disabled') || el.disabled) return;
   const site = sitesCache.find(s => s.id === el.dataset.id);
   if (!site) return;
   const act = el.dataset.act;
-
-  if (act === 'delete') { deleteSite(site); return; }
-
-  if (!can('toggle_sites')) { showToast('Недостаточно прав', 'error'); return; }
-
+  if (act === 'delete') return deleteSite(site);
+  if (!can(PERM_FOR_ACT[act])) return toast('Недостаточно прав', 'error');
   if (act === 'status') {
     if (site.status === 'open') {
       pendingCloseSiteId = site.id;
@@ -321,454 +318,382 @@ $('sites-grid')?.addEventListener('click', (e) => {
         r.querySelector('input').checked = i === 0;
       });
       $('close-modal').classList.add('visible');
-    } else openSite(site.id);
-  } else if (act === 'banner') {
-    toggleBanner(site);
-  } else if (act === 'banner-apply') {
-    const input = el.closest('.site-card')?.querySelector('.banner-input');
-    applyBannerText(site, input ? input.value : '');
-  } else if (act === 'chat') {
-    toggleChat(site);
-  }
-});
-$('sites-grid')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && e.target.classList?.contains('banner-input')) {
+    } else openSite(site);
+  } else if (act === 'banner') toggleBanner(site);
+  else if (act === 'banner-apply') applyBannerText(site, el.closest('.site-card')?.querySelector('.banner-input')?.value);
+  else if (act === 'chat') toggleFlag(site, 'demo_chat_active', site.demo_chat_active === false, 'chat');
+  else if (act === 'news') toggleFlag(site, 'news_active', site.news_active === false, 'news');
+}
+$('sites-grid').addEventListener('click', (e) => { const el = e.target.closest('[data-act]'); if (el) onSiteAction(el); });
+$('sites-grid').addEventListener('keydown', (e) => {
+  if (e.target.classList?.contains('banner-input') && e.key === 'Enter') {
     e.preventDefault();
     const site = sitesCache.find(s => s.id === e.target.closest('.site-card')?.dataset.id);
-    if (site && can('toggle_sites')) applyBannerText(site, e.target.value);
+    if (site && can('toggle_banner')) applyBannerText(site, e.target.value);
+  } else if ((e.key === ' ' || e.key === 'Enter') && e.target.classList?.contains('toggle')) {
+    e.preventDefault(); onSiteAction(e.target);
   }
 });
 
 async function patchSite(site, patch) {
   const { error } = await sb.from('ecosystem_sites').update(patch).eq('id', site.id);
-  if (error) { showToast(friendlyError(error), 'error'); return false; }
-  Object.assign(site, patch);   // обновляем кэш — карточка перерисуется без «мигания»
+  if (error) { toast(friendlyError(error), 'error'); return false; }
+  Object.assign(site, patch);
   return true;
 }
-
+async function openSite(site) {
+  if (!(await patchSite(site, { status: 'open' }))) return;
+  renderSites(); logAction('open', site.id); toast('Сайт открыт'); loadMiniAudit();
+}
+async function closeSite(siteId, overlay) {
+  const site = sitesCache.find(s => s.id === siteId);
+  if (!site || !(await patchSite(site, { status: 'closed', overlay_type: overlay }))) return;
+  renderSites(); logAction('close', siteId, overlay); toast('Сайт закрыт'); loadMiniAudit();
+}
 async function toggleBanner(site) {
   const next = site.banner_active !== true;
   if (!(await patchSite(site, { banner_active: next }))) return;
-  renderSites();
-  logAction(next ? 'banner_on' : 'banner_off', site.id);
-  if (next && !(site.banner_text || '').trim()) showToast('Введите текст баннера и нажмите «Применить»');
-  else showToast(next ? 'Баннер включён' : 'Баннер выключен');
+  renderSites(); logAction(next ? 'banner_on' : 'banner_off', site.id);
+  toast(next && !(site.banner_text || '').trim() ? 'Введите текст баннера и нажмите «Применить»' : next ? 'Баннер включён' : 'Баннер выключен');
   loadMiniAudit();
 }
-
 async function applyBannerText(site, raw) {
   const text = String(raw || '').trim().slice(0, 160);
-  if (!text) { showToast('Введите текст баннера', 'error'); return; }
+  if (!text) return toast('Введите текст баннера', 'error');
   if (!(await patchSite(site, { banner_text: text, banner_active: true }))) return;
-  renderSites();
-  logAction('banner_edit', site.id);
-  showToast('Баннер применён');
-  loadMiniAudit();
+  renderSites(); logAction('banner_edit', site.id); toast('Баннер применён'); loadMiniAudit();
+}
+async function toggleFlag(site, column, next, name) {
+  if (!(await patchSite(site, { [column]: next }))) return;
+  renderSites(); logAction(`${name}_${next ? 'on' : 'off'}`, site.id);
+  toast(next ? 'Включено' : 'Выключено'); loadMiniAudit();
 }
 
-async function toggleChat(site) {
-  const next = site.demo_chat_active !== true;
-  if (!(await patchSite(site, { demo_chat_active: next }))) return;
-  renderSites();
-  logAction(next ? 'chat_on' : 'chat_off', site.id);
-  showToast(next ? 'Демо-чат включён' : 'Демо-чат скрыт');
-  loadMiniAudit();
-}
+// ---- модалка «Закрыть сайт»
+document.querySelectorAll('#close-modal .radio-item').forEach(item => item.addEventListener('click', () => {
+  document.querySelectorAll('#close-modal .radio-item').forEach(r => r.classList.remove('selected'));
+  item.classList.add('selected');
+  item.querySelector('input').checked = true;
+}));
+const hideCloseModal = () => { $('close-modal').classList.remove('visible'); pendingCloseSiteId = null; };
+$('modal-cancel').addEventListener('click', hideCloseModal);
+$('close-modal').addEventListener('click', e => { if (e.target === $('close-modal')) hideCloseModal(); });
+$('modal-confirm').addEventListener('click', () => {
+  const sel = document.querySelector('#close-modal input[name="overlay"]:checked');
+  const id = pendingCloseSiteId;
+  hideCloseModal();
+  if (sel && id) closeSite(id, sel.value);
+});
 
-// ---------- Site manager (super_admin) ----------
-function openSiteModal() {
-  if (!isSuper()) { showToast('Только для super_admin', 'error'); return; }
+// ---- добавить / удалить сайт
+const hideSiteModal = () => $('site-modal').classList.remove('visible');
+$('add-site-btn').addEventListener('click', () => {
+  if (!can('manage_sites')) return toast('Недостаточно прав', 'error');
   $('site-form').reset();
   $('site-modal').classList.add('visible');
-  setTimeout(() => $('site-new-id').focus(), 50);
-}
-function closeSiteModal() { $('site-modal').classList.remove('visible'); }
-
-$('add-site-btn')?.addEventListener('click', openSiteModal);
-$('site-cancel')?.addEventListener('click', closeSiteModal);
-$('site-modal')?.addEventListener('click', e => { if (e.target === $('site-modal')) closeSiteModal(); });
-$('site-form')?.addEventListener('submit', async (e) => {
+});
+$('site-cancel').addEventListener('click', hideSiteModal);
+$('site-modal').addEventListener('click', e => { if (e.target === $('site-modal')) hideSiteModal(); });
+$('site-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!isSuper()) { showToast('Только для super_admin', 'error'); return; }
+  if (!can('manage_sites')) return toast('Недостаточно прав', 'error');
   const id = $('site-new-id').value.trim().toLowerCase();
   const name = $('site-new-name').value.trim();
   let url = $('site-new-url').value.trim();
-  if (!/^[a-z0-9][a-z0-9_-]{1,31}$/.test(id)) {
-    showToast('ID: латиница, цифры, - и _ (2–32 символа)', 'error'); return;
-  }
-  if (!name) { showToast('Введите название', 'error'); return; }
+  if (!/^[a-z0-9][a-z0-9_-]{1,31}$/.test(id)) return toast('ID: латиница, цифры, - и _ (2–32 символа)', 'error');
+  if (!name) return toast('Введите название', 'error');
   if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-  try { url = new URL(url).href; } catch { showToast('Некорректный URL', 'error'); return; }
-
-  const btn = $('site-save');
-  btn.disabled = true;
+  try { url = new URL(url).href; } catch { return toast('Некорректный URL', 'error'); }
+  $('site-save').disabled = true;
   const { error } = await sb.from('ecosystem_sites').insert({ id, name, url, status: 'open', overlay_type: 'maintenance' });
-  btn.disabled = false;
-  if (error) {
-    showToast(/duplicate|already exists|unique/i.test(error.message) ? 'Сайт с таким ID уже есть' : friendlyError(error), 'error');
-    return;
-  }
+  $('site-save').disabled = false;
+  if (error) return toast(friendlyError(error), 'error');
   logAction('site_add', id);
-  closeSiteModal();
-  showToast('Сайт добавлен');
-  loadSites(); loadMiniAudit();
+  hideSiteModal(); toast('Сайт добавлен'); loadSites();
 });
-
 async function deleteSite(site) {
-  if (!isSuper()) { showToast('Только для super_admin', 'error'); return; }
+  if (!can('manage_sites')) return toast('Недостаточно прав', 'error');
   if (!confirm(`Удалить сайт «${site.name}» (${site.id})?\n\nВместе с ним удалится его история действий. Это нельзя отменить.`)) return;
   const { error } = await sb.from('ecosystem_sites').delete().eq('id', site.id);
-  if (error) { showToast(friendlyError(error), 'error'); return; }
+  if (error) return toast(friendlyError(error), 'error');
+  logAction('site_delete', null, null, `${site.name} (${site.id})`);
   sitesCache = sitesCache.filter(s => s.id !== site.id);
-  renderSites();
-  showToast('Сайт удалён');
-  loadMiniAudit();
+  renderSites(); toast('Сайт удалён');
 }
-
-async function closeSite(siteId, overlayType) {
-  const { error } = await sb.from('ecosystem_sites').update({ status: 'closed', overlay_type: overlayType }).eq('id', siteId);
-  if (error) { showToast(error.message, 'error'); return; }
-  await sb.from('audit_logs').insert({ admin_id: currentAdmin.admin_id, action: 'close', site_id: siteId, overlay_type: overlayType });
-  showToast('Сайт закрыт'); loadSites(); loadMiniAudit();
-}
-async function openSite(siteId) {
-  const { error } = await sb.from('ecosystem_sites').update({ status: 'open' }).eq('id', siteId);
-  if (error) { showToast(error.message, 'error'); return; }
-  await sb.from('audit_logs').insert({ admin_id: currentAdmin.admin_id, action: 'open', site_id: siteId });
-  showToast('Сайт открыт'); loadSites(); loadMiniAudit();
-}
-
-document.querySelectorAll('#close-modal .radio-item').forEach(item => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('#close-modal .radio-item').forEach(r => r.classList.remove('selected'));
-    item.classList.add('selected');
-    item.querySelector('input').checked = true;
-  });
-});
-$('modal-cancel')?.addEventListener('click', () => { $('close-modal').classList.remove('visible'); pendingCloseSiteId = null; });
-$('modal-confirm')?.addEventListener('click', () => {
-  const sel = document.querySelector('#close-modal input[name="overlay"]:checked');
-  if (!sel || !pendingCloseSiteId) return;
-  $('close-modal').classList.remove('visible');
-  closeSite(pendingCloseSiteId, sel.value);
-  pendingCloseSiteId = null;
-});
-$('close-modal')?.addEventListener('click', e => {
-  if (e.target === $('close-modal')) { $('close-modal').classList.remove('visible'); pendingCloseSiteId = null; }
-});
 
 async function loadVisits() {
   try {
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data } = await sb.from('site_visits').select('site_id').gte('created_at', since);
-    const rows = data || [];
-    $('stat-visits').textContent = rows.length;
+    const since = new Date(Date.now() - 864e5).toISOString();
+    const { data, error } = await sb.from('site_visits').select('site_id').gte('created_at', since).limit(10000);
+    if (error) throw error;
     const map = {};
-    rows.forEach(r => { map[r.site_id] = (map[r.site_id] || 0) + 1; });
+    (data || []).forEach(r => { map[r.site_id] = (map[r.site_id] || 0) + 1; });
+    $('stat-visits').textContent = (data || []).length;
     $('visits-breakdown').textContent = Object.keys(map).length
       ? Object.entries(map).map(([k, v]) => `${k}: ${v}`).join(' · ') : 'нет данных';
   } catch { $('stat-visits').textContent = '—'; }
 }
 
+// логи и справочники: без embed-join'ов (не зависят от внешних ключей)
+async function adminMap() {
+  const { data } = await sb.from('admins').select('id, nickname, name');
+  return Object.fromEntries((data || []).map(a => [a.id, a.nickname || a.name || '—']));
+}
 async function loadMiniAudit() {
+  if (!can('view_logs')) return;
   const box = $('mini-audit');
   try {
-    const { data } = await sb.from('audit_logs')
-      .select('action, site_id, created_at, admins(nickname)')
-      .order('created_at', { ascending: false }).limit(5);
+    const [{ data }, names] = await Promise.all([
+      sb.from('audit_logs').select('admin_id, action, site_id, details, created_at').order('created_at', { ascending: false }).limit(5),
+      adminMap()
+    ]);
     if (!data?.length) { box.textContent = 'Пусто'; return; }
-    box.innerHTML = data.map(l => {
-      const who = l.admins?.nickname || '—';
-      const act = (ACTION_LABELS[l.action] || l.action || '').toLowerCase();
-      const t = new Date(l.created_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-      return `<div class="mini-audit-row"><span>${esc(who)} ${act} <b>${esc(l.site_id)}</b></span><span class="meta">${t}</span></div>`;
-    }).join('');
+    box.innerHTML = data.map(l => `<div class="mini-audit-row"><span>${esc(names[l.admin_id] || '—')} ${esc((ACTION_LABELS[l.action] || l.action).toLowerCase())} <b>${esc(l.site_id || '')}</b></span><span class="meta">${fmtDateTime(l.created_at, true)}</span></div>`).join('');
   } catch { box.textContent = '—'; }
 }
 
-// ---------- News on dashboard ----------
-$('news-form')?.addEventListener('submit', async (e) => {
+// ======================================================================= новости
+$('news-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!can('manage_news')) { showToast('Недостаточно прав', 'error'); return; }
-  const title = $('news-title').value.trim();
+  if (!can('manage_news')) return toast('Недостаточно прав', 'error');
+  const title = $('news-title').value.trim().slice(0, 140);
   const body = $('news-body').value.trim();
-  const type = $('news-type').value;
-  const display_date = $('news-date').value || todayISO();
-  const btn = $('news-submit-btn');
-  btn.disabled = true;
-  const { error } = await sb.from('news').insert({ title, body, type, display_date, is_published: true });
-  btn.disabled = false;
-  if (error) { showToast(friendlyError(error), 'error'); return; }
-  showToast('Опубликовано — уже на сайте');
-  e.target.reset();
-  $('news-date').value = todayISO();
+  if (!title || !body) return toast('Заполните заголовок и текст', 'error');
+  $('news-submit-btn').disabled = true;
+  const { error } = await sb.from('news').insert({
+    title, body, type: $('news-type').value, display_date: $('news-date').value || todayISO(), is_published: true
+  });
+  $('news-submit-btn').disabled = false;
+  if (error) return toast(friendlyError(error), 'error');
+  logAction('news_add', null, null, title);
+  toast('Опубликовано — уже на сайте');
+  e.target.reset(); $('news-date').value = todayISO();
+  loadNewsAdmin();
+});
+async function loadNewsAdmin() {
+  const list = $('news-admin-list');
+  list.innerHTML = '<div class="loading-state">Загрузка…</div>';
+  const { data, error } = await sb.from('news').select('id, title, body, type, display_date, published_at').order('published_at', { ascending: false }).limit(10);
+  if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
+  if (!data?.length) { list.innerHTML = '<div class="loading-state">Нет новостей</div>'; return; }
+  list.innerHTML = data.map(n => `
+    <div class="admin-card glass news-card">
+      <div class="admin-card-info"><div class="admin-meta">
+        <h4>${esc(n.title)} <span class="role-badge admin">${esc(NEWS_TYPES[n.type] || n.type)}</span> <span class="news-date">${esc(fmtDate(n.display_date || n.published_at))}</span></h4>
+        <p>${esc((n.body || '').slice(0, 140))}</p>
+      </div></div>
+      <button type="button" class="btn-icon news-del" data-id="${esc(n.id)}" data-title="${esc(n.title)}" aria-label="Удалить" title="Удалить">×</button>
+    </div>`).join('');
+}
+$('news-admin-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('.news-del');
+  if (!b || !can('manage_news')) return;
+  if (!confirm('Удалить новость?')) return;
+  const { error } = await sb.from('news').delete().eq('id', b.dataset.id);
+  if (error) toast(friendlyError(error), 'error');
+  else { logAction('news_delete', null, null, b.dataset.title); toast('Новость удалена'); }
   loadNewsAdmin();
 });
 
-async function loadNewsAdmin() {
-  const list = $('news-admin-list');
-  if (!list) return;
-  list.innerHTML = '<div class="loading-state">Загрузка…</div>';
-  const { data, error } = await sb.from('news').select('*').order('published_at', { ascending: false }).limit(5);
-  if (error) { list.innerHTML = `<div class="loading-state">${esc(error.message)}</div>`; return; }
-  if (!data?.length) { list.innerHTML = '<div class="loading-state">Нет новостей</div>'; return; }
-  const typeLabel = { news: 'Новость', patch: 'Патч', soon: 'Скоро' };
-  list.innerHTML = data.map(n => `
-    <div class="admin-card glass news-card" data-id="${n.id}">
-      <div class="admin-card-info">
-        <div class="admin-meta">
-          <h4>${esc(n.title)} <span class="role-badge admin">${esc(typeLabel[n.type] || n.type)}</span> <span class="news-date">${esc(fmtDate(n.display_date || n.published_at))}</span></h4>
-          <p>${esc((n.body || '').slice(0, 140))}</p>
-        </div>
-      </div>
-      <button type="button" class="btn-icon news-del" data-id="${n.id}" aria-label="Удалить" title="Удалить">×</button>
-    </div>`).join('');
-  list.querySelectorAll('.news-del').forEach(b => b.addEventListener('click', async () => {
-    if (!can('manage_news')) return;
-    if (!confirm('Удалить новость?')) return;
-    const { error: delErr } = await sb.from('news').delete().eq('id', b.dataset.id);
-    if (delErr) showToast(friendlyError(delErr), 'error'); else showToast('Новость удалена');
-    loadNewsAdmin();
-  }));
-}
-
-// ---------- Media ----------
-const dropzone = $('dropzone');
-const mediaFile = $('media-file');
-dropzone?.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
-dropzone?.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
-dropzone?.addEventListener('drop', e => {
-  e.preventDefault(); dropzone.classList.remove('drag');
-  if (e.dataTransfer.files?.[0]) uploadMedia(e.dataTransfer.files[0]);
-});
-mediaFile?.addEventListener('change', () => { if (mediaFile.files?.[0]) uploadMedia(mediaFile.files[0]); });
+// ======================================================================= медиа
+const dz = $('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); if (e.dataTransfer.files?.[0]) uploadMedia(e.dataTransfer.files[0]); });
+$('media-file').addEventListener('change', (e) => { if (e.target.files?.[0]) uploadMedia(e.target.files[0]); e.target.value = ''; });
 
 async function uploadMedia(file) {
+  if (!can('manage_media')) return toast('Недостаточно прав', 'error');
+  if (!/^image\//.test(file.type)) return toast('Можно загружать только картинки', 'error');
+  if (file.size > 5 * 1024 * 1024) return toast('Файл больше 5 МБ', 'error');
   const path = `${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
-  const { error } = await sb.storage.from('media').upload(path, file, { upsert: false });
-  if (error) { showToast(error.message, 'error'); return; }
-  showToast('Загружено'); loadMedia();
+  const { error } = await sb.storage.from('media').upload(path, file, { upsert: false, contentType: file.type });
+  if (error) return toast(friendlyError(error), 'error');
+  logAction('media_upload', null, null, path);
+  toast('Загружено'); loadMedia();
 }
 async function loadMedia() {
   const grid = $('media-grid');
   grid.innerHTML = '<div class="loading-state">Загрузка…</div>';
-  const { data, error } = await sb.storage.from('media').list('', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
-  if (error) { grid.innerHTML = `<div class="loading-state">${esc(error.message)}</div>`; return; }
-  const files = (data || []).filter(f => f.name && !f.name.endsWith('/'));
-  if (!files.length) { grid.innerHTML = '<div class="loading-state">Пусто · bucket media</div>'; return; }
+  const { data, error } = await sb.storage.from('media').list('', { limit: 60, sortBy: { column: 'created_at', order: 'desc' } });
+  if (error) { grid.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
+  const files = (data || []).filter(f => f.name && !f.name.endsWith('/') && f.name !== '.emptyFolderPlaceholder');
+  if (!files.length) { grid.innerHTML = '<div class="loading-state">Пусто</div>'; return; }
   grid.innerHTML = files.map(f => {
-    const { data: pub } = sb.storage.from('media').getPublicUrl(f.name);
-    const url = pub.publicUrl;
-    return `<div class="media-item glass">
-      <img src="${esc(url)}" alt="" loading="lazy">
-      <button type="button" class="btn btn-ghost btn-sm copy-url" data-url="${esc(url)}">Скопировать</button>
-    </div>`;
+    const url = sb.storage.from('media').getPublicUrl(f.name).data.publicUrl;
+    return `<div class="media-item glass"><img src="${esc(url)}" alt="" loading="lazy">
+      <button type="button" class="btn btn-ghost btn-sm copy-url" data-url="${esc(url)}">Скопировать ссылку</button></div>`;
   }).join('');
-  grid.querySelectorAll('.copy-url').forEach(b => b.addEventListener('click', async () => {
-    const ok = await copyText(b.dataset.url);   // прямая публичная ссылка на файл
-    if (ok) showToast('Ссылка на картинку скопирована!');
-    else { showToast('Не удалось скопировать — скопируйте вручную', 'error'); window.prompt('Ссылка на картинку:', b.dataset.url); }
-  }));
 }
+$('media-grid').addEventListener('click', async (e) => {
+  const b = e.target.closest('.copy-url');
+  if (!b) return;
+  if (await copyText(b.dataset.url)) toast('Ссылка скопирована!');
+  else { toast('Не удалось скопировать', 'error'); window.prompt('Ссылка на картинку:', b.dataset.url); }
+});
 
-// ---------- Flags ----------
-async function loadFlags() {
-  const list = $('flags-list');
-  list.innerHTML = '<div class="loading-state">Загрузка…</div>';
-  const { data, error } = await sb.from('feature_flags').select('*').order('key');
-  if (error) { list.innerHTML = `<div class="loading-state">${esc(error.message)}</div>`; return; }
-  list.innerHTML = (data || []).map(f => `
-    <div class="admin-card glass">
-      <div class="admin-card-info"><div class="admin-meta">
-        <h4>${esc(f.key)}</h4><p>${esc(f.description)}</p>
-      </div></div>
-      <div class="toggle ${f.is_enabled ? 'open' : 'closed'} flag-toggle" data-key="${esc(f.key)}"><div class="toggle-knob"></div></div>
-    </div>`).join('');
-  list.querySelectorAll('.flag-toggle').forEach(el => {
-    el.addEventListener('click', async () => {
-      if (!isSuper()) return;
-      const enabled = !el.classList.contains('open');
-      const { error: err } = await sb.from('feature_flags')
-        .update({ is_enabled: enabled, updated_at: new Date().toISOString() }).eq('key', el.dataset.key);
-      if (err) { showToast(err.message, 'error'); return; }
-      el.classList.toggle('open', enabled);
-      el.classList.toggle('closed', !enabled);
-      showToast(enabled ? 'Включено' : 'Выключено');
-    });
-  });
-}
-
-// ---------- Backup ----------
-$('backup-btn')?.addEventListener('click', async () => {
-  if (!isSuper()) { showToast('Только для super_admin', 'error'); return; }
+// ======================================================================= настройки: бэкап
+$('backup-btn').addEventListener('click', async () => {
+  if (!can('download_backup')) return toast('Недостаточно прав', 'error');
   const btn = $('backup-btn'), label = $('backup-btn-text');
   btn.disabled = true; label.textContent = 'Собираю данные…';
   try {
-    const [sitesRes, newsRes] = await Promise.all([
+    const [sites, news, admins] = await Promise.all([
       sb.from('ecosystem_sites').select('*').order('id'),
-      sb.from('news').select('*').order('published_at', { ascending: false })
+      sb.from('news').select('*').order('published_at', { ascending: false }),
+      sb.from('admins').select('id, email, name, nickname, role, permissions, created_at')
     ]);
-    if (sitesRes.error) throw sitesRes.error;
-    if (newsRes.error) throw newsRes.error;
+    for (const r of [sites, news, admins]) if (r.error) throw r.error;
     const payload = {
-      app: 'amoore-dev', version: '7.0',
-      exported_at: new Date().toISOString(),
-      exported_by: currentAdmin?.nickname || currentAdmin?.email || null,
-      ecosystem_sites: sitesRes.data || [],
-      news: newsRes.data || []
+      app: 'amoore-dev', version: '8.0', exported_at: new Date().toISOString(),
+      exported_by: me.nickname || me.email,
+      ecosystem_sites: sites.data, news: news.data, admins: admins.data   // токены доступа в бэкап не попадают
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
-    a.href = url; a.download = 'amoore-backup.json';
+    a.href = url; a.download = `amoore-backup-${todayISO()}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    showToast(`Резервная копия скачана: ${payload.ecosystem_sites.length} сайтов, ${payload.news.length} новостей`);
-  } catch (err) {
-    showToast(friendlyError(err), 'error');
-  } finally {
-    btn.disabled = false; label.textContent = 'Скачать резервную копию (JSON)';
-  }
+    logAction('backup');
+    toast(`Бэкап: ${sites.data.length} сайтов, ${news.data.length} новостей, ${admins.data.length} пользователей`);
+  } catch (err) { toast(friendlyError(err), 'error'); }
+  finally { btn.disabled = false; label.textContent = 'Скачать резервную копию (JSON)'; }
 });
 
-// ---------- Team + permissions modal ----------
-function genToken() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let s = '';
-  for (let i = 0; i < 12; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
-}
-$('gen-token-btn')?.addEventListener('click', () => { $('new-token').value = genToken(); });
-$('add-admin-form')?.addEventListener('submit', async (e) => {
+// ======================================================================= команда и права
+$('gen-token-btn').addEventListener('click', () => { $('new-token').value = genToken(); });
+$('add-admin-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (!can('manage_admins')) { showToast('Недостаточно прав', 'error'); return; }
-  const payload = {
-    email: $('new-email').value.trim(), name: $('new-name').value.trim(),
-    nickname: $('new-nickname').value.trim(), role: $('new-role').value,
-    access_token: $('new-token').value.trim(), permissions: null
+  if (!can('manage_admins')) return toast('Недостаточно прав', 'error');
+  const row = {
+    email: $('new-email').value.trim().toLowerCase(), name: $('new-name').value.trim(),
+    nickname: $('new-nickname').value.trim(), role: $('new-role').value, access_token: $('new-token').value.trim()
   };
-  const { error } = await sb.from('admins').insert(payload);
-  if (error) { showToast(error.message.includes('duplicate') ? 'Email уже есть' : error.message, 'error'); return; }
-  showToast('Добавлен'); e.target.reset(); loadTeam();
+  if (row.access_token.length < 12) return toast('Токен слишком короткий (минимум 12 символов)', 'error');
+  const { error } = await sb.from('admins').insert(row);
+  if (error) return toast(friendlyError(error), 'error');
+  logAction('admin_add', null, null, `${row.nickname} · ${row.role}`);
+  toast('Добавлен. Не забудьте создать этот email в Supabase → Authentication'); e.target.reset(); loadTeam();
 });
 
 async function loadTeam() {
-  if (!(isSuper() || can('manage_admins'))) return;
   const list = $('team-list');
   list.innerHTML = '<div class="loading-state">Загрузка…</div>';
-  const { data: admins, error } = await sb.from('admins').select('*').order('created_at');
-  if (error) { list.innerHTML = `<div class="loading-state">${esc(error.message)}</div>`; return; }
-  list.innerHTML = (admins || []).map(a => {
-    const isSelf = a.id === currentAdmin.admin_id;
-    const roles = ['moderator', 'admin', 'super_admin'];
+  const { data, error } = await sb.from('admins').select('id, email, name, nickname, role, permissions').order('created_at');
+  if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
+  list.innerHTML = (data || []).map(a => {
+    const self = a.id === me.admin_id;
     return `<div class="admin-card glass team-card">
       <div class="admin-card-info">
         <div class="admin-avatar">${esc((a.nickname || '?')[0].toUpperCase())}</div>
         <div class="admin-meta">
-          <h4>${esc(a.nickname)}${isSelf ? ' <span class="role-badge super_admin">вы</span>' : ''}</h4>
+          <h4>${esc(a.nickname)}${self ? ' <span class="role-badge super_admin">вы</span>' : ''}</h4>
           <p>${esc(a.email)} · ${esc(a.name)}</p>
-          <p class="widget-meta">роль: ${esc(a.role)}${a.permissions ? ' · custom perms' : ''}</p>
+          <p class="widget-meta">роль: ${esc(a.role)}${a.permissions ? ' · личные права' : ''}</p>
         </div>
       </div>
       <div class="admin-card-actions">
-        ${isSuper() ? `<select class="role-select" data-id="${a.id}" ${isSelf ? 'disabled' : ''}>
-          ${roles.map(r => `<option value="${r}" ${a.role === r ? 'selected' : ''}>${r}</option>`).join('')}
-        </select>` : `<span class="role-badge ${a.role}">${esc(a.role)}</span>`}
-        ${isSuper() && !isSelf ? `<button class="btn btn-ghost btn-sm perms-btn" data-id="${a.id}" data-role="${esc(a.role)}">Права</button>` : ''}
-        ${isSuper() && !isSelf ? `<button class="btn btn-danger-outline btn-sm del-admin" data-id="${a.id}">Удалить</button>` : ''}
-      </div>
-    </div>`;
+        ${isSuper() ? `<select class="role-select" data-id="${a.id}" aria-label="Роль"${self ? ' disabled' : ''}>
+          ${['moderator', 'admin', 'super_admin'].map(r => `<option value="${r}"${a.role === r ? ' selected' : ''}>${r}</option>`).join('')}</select>`
+          : `<span class="role-badge ${esc(a.role)}">${esc(a.role)}</span>`}
+        ${isSuper() && !self ? `<button class="btn btn-ghost btn-sm perms-btn" data-id="${a.id}">Права</button>` : ''}
+        ${isSuper() && !self ? `<button class="btn btn-danger-outline btn-sm del-admin" data-id="${a.id}" data-nick="${esc(a.nickname)}">Удалить</button>` : ''}
+      </div></div>`;
   }).join('');
-
-  list.querySelectorAll('.role-select').forEach(sel => sel.addEventListener('change', async () => {
-    const { error } = await sb.from('admins').update({ role: sel.value }).eq('id', sel.dataset.id);
-    if (error) showToast(error.message, 'error'); else showToast('Роль обновлена');
-  }));
-  list.querySelectorAll('.del-admin').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('Удалить?')) return;
-    const { error } = await sb.from('admins').delete().eq('id', b.dataset.id);
-    if (error) showToast(error.message, 'error'); else { showToast('Удалён'); loadTeam(); }
-  }));
-  list.querySelectorAll('.perms-btn').forEach(b => b.addEventListener('click', () => openPermsModal(b.dataset.id, b.dataset.role)));
 }
+$('team-list').addEventListener('change', async (e) => {
+  const sel = e.target.closest('.role-select');
+  if (!sel || !isSuper()) return;
+  const { error } = await sb.from('admins').update({ role: sel.value }).eq('id', sel.dataset.id);
+  if (error) toast(friendlyError(error), 'error');
+  else { logAction('role_change', null, null, sel.value); toast('Роль обновлена'); }
+  loadTeam();
+});
+$('team-list').addEventListener('click', async (e) => {
+  const del = e.target.closest('.del-admin');
+  if (del && isSuper()) {
+    if (!confirm(`Удалить пользователя «${del.dataset.nick}»?`)) return;
+    const { error } = await sb.from('admins').delete().eq('id', del.dataset.id);
+    if (error) toast(friendlyError(error), 'error');
+    else { logAction('admin_delete', null, null, del.dataset.nick); toast('Удалён'); }
+    loadTeam();
+    return;
+  }
+  const pb = e.target.closest('.perms-btn');
+  if (pb) openPermsModal(pb.dataset.id);
+});
 
-async function openPermsModal(adminId, role) {
-  if (!isSuper()) return;
-  permsTargetId = adminId;
-  const { data: admin, error } = await sb.from('admins').select('*').eq('id', adminId).single();
-  if (error || !admin) { showToast(error?.message || 'Не найден', 'error'); return; }
-  $('perms-user-label').textContent = `${admin.nickname || admin.email} · ${admin.role}`;
-  permsDraft = resolvePermissions(admin.role, admin.permissions);
-  document.querySelectorAll('#perms-list .toggle').forEach(t => {
-    const k = t.dataset.key;
+// ---- модалка «Права»: у каждого действия свой тумблер; в БД хранятся только отличия от роли
+function renderPermsList() {
+  $('perms-list').innerHTML = PERMS.map(([k, label]) => {
     const on = !!permsDraft[k];
-    t.classList.toggle('open', on);
-    t.classList.toggle('closed', !on);
-  });
+    return `<label class="perm-row"><span>${esc(label)}</span><div class="toggle ${on ? 'open' : 'closed'}" data-key="${k}" role="switch" tabindex="0" aria-checked="${on}"><div class="toggle-knob"></div></div></label>`;
+  }).join('');
+}
+async function openPermsModal(id) {
+  if (!isSuper()) return;
+  const { data, error } = await sb.from('admins').select('id, email, nickname, role, permissions').eq('id', id).single();
+  if (error || !data) return toast(friendlyError(error) || 'Не найден', 'error');
+  permsTarget = { id: data.id, role: data.role };
+  $('perms-user-label').textContent = `${data.nickname || data.email} · ${data.role}`;
+  permsDraft = resolvePermissions(data.role, data.permissions);
+  renderPermsList();
   $('perms-modal').classList.add('visible');
 }
+function flipPerm(t) {
+  const k = t.dataset.key;
+  permsDraft[k] = !permsDraft[k];
+  t.classList.toggle('open', permsDraft[k]); t.classList.toggle('closed', !permsDraft[k]);
+  t.setAttribute('aria-checked', permsDraft[k]);
+}
+$('perms-list').addEventListener('click', e => { const t = e.target.closest('.toggle'); if (t) { e.preventDefault(); flipPerm(t); } });
+$('perms-list').addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && e.target.classList.contains('toggle')) { e.preventDefault(); flipPerm(e.target); } });
+async function savePerms(value) {
+  if (!permsTarget) return;
+  const { error } = await sb.from('admins').update({ permissions: value }).eq('id', permsTarget.id);
+  if (error) return toast(friendlyError(error), 'error');
+  logAction('perms_change');
+  toast('Права сохранены'); $('perms-modal').classList.remove('visible'); loadTeam();
+}
+$('perms-save').addEventListener('click', () => {
+  const diff = {};
+  PERM_KEYS.forEach(k => { if (!!permsDraft[k] !== roleDefault(permsTarget.role, k)) diff[k] = !!permsDraft[k]; });
+  savePerms(Object.keys(diff).length ? diff : null);
+});
+$('perms-reset').addEventListener('click', () => savePerms(null));
+$('perms-modal').addEventListener('click', e => { if (e.target === $('perms-modal')) $('perms-modal').classList.remove('visible'); });
 
-document.querySelectorAll('#perms-list .toggle').forEach(t => {
-  t.addEventListener('click', () => {
-    const k = t.dataset.key;
-    const on = !t.classList.contains('open');
-    t.classList.toggle('open', on);
-    t.classList.toggle('closed', !on);
-    if (permsDraft) permsDraft[k] = on;
-  });
-});
-$('perms-save')?.addEventListener('click', async () => {
-  if (!permsTargetId || !permsDraft) return;
-  const { error } = await sb.from('admins').update({ permissions: permsDraft }).eq('id', permsTargetId);
-  if (error) { showToast(error.message, 'error'); return; }
-  showToast('Права сохранены');
-  $('perms-modal').classList.remove('visible');
-  loadTeam();
-});
-$('perms-reset')?.addEventListener('click', async () => {
-  if (!permsTargetId) return;
-  const { error } = await sb.from('admins').update({ permissions: null }).eq('id', permsTargetId);
-  if (error) { showToast(error.message, 'error'); return; }
-  showToast('Сброшено к роли');
-  $('perms-modal').classList.remove('visible');
-  loadTeam();
-});
-$('perms-modal')?.addEventListener('click', e => {
-  if (e.target === $('perms-modal')) $('perms-modal').classList.remove('visible');
-});
-
-// ---------- Logs ----------
+// ======================================================================= логи
+function logRow(l, names, sites, full) {
+  const where = sites[l.site_id] || l.site_id || l.details || '—';
+  return { who: names[l.admin_id] || '—', act: ACTION_LABELS[l.action] || l.action || '—', where, t: fmtDateTime(l.created_at, !full) };
+}
 async function loadLogs() {
   if (!can('view_logs')) return;
-  const tbody = $('logs-tbody');
-  const cards = $('logs-cards');
+  const tbody = $('logs-tbody'), cards = $('logs-cards');
   tbody.innerHTML = '<tr><td colspan="5" class="loading-state">Загрузка…</td></tr>';
-  const { data: logs, error } = await sb.from('audit_logs')
-    .select('*, admins(nickname, name), ecosystem_sites(name)')
-    .order('created_at', { ascending: false }).limit(100);
-  if (error) { tbody.innerHTML = `<tr><td colspan="5">${esc(error.message)}</td></tr>`; return; }
-  if (!logs?.length) { tbody.innerHTML = '<tr><td colspan="5" class="loading-state">Пусто</td></tr>'; return; }
-  const labels = { maintenance: 'Плановые', crash: 'Крах', private: 'Приват' };
+  const [{ data: logs, error }, names, sres] = await Promise.all([
+    sb.from('audit_logs').select('admin_id, action, site_id, overlay_type, details, created_at').order('created_at', { ascending: false }).limit(100),
+    adminMap(),
+    sb.from('ecosystem_sites').select('id, name')
+  ]);
+  if (error) { tbody.innerHTML = `<tr><td colspan="5">${esc(friendlyError(error))}</td></tr>`; return; }
+  if (!logs?.length) { tbody.innerHTML = '<tr><td colspan="5" class="loading-state">Пусто</td></tr>'; cards.innerHTML = ''; return; }
+  const sites = Object.fromEntries((sres.data || []).map(s => [s.id, s.name]));
   tbody.innerHTML = logs.map(l => {
-    const who = l.admins?.nickname || '—';
-    const site = l.ecosystem_sites?.name || l.site_id || '—';
-    const act = ACTION_LABELS[l.action] || l.action || '—';
-    const t = new Date(l.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-    return `<tr><td>${esc(who)}</td><td><span class="action-pill ${l.action}">${act}</span></td><td>${esc(site)}</td><td>${esc(l.overlay_type ? labels[l.overlay_type] || l.overlay_type : '—')}</td><td style="color:var(--text-muted);white-space:nowrap">${t}</td></tr>`;
+    const r = logRow(l, names, sites, true);
+    return `<tr><td>${esc(r.who)}</td><td><span class="action-pill ${esc(l.action)}">${esc(r.act)}</span></td><td>${esc(r.where)}</td><td>${esc(l.overlay_type ? OVERLAY_LABELS[l.overlay_type] || l.overlay_type : '—')}</td><td style="color:var(--text-muted);white-space:nowrap">${r.t}</td></tr>`;
   }).join('');
   cards.innerHTML = logs.map(l => {
-    const who = l.admins?.nickname || '—';
-    const site = l.ecosystem_sites?.name || l.site_id || '—';
-    const act = ACTION_LABELS[l.action] || l.action || '—';
-    const t = new Date(l.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-    return `<div class="log-card glass"><div class="log-card-row"><strong>${esc(who)}</strong><span class="action-pill ${l.action}">${act}</span></div>
-      <div class="log-card-row"><span class="meta">${esc(site)}</span><span class="meta">${t}</span></div></div>`;
+    const r = logRow(l, names, sites, false);
+    return `<div class="log-card glass"><div class="log-card-row"><strong>${esc(r.who)}</strong><span class="action-pill ${esc(l.action)}">${esc(r.act)}</span></div>
+      <div class="log-card-row"><span class="meta">${esc(r.where)}</span><span class="meta">${r.t}</span></div></div>`;
   }).join('');
 }
 
-// ---------- Login ----------
-$('full-login-btn')?.addEventListener('click', () => setLoginMode(false));
-$('login-form')?.addEventListener('submit', async (e) => {
+// ======================================================================= вход / выход / старт
+$('full-login-btn').addEventListener('click', () => setLoginMode(false));
+$('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('login-error').classList.remove('visible');
   $('login-btn').disabled = true;
@@ -777,18 +702,15 @@ $('login-form')?.addEventListener('submit', async (e) => {
   const password = $('password').value;
   const token = $('token').value.trim();
   try {
-    if (!email || !token) throw new Error('Заполните поля');
+    if (!token || (!tokenOnlyMode && (!email || !password))) throw new Error('Заполните все поля');
     let session;
     if (tokenOnlyMode) {
-      try { session = await loginTokenOnly(email, token); }
+      try { session = await loginTokenOnly(token); }
       catch (err) {
         if (err.message === 'NEED_PASSWORD') { setLoginMode(false); throw new Error('Сессия истекла — введите пароль'); }
         throw err;
       }
-    } else {
-      if (!password) throw new Error('Укажите пароль');
-      session = await loginFull(email, password, token);
-    }
+    } else session = await loginFull(email, password, token);
     showApp(session);
   } catch (err) {
     $('login-error').textContent = friendlyError(err);
@@ -798,36 +720,22 @@ $('login-form')?.addEventListener('submit', async (e) => {
     $('login-btn-text').textContent = 'Войти';
   }
 });
-$('logout-btn')?.addEventListener('click', () => {
+$('logout-btn').addEventListener('click', () => {
   clearSession(true);
   sb.auth.signOut().catch(() => {});
-  currentAdmin = null;
+  me = null;
   showLogin(false);
 });
 
 (async function boot() {
-  if (!SUPABASE_URL || SUPABASE_URL.includes('YOUR_PROJECT') || !SUPABASE_ANON || SUPABASE_ANON === 'YOUR_ANON_KEY') {
-    showLogin(false);
-    $('login-error').textContent = 'Подставьте SUPABASE_URL и SUPABASE_ANON в app.js';
-    $('login-error').classList.add('visible');
-    return;
-  }
-  const session = loadSession();
-  if (session?.admin_id) {
+  const s = loadSession();
+  if (s?.admin_id) {
     try {
       const { data } = await sb.auth.getSession();
       if (data.session) {
-        // refresh permissions from DB
-        try {
-          const { data: admin } = await sb.from('admins').select('*').eq('id', session.admin_id).single();
-          if (admin) {
-            session.role = admin.role;
-            session.permissions = admin.permissions || null;
-            session.permissions_resolved = resolvePermissions(admin.role, admin.permissions);
-          }
-        } catch (_) {}
-        saveSession(session);
-        showApp(session);
+        const fresh = await verifyAdmin(s.access_token);   // права и роль — всегда из БД
+        saveSession(fresh, s.expires_at);                  // 6 часов считаются от момента входа
+        showApp(fresh);
         return;
       }
     } catch (_) {}
@@ -835,11 +743,9 @@ $('logout-btn')?.addEventListener('click', () => {
     showLogin(true);
     return;
   }
-  if (rememberedEmail()) {
-    try {
-      const { data } = await sb.auth.getSession();
-      if (data.session) { showLogin(true); return; }
-    } catch (_) {}
-  }
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data.session && rememberedEmail()) return showLogin(true);
+  } catch (_) {}
   showLogin(false);
 })();

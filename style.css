@@ -1682,3 +1682,21 @@ textarea:focus {
   .banner-edit .btn { width: 100%; }
   .site-card-side { align-self: flex-end; }
 }
+
+/* ===== Clean Build v1.0: mobile / Telegram WebView hardening ===== */
+html, body { max-width: 100%; overflow-x: hidden; }
+input, select, textarea, .banner-input { font-size: 16px !important; }   /* iOS не зумит поля */
+.toggle.disabled { opacity: .45; pointer-events: none; }
+.toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.topbar { padding-top: env(safe-area-inset-top, 0px); }
+.toast { bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+.main { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+.logs-wrap, .media-grid, .team-list { max-width: 100%; }
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  /* тяжёлые backdrop-filter лагают в Telegram WebView — заменяем плотным фоном */
+  *, *::before, *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .glass, .modal, .topbar { background: rgba(14, 20, 40, 0.96) !important; }
+}
