@@ -1535,3 +1535,150 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   v7.0 Mission Control & Smart Toggles
+   ============================================================ */
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.section-head .section-title { margin-bottom: 0; }
+.section-head .btn-primary { width: auto; margin-top: 0; }
+
+/* ---- Hint card (Медиатека) ---- */
+.hint-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: var(--gold-dim);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--gold-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.hint-card p { margin: 0; color: var(--text); }
+.hint-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--gold);
+  line-height: 1;
+}
+
+/* ---- Site card: compact + 3 vertical toggles ---- */
+.site-card { padding: 16px 18px; }
+.site-card .site-card-header { margin-bottom: 8px; }
+.site-card-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.btn-trash {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 10px;
+  color: var(--danger);
+  cursor: pointer;
+  transition: background var(--transition), transform var(--transition);
+}
+.btn-trash:hover { background: var(--danger-dim); }
+.btn-trash:active { transform: scale(0.94); }
+.btn-trash svg { width: 16px; height: 16px; pointer-events: none; }
+
+.toggle-list { display: flex; flex-direction: column; }
+.toggle-list .toggle-row {
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 52px;
+}
+.toggle-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.toggle-list .toggle-label { color: var(--text); font-size: 13px; font-weight: 600; }
+.toggle-sub { font-size: 11px; color: var(--text-dim); }
+
+/* smaller toggle inside site cards */
+.toggle-list .toggle { width: 46px; height: 28px; }
+.toggle-list .toggle .toggle-knob { top: 3px; left: 3px; width: 20px; height: 20px; }
+.toggle-list .toggle.open .toggle-knob { transform: translateX(18px); }
+
+/* neutral on/off pair for Banner / Demo chat (off != "danger") */
+.toggle.on {
+  background: var(--gold-dim);
+  border-color: var(--border-strong);
+}
+.toggle.on .toggle-knob { transform: translateX(20px); background: var(--gold); }
+.toggle-list .toggle.on .toggle-knob { transform: translateX(18px); }
+.toggle.off .toggle-knob { transform: translateX(0); background: var(--text-muted); }
+
+/* banner text editor */
+.banner-edit {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0 12px;
+}
+.banner-edit input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px; /* no iOS zoom */
+  outline: none;
+}
+.banner-edit input:focus {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 3px var(--gold-dim);
+}
+.banner-edit .btn { flex-shrink: 0; }
+.site-card .overlay-meta { margin-top: 4px; }
+
+/* backup */
+.backup-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.backup-card h3 { margin-bottom: 4px; }
+
+/* extra action pills in logs */
+.action-pill.site_add,
+.action-pill.banner_on,
+.action-pill.chat_on { background: rgba(52, 211, 153, 0.12); color: var(--success); }
+.action-pill.banner_off,
+.action-pill.chat_off { background: rgba(255, 255, 255, 0.06); color: var(--text-muted); }
+.action-pill.banner_edit { background: var(--gold-dim); color: var(--gold); }
+
+.news-date { font-size: 11px; color: var(--text-dim); font-weight: 500; }
+
+@media (max-width: 400px) {
+  .banner-edit { flex-direction: column; }
+  .banner-edit .btn { width: 100%; }
+  .site-card-side { align-self: flex-end; }
+}

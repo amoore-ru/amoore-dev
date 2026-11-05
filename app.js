@@ -1,4 +1,4 @@
-// amoore Dev Mission Control v5.0
+// amoore Dev Mission Control v7.0 — Smart Toggles
 const SUPABASE_URL  = 'https://wogouiecoigzmxqccnsk.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q';
 
@@ -56,12 +56,50 @@ function friendlyError(err) {
   const msg = String(err?.message || err || '');
   if (/failed to fetch|networkerror|load failed/i.test(msg)) return 'Нет связи с Supabase. Проверьте URL/ключ.';
   if (/invalid login credentials/i.test(msg)) return 'Неверный email или пароль';
+  if (/column .* does not exist|schema cache|could not find the/i.test(msg)) return 'В БД нет новых колонок — выполните SQL-миграцию v7';
+  if (/row-level security|violates row-level/i.test(msg)) return 'Недостаточно прав в БД (RLS). Проверьте SQL-миграцию v7';
   return msg || 'Ошибка';
 }
 function esc(str) {
   const d = document.createElement('div');
   d.textContent = str == null ? '' : String(str);
-  return d.innerHTML;
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function todayISO() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function fmtDate(v) {
+  // 'YYYY-MM-DD' -> 'ДД.ММ.ГГГГ' (без сдвига часовых поясов); произвольный текст — как есть
+  if (!v) return '';
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : String(v);
+}
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch (_) {}
+  try { // fallback: iOS / http / старые WebView
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (_) { return false; }
+}
+const ACTION_LABELS = {
+  close: 'Закрыл', open: 'Открыл',
+  banner_on: 'Включил баннер', banner_off: 'Выключил баннер', banner_edit: 'Изменил баннер',
+  chat_on: 'Включил чат', chat_off: 'Выключил чат', site_add: 'Добавил сайт'
+};
+async function logAction(action, siteId, overlay = null) {
+  try {
+    await sb.from('audit_logs').insert({ admin_id: currentAdmin.admin_id, action, site_id: siteId, overlay_type: overlay });
+  } catch (_) {}
 }
 function showToast(msg, type = 'success') {
   const el = $('toast');
@@ -142,6 +180,7 @@ function showApp(admin) {
   $('app').classList.add('visible');
   $('admin-nickname').textContent = admin.nickname || admin.name || admin.email;
   applyRoleUI();
+  if ($('news-date') && !$('news-date').value) $('news-date').value = todayISO();
   switchView('dashboard');
   loadDashboard();
 }
@@ -161,6 +200,8 @@ function applyRoleUI() {
   });
   const newsBlock = $('news-dashboard-block');
   if (newsBlock) newsBlock.style.display = can('manage_news') ? '' : 'none';
+  const addSiteBtn = $('add-site-btn');
+  if (addSiteBtn) addSiteBtn.style.display = isSuper() ? '' : 'none';
   const addWrap = $('add-admin-wrap');
   if (addWrap) addWrap.style.display = can('manage_admins') ? '' : 'none';
 }
@@ -197,51 +238,191 @@ async function loadDashboard() {
   if (can('manage_news')) loadNewsAdmin();
 }
 
+let sitesCache = [];
+const OVERLAY_LABELS = { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' };
+const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+
 async function loadSites() {
   const grid = $('sites-grid');
   grid.innerHTML = '<div class="loading-state">Загрузка…</div>';
   const { data: sites, error } = await sb.from('ecosystem_sites').select('*').order('id');
-  if (error) { grid.innerHTML = `<div class="loading-state">${esc(error.message)}</div>`; return; }
-  const list = sites || [];
+  if (error) { grid.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
+  sitesCache = sites || [];
+  renderSites();
+}
+
+function renderSites() {
+  const grid = $('sites-grid');
+  const list = sitesCache;
   $('stat-total').textContent = list.length;
   $('stat-closed').textContent = list.filter(s => s.status === 'closed').length;
   $('stat-open').textContent = list.filter(s => s.status === 'open').length;
   if (!list.length) { grid.innerHTML = '<div class="loading-state">Нет сайтов</div>'; return; }
   const locked = !can('toggle_sites');
-  const labels = { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' };
+  const dis = locked ? ' disabled' : '';
   grid.innerHTML = list.map(site => {
+    const id = esc(site.id);
     const isOpen = site.status === 'open';
-    return `<div class="site-card glass" data-id="${esc(site.id)}">
+    const bannerOn = site.banner_active === true;
+    const chatOn = site.demo_chat_active === true;
+    return `<div class="site-card glass" data-id="${id}">
       <div class="site-card-header">
         <div class="site-info"><h3>${esc(site.name)}</h3>
           <a href="${esc(site.url)}" target="_blank" rel="noopener">${esc(site.url)}</a></div>
-        <div class="status-pill ${isOpen ? 'online' : 'offline'}"><span class="dot"></span>${isOpen ? 'Online' : 'Offline'}</div>
+        <div class="site-card-side">
+          <div class="status-pill ${isOpen ? 'online' : 'offline'}"><span class="dot"></span>${isOpen ? 'Online' : 'Offline'}</div>
+          ${isSuper() ? `<button type="button" class="btn-trash" data-act="delete" data-id="${id}" title="Удалить сайт" aria-label="Удалить сайт">${TRASH_SVG}</button>` : ''}
+        </div>
       </div>
-      <div class="toggle-row">
-        <span class="toggle-label">${isOpen ? 'Открыт' : 'Закрыт'}${locked ? ' · нет прав' : ''}</span>
-        <div class="toggle ${isOpen ? 'open' : 'closed'}${locked ? ' disabled' : ''}" data-id="${esc(site.id)}"><div class="toggle-knob"></div></div>
+      <div class="toggle-list">
+        <div class="toggle-row">
+          <div class="toggle-text"><span class="toggle-label">Статус сайта</span>
+            <span class="toggle-sub">${isOpen ? 'Открыт' : 'Закрыт'}${locked ? ' · нет прав' : ''}</span></div>
+          <div class="toggle ${isOpen ? 'open' : 'closed'}${dis}" data-act="status" data-id="${id}" role="switch" aria-checked="${isOpen}" aria-label="Статус сайта"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-text"><span class="toggle-label">Глобальный баннер</span>
+            <span class="toggle-sub">${bannerOn ? 'Показывается' : 'Выключен'}</span></div>
+          <div class="toggle ${bannerOn ? 'on' : 'off'}${dis}" data-act="banner" data-id="${id}" role="switch" aria-checked="${bannerOn}" aria-label="Глобальный баннер"><div class="toggle-knob"></div></div>
+        </div>
+        ${bannerOn ? `<div class="banner-edit">
+          <input type="text" class="banner-input" maxlength="160" value="${esc(site.banner_text || '')}" placeholder="Например: Сайт на профилактике" aria-label="Текст баннера"${locked ? ' disabled' : ''}>
+          <button type="button" class="btn btn-ghost btn-sm" data-act="banner-apply" data-id="${id}"${locked ? ' disabled' : ''}>Применить</button>
+        </div>` : ''}
+        <div class="toggle-row">
+          <div class="toggle-text"><span class="toggle-label">Демо-чат</span>
+            <span class="toggle-sub">${chatOn ? 'Виден на лендинге' : 'Скрыт'}</span></div>
+          <div class="toggle ${chatOn ? 'on' : 'off'}${dis}" data-act="chat" data-id="${id}" role="switch" aria-checked="${chatOn}" aria-label="Демо-чат"><div class="toggle-knob"></div></div>
+        </div>
       </div>
-      ${!isOpen ? `<div class="overlay-meta">Заставка: <strong>${labels[site.overlay_type] || site.overlay_type}</strong></div>` : ''}
+      ${!isOpen ? `<div class="overlay-meta">Заставка: <strong>${esc(OVERLAY_LABELS[site.overlay_type] || site.overlay_type)}</strong></div>` : ''}
     </div>`;
   }).join('');
-  grid.querySelectorAll('.toggle').forEach(el => {
-    el.addEventListener('click', () => {
-      if (el.classList.contains('disabled') || !can('toggle_sites')) {
-        showToast('Недостаточно прав', 'error');
-        return;
-      }
-      const id = el.dataset.id;
-      if (el.classList.contains('open')) {
-        pendingCloseSiteId = id;
-        $('modal-site-name').textContent = 'Выберите заставку';
-        document.querySelectorAll('#close-modal .radio-item').forEach((r, i) => {
-          r.classList.toggle('selected', i === 0);
-          r.querySelector('input').checked = i === 0;
-        });
-        $('close-modal').classList.add('visible');
-      } else openSite(id);
-    });
-  });
+}
+
+// Один делегированный обработчик на всю сетку сайтов
+$('sites-grid')?.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const site = sitesCache.find(s => s.id === el.dataset.id);
+  if (!site) return;
+  const act = el.dataset.act;
+
+  if (act === 'delete') { deleteSite(site); return; }
+
+  if (!can('toggle_sites')) { showToast('Недостаточно прав', 'error'); return; }
+
+  if (act === 'status') {
+    if (site.status === 'open') {
+      pendingCloseSiteId = site.id;
+      $('modal-site-name').textContent = `${site.name} — выберите заставку`;
+      document.querySelectorAll('#close-modal .radio-item').forEach((r, i) => {
+        r.classList.toggle('selected', i === 0);
+        r.querySelector('input').checked = i === 0;
+      });
+      $('close-modal').classList.add('visible');
+    } else openSite(site.id);
+  } else if (act === 'banner') {
+    toggleBanner(site);
+  } else if (act === 'banner-apply') {
+    const input = el.closest('.site-card')?.querySelector('.banner-input');
+    applyBannerText(site, input ? input.value : '');
+  } else if (act === 'chat') {
+    toggleChat(site);
+  }
+});
+$('sites-grid')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.classList?.contains('banner-input')) {
+    e.preventDefault();
+    const site = sitesCache.find(s => s.id === e.target.closest('.site-card')?.dataset.id);
+    if (site && can('toggle_sites')) applyBannerText(site, e.target.value);
+  }
+});
+
+async function patchSite(site, patch) {
+  const { error } = await sb.from('ecosystem_sites').update(patch).eq('id', site.id);
+  if (error) { showToast(friendlyError(error), 'error'); return false; }
+  Object.assign(site, patch);   // обновляем кэш — карточка перерисуется без «мигания»
+  return true;
+}
+
+async function toggleBanner(site) {
+  const next = site.banner_active !== true;
+  if (!(await patchSite(site, { banner_active: next }))) return;
+  renderSites();
+  logAction(next ? 'banner_on' : 'banner_off', site.id);
+  if (next && !(site.banner_text || '').trim()) showToast('Введите текст баннера и нажмите «Применить»');
+  else showToast(next ? 'Баннер включён' : 'Баннер выключен');
+  loadMiniAudit();
+}
+
+async function applyBannerText(site, raw) {
+  const text = String(raw || '').trim().slice(0, 160);
+  if (!text) { showToast('Введите текст баннера', 'error'); return; }
+  if (!(await patchSite(site, { banner_text: text, banner_active: true }))) return;
+  renderSites();
+  logAction('banner_edit', site.id);
+  showToast('Баннер применён');
+  loadMiniAudit();
+}
+
+async function toggleChat(site) {
+  const next = site.demo_chat_active !== true;
+  if (!(await patchSite(site, { demo_chat_active: next }))) return;
+  renderSites();
+  logAction(next ? 'chat_on' : 'chat_off', site.id);
+  showToast(next ? 'Демо-чат включён' : 'Демо-чат скрыт');
+  loadMiniAudit();
+}
+
+// ---------- Site manager (super_admin) ----------
+function openSiteModal() {
+  if (!isSuper()) { showToast('Только для super_admin', 'error'); return; }
+  $('site-form').reset();
+  $('site-modal').classList.add('visible');
+  setTimeout(() => $('site-new-id').focus(), 50);
+}
+function closeSiteModal() { $('site-modal').classList.remove('visible'); }
+
+$('add-site-btn')?.addEventListener('click', openSiteModal);
+$('site-cancel')?.addEventListener('click', closeSiteModal);
+$('site-modal')?.addEventListener('click', e => { if (e.target === $('site-modal')) closeSiteModal(); });
+$('site-form')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!isSuper()) { showToast('Только для super_admin', 'error'); return; }
+  const id = $('site-new-id').value.trim().toLowerCase();
+  const name = $('site-new-name').value.trim();
+  let url = $('site-new-url').value.trim();
+  if (!/^[a-z0-9][a-z0-9_-]{1,31}$/.test(id)) {
+    showToast('ID: латиница, цифры, - и _ (2–32 символа)', 'error'); return;
+  }
+  if (!name) { showToast('Введите название', 'error'); return; }
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  try { url = new URL(url).href; } catch { showToast('Некорректный URL', 'error'); return; }
+
+  const btn = $('site-save');
+  btn.disabled = true;
+  const { error } = await sb.from('ecosystem_sites').insert({ id, name, url, status: 'open', overlay_type: 'maintenance' });
+  btn.disabled = false;
+  if (error) {
+    showToast(/duplicate|already exists|unique/i.test(error.message) ? 'Сайт с таким ID уже есть' : friendlyError(error), 'error');
+    return;
+  }
+  logAction('site_add', id);
+  closeSiteModal();
+  showToast('Сайт добавлен');
+  loadSites(); loadMiniAudit();
+});
+
+async function deleteSite(site) {
+  if (!isSuper()) { showToast('Только для super_admin', 'error'); return; }
+  if (!confirm(`Удалить сайт «${site.name}» (${site.id})?\n\nВместе с ним удалится его история действий. Это нельзя отменить.`)) return;
+  const { error } = await sb.from('ecosystem_sites').delete().eq('id', site.id);
+  if (error) { showToast(friendlyError(error), 'error'); return; }
+  sitesCache = sitesCache.filter(s => s.id !== site.id);
+  renderSites();
+  showToast('Сайт удалён');
+  loadMiniAudit();
 }
 
 async function closeSite(siteId, overlayType) {
@@ -298,7 +479,7 @@ async function loadMiniAudit() {
     if (!data?.length) { box.textContent = 'Пусто'; return; }
     box.innerHTML = data.map(l => {
       const who = l.admins?.nickname || '—';
-      const act = l.action === 'close' ? 'закрыл' : 'открыл';
+      const act = (ACTION_LABELS[l.action] || l.action || '').toLowerCase();
       const t = new Date(l.created_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
       return `<div class="mini-audit-row"><span>${esc(who)} ${act} <b>${esc(l.site_id)}</b></span><span class="meta">${t}</span></div>`;
     }).join('');
@@ -312,10 +493,15 @@ $('news-form')?.addEventListener('submit', async (e) => {
   const title = $('news-title').value.trim();
   const body = $('news-body').value.trim();
   const type = $('news-type').value;
-  const { error } = await sb.from('news').insert({ title, body, type, is_published: true });
-  if (error) { showToast(error.message, 'error'); return; }
-  showToast('Опубликовано');
+  const display_date = $('news-date').value || todayISO();
+  const btn = $('news-submit-btn');
+  btn.disabled = true;
+  const { error } = await sb.from('news').insert({ title, body, type, display_date, is_published: true });
+  btn.disabled = false;
+  if (error) { showToast(friendlyError(error), 'error'); return; }
+  showToast('Опубликовано — уже на сайте');
   e.target.reset();
+  $('news-date').value = todayISO();
   loadNewsAdmin();
 });
 
@@ -331,7 +517,7 @@ async function loadNewsAdmin() {
     <div class="admin-card glass news-card" data-id="${n.id}">
       <div class="admin-card-info">
         <div class="admin-meta">
-          <h4>${esc(n.title)} <span class="role-badge admin">${esc(typeLabel[n.type] || n.type)}</span></h4>
+          <h4>${esc(n.title)} <span class="role-badge admin">${esc(typeLabel[n.type] || n.type)}</span> <span class="news-date">${esc(fmtDate(n.display_date || n.published_at))}</span></h4>
           <p>${esc((n.body || '').slice(0, 140))}</p>
         </div>
       </div>
@@ -340,7 +526,8 @@ async function loadNewsAdmin() {
   list.querySelectorAll('.news-del').forEach(b => b.addEventListener('click', async () => {
     if (!can('manage_news')) return;
     if (!confirm('Удалить новость?')) return;
-    await sb.from('news').delete().eq('id', b.dataset.id);
+    const { error: delErr } = await sb.from('news').delete().eq('id', b.dataset.id);
+    if (delErr) showToast(friendlyError(delErr), 'error'); else showToast('Новость удалена');
     loadNewsAdmin();
   }));
 }
@@ -378,8 +565,9 @@ async function loadMedia() {
     </div>`;
   }).join('');
   grid.querySelectorAll('.copy-url').forEach(b => b.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(b.dataset.url); showToast('Скопировано'); }
-    catch { showToast(b.dataset.url); }
+    const ok = await copyText(b.dataset.url);   // прямая публичная ссылка на файл
+    if (ok) showToast('Ссылка на картинку скопирована!');
+    else { showToast('Не удалось скопировать — скопируйте вручную', 'error'); window.prompt('Ссылка на картинку:', b.dataset.url); }
   }));
 }
 
@@ -409,6 +597,39 @@ async function loadFlags() {
     });
   });
 }
+
+// ---------- Backup ----------
+$('backup-btn')?.addEventListener('click', async () => {
+  if (!isSuper()) { showToast('Только для super_admin', 'error'); return; }
+  const btn = $('backup-btn'), label = $('backup-btn-text');
+  btn.disabled = true; label.textContent = 'Собираю данные…';
+  try {
+    const [sitesRes, newsRes] = await Promise.all([
+      sb.from('ecosystem_sites').select('*').order('id'),
+      sb.from('news').select('*').order('published_at', { ascending: false })
+    ]);
+    if (sitesRes.error) throw sitesRes.error;
+    if (newsRes.error) throw newsRes.error;
+    const payload = {
+      app: 'amoore-dev', version: '7.0',
+      exported_at: new Date().toISOString(),
+      exported_by: currentAdmin?.nickname || currentAdmin?.email || null,
+      ecosystem_sites: sitesRes.data || [],
+      news: newsRes.data || []
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'amoore-backup.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    showToast(`Резервная копия скачана: ${payload.ecosystem_sites.length} сайтов, ${payload.news.length} новостей`);
+  } catch (err) {
+    showToast(friendlyError(err), 'error');
+  } finally {
+    btn.disabled = false; label.textContent = 'Скачать резервную копию (JSON)';
+  }
+});
 
 // ---------- Team + permissions modal ----------
 function genToken() {
@@ -531,14 +752,14 @@ async function loadLogs() {
   tbody.innerHTML = logs.map(l => {
     const who = l.admins?.nickname || '—';
     const site = l.ecosystem_sites?.name || l.site_id || '—';
-    const act = l.action === 'close' ? 'Закрыл' : 'Открыл';
+    const act = ACTION_LABELS[l.action] || l.action || '—';
     const t = new Date(l.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
     return `<tr><td>${esc(who)}</td><td><span class="action-pill ${l.action}">${act}</span></td><td>${esc(site)}</td><td>${esc(l.overlay_type ? labels[l.overlay_type] || l.overlay_type : '—')}</td><td style="color:var(--text-muted);white-space:nowrap">${t}</td></tr>`;
   }).join('');
   cards.innerHTML = logs.map(l => {
     const who = l.admins?.nickname || '—';
     const site = l.ecosystem_sites?.name || l.site_id || '—';
-    const act = l.action === 'close' ? 'Закрыл' : 'Открыл';
+    const act = ACTION_LABELS[l.action] || l.action || '—';
     const t = new Date(l.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     return `<div class="log-card glass"><div class="log-card-row"><strong>${esc(who)}</strong><span class="action-pill ${l.action}">${act}</span></div>
       <div class="log-card-row"><span class="meta">${esc(site)}</span><span class="meta">${t}</span></div></div>`;
