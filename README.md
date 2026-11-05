@@ -1,47 +1,26 @@
-# amoore Dev v4.0 — Mission Control
+# amoore Dev v5.0
 
-## Быстрый старт
+## Миграции SQL (по порядку)
+1. `supabase-schema.sql`
+2. `supabase-rls-rbac.sql`
+3. `supabase-v4-mission-control.sql` (news, flags, visits, media)
+4. **`supabase-v5-permissions.sql`** — колонка `admins.permissions` (JSONB)
 
-1. SQL Editor по порядку:
-   - `supabase-schema.sql`
-   - `supabase-rls-rbac.sql`
-   - `supabase-v4-mission-control.sql`
-2. Storage → New bucket **`media`** (Public)
-3. Раскомментируй storage policies в конце `supabase-v4-mission-control.sql`
-4. Edge Function:
-   ```bash
-   supabase functions deploy send-telegram
-   supabase secrets set TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=...
-   ```
-5. В `app.js` и на сайтах (core.js config):
-   ```js
-   const SUPABASE_URL  = 'https://xxx.supabase.co';
-   const SUPABASE_ANON = 'eyJ...';
-   ```
-
-## Вкладки и роли
-
-| Вкладка | super_admin | admin | moderator |
-|---------|-------------|-------|-----------|
-| Дашборд | ✅ | ✅ | ✅ (без тумблеров) |
-| Контент | ✅ | ✅ | — |
-| Бот | ✅ | ✅ | — |
-| Медиа | ✅ | ✅ | — |
-| Настройки (flags) | ✅ | — | — |
-| Команда | ✅ | — | — |
-| Логи | ✅ | ✅ | — |
-
-## amoore-core.js на сайтах
-
-```html
-<script>
-  window.AMOORE_SITE_ID = 'landing';
-  window.AMOORE_SUPABASE_URL = 'https://xxx.supabase.co';
-  window.AMOORE_SUPABASE_ANON = 'eyJ...';
-  window.AMOORE_NEWS_SELECTOR = '#news-list'; // опционально
-</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/amoore-core.js"></script>
+## Конфиг
+В `app.js`:
+```js
+const SUPABASE_URL  = 'https://xxx.supabase.co';
+const SUPABASE_ANON = 'eyJ...';
 ```
 
-Делает: статус/заставки, God Mode, визиты, feature-flag классы `flag-*`, рендер новостей.
+## Роли и permissions
+Ключи JSONB: `toggle_sites`, `manage_news`, `view_logs`, `manage_admins`  
+`null` = дефолт роли (super/admin/moderator).  
+Super admin → модалка «Права» у каждого пользователя.
+
+## Вкладки
+Дашборд (сайты + новости) · Медиа · Настройки · Команда · Логи  
+Удалены: Контент, Бот.
+
+## Лендинг
+`amoore-core.js` тянет published news в `#news-list` / `[data-amoore-news]`.

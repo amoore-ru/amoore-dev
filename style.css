@@ -88,7 +88,6 @@ button, a, .toggle, .tab-btn, .radio-item {
 
 /* ---------- Login ---------- */
 .login-screen {
-  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   align-items: center;
@@ -293,7 +292,6 @@ button, a, .toggle, .tab-btn, .radio-item {
 /* ---------- App shell ---------- */
 .app {
   display: none;
-  min-height: 100vh;
   min-height: 100dvh;
   flex-direction: column;
 }
@@ -1389,5 +1387,151 @@ textarea:focus {
     width: 100%;
     text-align: left;
     justify-content: flex-start;
+  }
+}
+
+
+/* ============================================================
+   v5.0 Mobile Hardening + Bottom Sheet + Team cards
+   ============================================================ */
+
+.ta {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  resize: vertical;
+  outline: none;
+  min-height: 88px;
+  box-sizing: border-box;
+}
+.ta:focus {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 3px var(--gold-dim);
+}
+
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.btn-icon:active { transform: scale(0.96); }
+
+.news-card {
+  align-items: flex-start;
+}
+
+.perms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.perm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  min-height: 52px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Bottom sheet modals on mobile */
+@media (max-width: 768px) {
+  .glass {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(7, 11, 22, 0.95) !important;
+  }
+
+  .login-screen {
+    min-height: 100dvh;
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .topbar {
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .main {
+    padding-bottom: max(48px, calc(24px + env(safe-area-inset-bottom)));
+  }
+
+  .tab-btn {
+    min-height: 44px;
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .burger {
+    width: 44px;
+    height: 44px;
+  }
+
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .modal.sheet {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    margin: 0;
+    max-height: 92dvh;
+    transform: translateY(24px);
+  }
+  .modal-overlay.visible .modal.sheet {
+    transform: translateY(0);
+  }
+
+  /* Team as stacked cards — no horizontal table scroll */
+  .admin-card,
+  .team-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-card-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .role-select {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .logs-table { display: none; }
+  .logs-cards { display: flex; }
+
+  .toast {
+    bottom: max(16px, env(safe-area-inset-bottom));
+    max-width: calc(100vw - 32px);
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+  .widgets-row {
+    grid-template-columns: 1fr;
   }
 }
