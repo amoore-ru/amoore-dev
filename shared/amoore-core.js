@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v8.2.0 (demo brains + news pipeline)
+ * amoore-core.js — v8.2.1 (news REST fallback + no hang)
  * Один скрипт для всех сайтов экосистемы. Подключение (3 строки в конце body):
  *   <script>window.AMOORE_SITE_ID = 'landing';</script>   // или 'studio'
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -273,57 +273,21 @@
     var target = document.querySelector('#news-list, [data-amoore-news]');
     if (!target) return;
 
-    // Всегда сбрасываем «Загрузка…» и любой старый контент перед новой отрисовкой
     function setPlaceholder(msg, isError) {
       target.textContent = '';
       var item = document.createElement('div');
       item.className = 'news-item glass-card';
       if (isError) item.setAttribute('data-amoore-news-error', '1');
+      else item.setAttribute('data-amoore-news-placeholder', '1');
       var span = document.createElement('span');
       span.textContent = msg;
       item.appendChild(span);
       target.appendChild(item);
     }
 
-    // Новости выключены тумблером — показываем паузу (секция видима)
-    if (cfg && cfg.news_active === false) {
-      var pauses = [
-        'Редакция ушла на перерыв. Скоро вернёмся.',
-        'Новости на паузе. Но мы готовим кое-что крутое.',
-        'Тишина в эфире...'
-      ];
-      setPlaceholder(pauses[Math.floor(Math.random() * pauses.length)], false);
-      return;
-    }
-
-    // Пока грузим — явный индикатор (не вечный «Загрузка…» из HTML)
-    if (!target.querySelector('[data-type]')) {
-      setPlaceholder('Обновляем ленту…', false);
-    }
-
-    if (!client) {
-      setPlaceholder('Не удалось подключиться к серверу новостей.', true);
-      return;
-    }
-
-    try {
-      // Таймаут 8 с — чтобы «Загрузка» не висела вечно
-      var timeoutMs = 8000;
-      var fetchPromise = client.from('news')
-        .select('id, title, body, type, display_date, published_at')
-        .eq('is_published', true)
-        .order('published_at', { ascending: false })
-        .limit(20);
-      var res = await Promise.race([
-        fetchPromise,
-        new Promise(function (_, reject) {
-          setTimeout(function () { reject(new Error('timeout')); }, timeoutMs);
-        })
-      ]);
-      if (res.error) throw res.error;
-      var items = res.data || [];
+    function paintItems(items) {
       target.textContent = '';
-      if (!items.length) {
+      if (!items || !items.length) {
         setPlaceholder('Здесь пока пусто. Новости появятся из панели amoore Dev.', false);
         return;
       }
@@ -344,13 +308,91 @@
         frag.appendChild(item);
       });
       target.appendChild(frag);
+    }
+
+    // Тумблер новостей выключен
+    if (cfg && cfg.news_active === false) {
+      var pauses = [
+        'Редакция ушла на перерыв. Скоро вернёмся.',
+        'Новости на паузе. Но мы готовим кое-что крутое.',
+        'Тишина в эфире...'
+      ];
+      setPlaceholder(pauses[Math.floor(Math.random() * pauses.length)], false);
+      return;
+    }
+
+    // Не мигаем «Обновляем…», если уже есть карточки новостей
+    if (!target.querySelector('[data-type]')) {
+      setPlaceholder('Обновляем ленту…', false);
+    }
+
+    // 1) Пробуем supabase-js
+    // 2) Fallback: прямой REST (тот же anon-ключ) — если клиент завис
+    function fetchViaClient() {
+      if (!client) return Promise.reject(new Error('no-client'));
+      return client
+        .from('news')
+        .select('id, title, body, type, display_date, published_at')
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+        .limit(20)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          return res.data || [];
+        });
+    }
+
+    function fetchViaRest() {
+      var url = SB_URL.replace(/\/$/, '') +
+        '/rest/v1/news?select=id,title,body,type,display_date,published_at' +
+        '&is_published=eq.true&order=published_at.desc&limit=20';
+      return fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': SB_ANON,
+          'Authorization': 'Bearer ' + SB_ANON,
+          'Accept': 'application/json'
+        }
+      }).then(function (r) {
+        if (!r.ok) throw new Error('http-' + r.status);
+        return r.json();
+      });
+    }
+
+    function withTimeout(promise, ms) {
+      return new Promise(function (resolve, reject) {
+        var done = false;
+        var timer = setTimeout(function () {
+          if (done) return;
+          done = true;
+          reject(new Error('timeout'));
+        }, ms);
+        Promise.resolve(promise).then(
+          function (v) { if (!done) { done = true; clearTimeout(timer); resolve(v); } },
+          function (e) { if (!done) { done = true; clearTimeout(timer); reject(e); } }
+        );
+      });
+    }
+
+    try {
+      var items = null;
+      try {
+        items = await withTimeout(fetchViaClient(), 6000);
+      } catch (e1) {
+        try {
+          items = await withTimeout(fetchViaRest(), 6000);
+        } catch (e2) {
+          throw e2;
+        }
+      }
+      paintItems(items);
     } catch (e) {
-      // Не затираем уже показанные новости при временном сбое
       if (!target.querySelector('[data-type]')) {
         var msg = (e && e.message === 'timeout')
-          ? 'Сервер новостей не ответил. Обновите страницу чуть позже.'
+          ? 'Сервер новостей не ответил. Обновите страницу.'
           : 'Не удалось загрузить новости. Проверьте соединение.';
         setPlaceholder(msg, true);
+        try { console.warn('[amoore-core] news load failed', e); } catch (x) {}
       }
     }
   }
@@ -368,8 +410,18 @@
   // ------------------------------------------------------------------ config + live
   async function fetchConfig() {
     try {
-      var r = await client.from('ecosystem_sites').select('*').eq('id', SITE_ID).maybeSingle();
-      return r && !r.error && r.data ? r.data : null;
+      if (client) {
+        var r = await client.from('ecosystem_sites').select('*').eq('id', SITE_ID).maybeSingle();
+        if (r && !r.error && r.data) return r.data;
+      }
+      // REST fallback
+      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=*&id=eq.' + encodeURIComponent(SITE_ID);
+      var res = await fetch(url, {
+        headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Accept': 'application/json' }
+      });
+      if (!res.ok) return null;
+      var arr = await res.json();
+      return arr && arr[0] ? arr[0] : null;
     } catch (e) { return null; }
   }
   function applyConfig() {
@@ -397,30 +449,40 @@
     } catch (e) {}
     function tick() {
       if (document.visibilityState && document.visibilityState !== 'visible') return;
-      refreshCfg();
-      renderNews();
+      refreshCfg(); // уже вызывает renderNews
     }
     setInterval(tick, POLL_MS);                     // страховка Realtime (20 с)
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible') tick();
+      if (document.visibilityState === 'visible') {
+        renderNews();
+        tick();
+      }
     });
   }
 
   async function boot() {
-    if (!window.supabase || !window.supabase.createClient) {
-      console.warn('[amoore-core] supabase-js не загружен');
-      return;
-    }
     captureGodParam();
-    client = window.supabase.createClient(SB_URL, SB_ANON, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-    });
-    trackVisit();                                   // быстрый INSERT, не ждём остального
+    if (window.supabase && window.supabase.createClient) {
+      client = window.supabase.createClient(SB_URL, SB_ANON, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+      });
+    } else {
+      console.warn('[amoore-core] supabase-js не загружен — новости через REST fallback');
+      client = null;
+    }
+    trackVisit();
     cfg = await fetchConfig();
-    window.AMOORE_CONFIG = cfg;                     // 2.1 глобальный экспорт конфига
+    window.AMOORE_CONFIG = cfg;
     applyConfig();
     await renderNews();
-    startLive();
+    if (client) startLive();
+    else {
+      // без supabase-js — простой polling REST
+      setInterval(function () {
+        if (document.visibilityState && document.visibilityState !== 'visible') return;
+        renderNews();
+      }, POLL_MS);
+    }
   }
 
   function publishConfig() {
@@ -428,7 +490,7 @@
   }
 
   window.amooreCore = {
-    version: '8.2.0',
+    version: '8.2.1',
     siteId: SITE_ID,
     getConfig: function () { return cfg ? Object.assign({}, cfg) : null; },
     isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false); },
