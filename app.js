@@ -292,8 +292,8 @@ function renderSites() {
           <input type="text" class="banner-input" maxlength="160" value="${esc(site.banner_text || '')}" placeholder="Текст баннера" aria-label="Текст баннера"${bannerAllowed ? '' : ' disabled'}>
           <button type="button" class="btn btn-ghost btn-sm" data-act="banner-apply" data-id="${id}"${bannerAllowed ? '' : ' disabled'}>Применить</button>
         </div>` : ''}
-        ${isLanding ? toggleRow(site, 'chat', 'Демо-чат', chatOn ? 'Виден на сайте' : 'Скрыт', chatOn, can('toggle_chat')) : ''}
-        ${isLanding ? toggleRow(site, 'news', 'Новости', newsOn ? 'Виден на сайте' : 'Скрыт', newsOn, can('toggle_news')) : ''}
+        ${isLanding ? toggleRow(site, 'chat', 'Демо-чат', chatOn ? 'Бот отвечает на сайте' : 'Бот говорит, что выключен', chatOn, can('toggle_chat')) : ''}
+        ${isLanding ? toggleRow(site, 'news', 'Новости', newsOn ? 'Лента с лендинга' : 'Пауза на лендинге', newsOn, can('toggle_news')) : ''}
       </div>
       ${!isOpen ? `<div class="overlay-meta">Заставка: <strong>${esc(OVERLAY_LABELS[site.overlay_type] || site.overlay_type)}</strong></div>` : ''}
     </div>`;
@@ -473,17 +473,23 @@ $('news-form').addEventListener('submit', async (e) => {
   btn.textContent = 'Сохранение…';
   btn.setAttribute('aria-busy', 'true');
   try {
-    const { error } = await sb.from('news').insert({
-      title, body, type: $('news-type').value, display_date: $('news-date').value || todayISO(), is_published: true
-    });
+    const payload = {
+      title,
+      body,
+      type: $('news-type').value || 'news',
+      display_date: $('news-date').value || todayISO(),
+      is_published: true,
+      published_at: new Date().toISOString()
+    };
+    const { data, error } = await sb.from('news').insert(payload).select('id, title').maybeSingle();
     if (error) {
       toast(friendlyError(error), 'error');
       return;
     }
     logAction('news_add', null, null, title);
-    toast('Опубликовано — уже на сайте');
+    toast('Опубликовано на лендинге (Realtime / до 20 сек)');
     e.target.reset();
-    $('news-date').value = todayISO();
+    if ($('news-date')) $('news-date').value = todayISO();
     loadNewsAdmin();
   } finally {
     btn.disabled = false;

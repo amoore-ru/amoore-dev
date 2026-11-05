@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v8.1.1 (Update v1.1 — exact TZ)
+ * amoore-core.js — v8.2.0 (demo brains + news pipeline)
  * Один скрипт для всех сайтов экосистемы. Подключение (3 строки в конце body):
  *   <script>window.AMOORE_SITE_ID = 'landing';</script>   // или 'studio'
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -29,7 +29,7 @@
   var AUTH_KEY = 'amoore_dev_auth';   // сессия админки (если админка на этом же домене)
   var VISIT_KEY = 'amoore_visit_' + SITE_ID;
   var TTL_MS = 6 * 60 * 60 * 1000;    // 6 часов
-  var POLL_MS = 60 * 1000;
+  var POLL_MS = 20 * 1000;
 
   var client = null;
   var cfg = null;          // строка ecosystem_sites для этого сайта
@@ -230,46 +230,40 @@
 
   // ------------------------------------------------------------------ chat / news visibility
   function applyVisibility() {
-    styleOnce('amoore-hide-css', '.amoore-hidden{display:none!important}');
+    styleOnce('amoore-hide-css', [
+      '.amoore-hidden{display:none!important}',
+      '.amoore-chat-offline #chat-suggestions{opacity:.55;pointer-events:none}',
+      '.amoore-news-paused .section-lead{opacity:.7}'
+    ].join(''));
+
     var hideChat = !!cfg && cfg.demo_chat_active === false;
     var hideNews = !!cfg && cfg.news_active === false;
-    Array.prototype.forEach.call(document.querySelectorAll('#chat, [data-amoore-chat], a[href="#chat"]'), function (n) {
+
+    // Нав-ссылки можно приглушить, но сами секции #chat / #news остаются видимыми —
+    // иначе пользователь не видит офлайн-ответы бота и паузу новостей.
+    Array.prototype.forEach.call(document.querySelectorAll('a[href="#chat"]'), function (n) {
       n.classList.toggle('amoore-hidden', hideChat);
     });
-    Array.prototype.forEach.call(document.querySelectorAll('#news, [data-amoore-news-section], a[href="#news"]'), function (n) {
+    Array.prototype.forEach.call(document.querySelectorAll('a[href="#news"]'), function (n) {
       n.classList.toggle('amoore-hidden', hideNews);
     });
 
-    // 2.2 Жёсткая блокировка чата: disabled на #chat-input / #chat-send + сообщение в лог
-    var chatInput = document.getElementById('chat-input');
-    var chatSend  = document.getElementById('chat-send');
-    var chatLog   = document.getElementById('chat-log');
-    if (hideChat) {
-      if (chatInput) { chatInput.disabled = true; chatInput.setAttribute('aria-disabled', 'true'); }
-      if (chatSend)  { chatSend.disabled  = true; chatSend.setAttribute('aria-disabled', 'true'); }
-      // Сообщение от бота один раз (не дублируем)
-      if (chatLog && !chatLog.querySelector('[data-amoore-off]')) {
-        var row = document.createElement('div');
-        row.className = 'chat-bubble chat-bot';
-        row.setAttribute('data-amoore-off', '1');
-        var name = document.createElement('span');
-        name.className = 'chat-name';
-        name.textContent = 'amoore';
-        var p = document.createElement('p');
-        p.textContent = 'Мой создатель забрал меня на обед. Я вернусь, как только он меня включит!';
-        row.appendChild(name);
-        row.appendChild(p);
-        chatLog.appendChild(row);
-        try { chatLog.scrollTop = chatLog.scrollHeight; } catch (e) {}
-      }
-    } else {
-      if (chatInput) { chatInput.disabled = false; chatInput.removeAttribute('aria-disabled'); }
-      if (chatSend)  { chatSend.disabled  = false; chatSend.removeAttribute('aria-disabled'); }
-      if (chatLog) {
-        var offMsg = chatLog.querySelector('[data-amoore-off]');
-        if (offMsg) offMsg.remove();
-      }
+    var chatRoot = document.getElementById('chat') || document.querySelector('[data-amoore-chat]');
+    if (chatRoot) {
+      chatRoot.classList.toggle('amoore-chat-offline', hideChat);
+      chatRoot.setAttribute('data-amoore-chat-enabled', hideChat ? '0' : '1');
     }
+
+    var newsRoot = document.getElementById('news') || document.querySelector('[data-amoore-news-section]');
+    if (newsRoot) {
+      newsRoot.classList.toggle('amoore-news-paused', hideNews);
+      newsRoot.setAttribute('data-amoore-news-enabled', hideNews ? '0' : '1');
+    }
+
+    // Сообщаем демо-чату о смене состояния (кастомное событие)
+    try {
+      window.dispatchEvent(new CustomEvent('amoore:config', { detail: cfg ? Object.assign({}, cfg) : null }));
+    } catch (e) {}
   }
 
   // ------------------------------------------------------------------ news
@@ -278,58 +272,85 @@
   async function renderNews() {
     var target = document.querySelector('#news-list, [data-amoore-news]');
     if (!target) return;
-    // 2.3 Умная очистка: при выключенных новостях — пустой список + 1 случайный текст
-    if (cfg && cfg.news_active === false) {
+
+    // Всегда сбрасываем «Загрузка…» и любой старый контент перед новой отрисовкой
+    function setPlaceholder(msg, isError) {
       target.textContent = '';
+      var item = document.createElement('div');
+      item.className = 'news-item glass-card';
+      if (isError) item.setAttribute('data-amoore-news-error', '1');
+      var span = document.createElement('span');
+      span.textContent = msg;
+      item.appendChild(span);
+      target.appendChild(item);
+    }
+
+    // Новости выключены тумблером — показываем паузу (секция видима)
+    if (cfg && cfg.news_active === false) {
       var pauses = [
         'Редакция ушла на перерыв. Скоро вернёмся.',
         'Новости на паузе. Но мы готовим кое-что крутое.',
         'Тишина в эфире...'
       ];
-      var item = document.createElement('div');
-      item.className = 'news-item glass-card';
-      var span = document.createElement('span');
-      span.textContent = pauses[Math.floor(Math.random() * pauses.length)];
-      item.appendChild(span);
-      target.appendChild(item);
+      setPlaceholder(pauses[Math.floor(Math.random() * pauses.length)], false);
       return;
     }
-    // Убрать «Загрузка…», если ещё висит
-    if (target.childElementCount === 1 && /загрузк/i.test((target.textContent || '').trim())) {
-      target.textContent = '';
+
+    // Пока грузим — явный индикатор (не вечный «Загрузка…» из HTML)
+    if (!target.querySelector('[data-type]')) {
+      setPlaceholder('Обновляем ленту…', false);
     }
+
+    if (!client) {
+      setPlaceholder('Не удалось подключиться к серверу новостей.', true);
+      return;
+    }
+
     try {
-      var res = await client.from('news')
+      // Таймаут 8 с — чтобы «Загрузка» не висела вечно
+      var timeoutMs = 8000;
+      var fetchPromise = client.from('news')
         .select('id, title, body, type, display_date, published_at')
         .eq('is_published', true)
         .order('published_at', { ascending: false })
         .limit(20);
+      var res = await Promise.race([
+        fetchPromise,
+        new Promise(function (_, reject) {
+          setTimeout(function () { reject(new Error('timeout')); }, timeoutMs);
+        })
+      ]);
       if (res.error) throw res.error;
       var items = res.data || [];
       target.textContent = '';
       if (!items.length) {
-        var empty = el('div', 'news-item glass-card');
-        empty.appendChild(el('span')).textContent = 'Здесь пока пусто.';
-        target.appendChild(empty);
+        setPlaceholder('Здесь пока пусто. Новости появятся из панели amoore Dev.', false);
         return;
       }
       var frag = document.createDocumentFragment();
       items.forEach(function (n) {
-        var item = el('div', 'news-item glass-card');
+        var item = document.createElement('div');
+        item.className = 'news-item glass-card';
         item.setAttribute('data-type', n.type || 'news');
-        var small = el('small'); small.textContent = [TYPE_LABEL[n.type] || '', fmtDate(n)].filter(Boolean).join(' · ');
-        var title = el('b');     title.textContent = n.title || '';
-        var text = el('span');   text.textContent = n.body || '';
-        item.appendChild(small); item.appendChild(title); item.appendChild(text);
+        var small = document.createElement('small');
+        small.textContent = [TYPE_LABEL[n.type] || '', fmtDate(n)].filter(Boolean).join(' · ');
+        var title = document.createElement('b');
+        title.textContent = n.title || '';
+        var body = document.createElement('span');
+        body.textContent = n.body || '';
+        item.appendChild(small);
+        item.appendChild(title);
+        item.appendChild(body);
         frag.appendChild(item);
       });
       target.appendChild(frag);
     } catch (e) {
+      // Не затираем уже показанные новости при временном сбое
       if (!target.querySelector('[data-type]')) {
-        target.textContent = '';
-        var err = el('div', 'news-item glass-card');
-        err.appendChild(el('span')).textContent = 'Не удалось загрузить новости.';
-        target.appendChild(err);
+        var msg = (e && e.message === 'timeout')
+          ? 'Сервер новостей не ответил. Обновите страницу чуть позже.'
+          : 'Не удалось загрузить новости. Проверьте соединение.';
+        setPlaceholder(msg, true);
       }
     }
   }
@@ -377,10 +398,12 @@
     function tick() {
       if (document.visibilityState && document.visibilityState !== 'visible') return;
       refreshCfg();
-      renderNews();                                   // 2.4 принудительно при возврате на вкладку
+      renderNews();
     }
-    setInterval(tick, POLL_MS);                     // страховка, если Realtime выключен
-    document.addEventListener('visibilitychange', tick);
+    setInterval(tick, POLL_MS);                     // страховка Realtime (20 с)
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') tick();
+    });
   }
 
   async function boot() {
@@ -405,7 +428,7 @@
   }
 
   window.amooreCore = {
-    version: '8.1.1',
+    version: '8.2.0',
     siteId: SITE_ID,
     getConfig: function () { return cfg ? Object.assign({}, cfg) : null; },
     isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false); },
