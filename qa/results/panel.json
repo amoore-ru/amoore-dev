@@ -1,0 +1,1580 @@
+{
+  "suite": "panel",
+  "total": 208,
+  "passed": 208,
+  "failed": 0,
+  "rows": [
+    {
+      "title": "порядок вкладок: Дашборд → Медиа → Команда → Логи → Заявки → Дайджест → Настройки",
+      "ok": true,
+      "detail": "Дашборд>Медиа>Команда>Логи>Заявки>Дайджест>Настройки"
+    },
+    {
+      "title": "чип версии показывает v3.0.0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "нет ошибок JS при входе",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "если версия уже просмотрена — окно «Что нового» не показывается",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "клик по чипу версии открывает историю обновлений",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "первый вход за версию: выскакивает окно «Что нового»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "заголовок «Обновление v3.0»",
+      "ok": true,
+      "detail": "Обновление v3.0"
+    },
+    {
+      "title": "в списке новые функции: дайджест, дизайн, заявки",
+      "ok": true,
+      "detail": "5 пунктов"
+    },
+    {
+      "title": "после «Понятно» версия запоминается",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "после перезагрузки окно больше не появляется",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "синхронизация версий: core = app.js = changelog (3.0.0)",
+      "ok": true,
+      "detail": "3.0.0/3.0.0/3.0.0"
+    },
+    {
+      "title": "красный бейдж на вкладке «Заявки» показывает число новых (2)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "бейдж красный и заметный (цвет фона = красный)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "карточка «Новых заявок» на дашборде = 2 и подсвечена",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "новая заявка с лендинга увеличивает счётчик без перезагрузки (Realtime)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "список заявок: новые помечены, обработанные нет",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "«Обработана» уменьшает счётчик (3 → 2) и пишет событие lead_done",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "когда новых нет — бейдж скрывается",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "XSS в имени заявки экранируется",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "мобильный: на бургере есть красная точка при новых заявках",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "уходящая вкладка получает класс leaving (плавное исчезновение)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "новая вкладка выезжает снизу с blur (amoore-view-in)",
+      "ok": true,
+      "detail": "amoore-view-in"
+    },
+    {
+      "title": "после анимации контент чёткий и на месте",
+      "ok": true,
+      "detail": "{\"o\":\"1\",\"f\":\"blur(0px)\",\"t\":\"matrix(1, 0, 0, 1, 0, 0)\"}"
+    },
+    {
+      "title": "быстрые переключения не оставляют два экрана одновременно",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "prefers-reduced-motion: переключение мгновенное, без анимации",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "вкладка «Дайджест» открывается, видна кнопка «Сформировать сводку за неделю»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "плитки: новости 3, переключения 4, заявки 3, визиты 12",
+      "ok": true,
+      "detail": "3,4,3,12"
+    },
+    {
+      "title": "разделы отчёта: новости, тумблеры, визиты",
+      "ok": true,
+      "detail": "📰 Новости 3 | 🎛 Изменения тумблеров 4 | 👁 Визиты по сайтам"
+    },
+    {
+      "title": "в отчёте есть реальные записи (баннер landing, закрытие studio)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "черновик (не опубликован) в дайджест не попадает",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "«Скопировать текст» кладёт дайджест в буфер",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "«Скачать .txt» отдаёт файл amoore-digest-ДАТА.txt",
+      "ok": true,
+      "detail": "amoore-digest-2026-11-07.txt"
+    },
+    {
+      "title": "«Отправить боту» создаёт запрос в digest_queue (source=dev, pending, от имени админа)",
+      "ok": true,
+      "detail": "[{\"id\":\"id-325a4297\",\"created_at\":\"2026-11-07T17:17:42.125Z\",\"source\":\"dev\",\"status\":\"pending\",\"requested_by\":\"a1\"}]"
+    },
+    {
+      "title": "событие digest_request записано в журнал (Event System)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "когда бот отвечает «sent» — пользователь видит подтверждение",
+      "ok": true,
+      "detail": "✓ Бот отправил дайджест админам в Telegram."
+    },
+    {
+      "title": "повторный запрос, пока предыдущий в очереди, отклоняется понятным сообщением",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "пустая неделя: «Тихая неделя…» вместо пустого отчёта",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "отказ одной таблицы не ломает дайджест: отчёт собирается из остального",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "двойной клик по «Опубликовать» создаёт ровно одну новость",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "title": "новость сохранена опубликованной, с датой и типом",
+      "ok": true,
+      "detail": "{\"id\":\"id-666b0a54\",\"created_at\":\"2026-11-07T17:17:52.537Z\",\"published_at\":\"2026-11-07T17:17:52.495Z\",\"is_published\":true,\"title\":\"Большое обновление 3.0\",\"body\":\"Дайджесты, заявки и новый дизайн.\",\"type\":\"news\",\"display_date\":\"2026-11-06\"}"
+    },
+    {
+      "title": "событие news_add пишется в журнал с заголовком",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "валидация: слишком короткий заголовок отклоняется",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "опубликованная в админке новость появляется на лендинге без перезагрузки",
+      "ok": true,
+      "detail": "было 3"
+    },
+    {
+      "title": "на лендинге показана дата 06.11.2026",
+      "ok": true,
+      "detail": "Новость · 06.11.2026Большое обновление 3.0Дайджесты, заявки и новый дизайн."
+    },
+    {
+      "title": "после перезагрузки лендинга новость на месте",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "баннер: включение + текст сохраняются в БД",
+      "ok": true,
+      "detail": "[true,\"Профилактика до 18:00\"]"
+    },
+    {
+      "title": "демо-чат: тумблер переключает demo_chat_active",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "действия попадают в журнал (banner_on, banner_edit, chat_off)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "«+ Добавить сайт»: запись создана, URL нормализован до https://",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "RBAC: модератор без прав не видит Заявки/Дайджест/Логи/Команду/Настройки",
+      "ok": true,
+      "detail": "Дашборд"
+    },
+    {
+      "title": "RBAC: у модератора нет кнопки «+ Добавить сайт» и корзины",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "320px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":16,\"r\":304,\"t\":64,\"b\":800,\"vw\":320,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "320px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "320px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "320px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "320px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "320px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "320px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "320px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "320px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "320px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "360px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":16,\"r\":344,\"t\":64,\"b\":800,\"vw\":360,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "360px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "360px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "360px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "360px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "360px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "360px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "360px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "360px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "360px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "375px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":16,\"r\":359,\"t\":64,\"b\":800,\"vw\":375,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "375px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "375px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "375px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "375px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "375px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "375px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "375px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "375px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "375px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "390px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":16,\"r\":374,\"t\":64,\"b\":800,\"vw\":390,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "390px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "390px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "390px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "390px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "390px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "390px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "390px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "390px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "390px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "414px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":16,\"r\":398,\"t\":207.40625,\"b\":800,\"vw\":414,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "414px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "414px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "414px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "414px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "414px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "414px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "414px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "414px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "414px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "430px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":16,\"r\":414,\"t\":207.40625,\"b\":800,\"vw\":430,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "430px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "430px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "430px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "430px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "430px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "430px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "430px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "430px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "430px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "540px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":16,\"r\":524,\"t\":283.40625,\"b\":800,\"vw\":540,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "540px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "540px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "540px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "540px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "540px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "540px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "540px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "540px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "540px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "768px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":16,\"r\":752,\"t\":325.40625,\"b\":800,\"vw\":768,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "768px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "768px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "768px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "768px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "768px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "768px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "768px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "768px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "768px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "820px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":170,\"r\":650,\"t\":130.703125,\"b\":669.296875,\"vw\":820,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "820px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "820px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "820px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "820px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "820px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "820px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "820px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "820px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "820px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "900px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":210,\"r\":690,\"t\":130.703125,\"b\":669.296875,\"vw\":900,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "900px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "900px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "900px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "900px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "900px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "900px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "900px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "900px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "900px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "1024px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":272,\"r\":752,\"t\":130.703125,\"b\":669.296875,\"vw\":1024,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "1024px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1024px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1024px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1024px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1024px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1024px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1024px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1024px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "1024px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "1100px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":310,\"r\":790,\"t\":130.703125,\"b\":669.296875,\"vw\":1100,\"vh\":800,\"vis\":true}"
+    },
+    {
+      "title": "1100px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1100px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1100px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1100px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1100px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1100px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1100px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1100px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)",
+      "ok": true,
+      "detail": "48,48,48,48,48,48,48"
+    },
+    {
+      "title": "1100px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "1101px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":310.5,\"r\":790.5,\"t\":180.703125,\"b\":719.296875,\"vw\":1101,\"vh\":900,\"vis\":true}"
+    },
+    {
+      "title": "1101px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1101px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1101px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1101px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1101px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1101px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1101px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1101px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "1280px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":400,\"r\":880,\"t\":180.703125,\"b\":719.296875,\"vw\":1280,\"vh\":900,\"vis\":true}"
+    },
+    {
+      "title": "1280px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1280px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1280px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1280px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1280px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1280px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1280px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1280px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "1440px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":480,\"r\":960,\"t\":180.703125,\"b\":719.296875,\"vw\":1440,\"vh\":900,\"vis\":true}"
+    },
+    {
+      "title": "1440px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1440px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1440px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1440px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1440px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1440px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1440px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1440px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "1920px: окно «Что нового» целиком помещается на экран",
+      "ok": true,
+      "detail": "{\"l\":720,\"r\":1200,\"t\":180.703125,\"b\":719.296875,\"vw\":1920,\"vh\":900,\"vis\":true}"
+    },
+    {
+      "title": "1920px · dashboard: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1920px · media: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1920px · team: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1920px · logs: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1920px · leads: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1920px · digest: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1920px · settings: нет горизонтальной прокрутки",
+      "ok": true,
+      "detail": "over=0 "
+    },
+    {
+      "title": "1920px: нет ошибок JS",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "320px: экран входа без горизонтальной прокрутки",
+      "ok": true,
+      "detail": "0"
+    }
+  ],
+  "extra": {
+    "matrix": [
+      {
+        "w": 320,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 360,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 375,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 390,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 414,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 430,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 540,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 768,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 820,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 900,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 1024,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 1100,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 1101,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 1280,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 1440,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      },
+      {
+        "w": 1920,
+        "views": {
+          "dashboard": {
+            "over": 0,
+            "wide": []
+          },
+          "media": {
+            "over": 0,
+            "wide": []
+          },
+          "team": {
+            "over": 0,
+            "wide": []
+          },
+          "logs": {
+            "over": 0,
+            "wide": []
+          },
+          "leads": {
+            "over": 0,
+            "wide": []
+          },
+          "digest": {
+            "over": 0,
+            "wide": []
+          },
+          "settings": {
+            "over": 0,
+            "wide": []
+          }
+        }
+      }
+    ]
+  }
+}

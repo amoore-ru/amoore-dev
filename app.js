@@ -11,6 +11,8 @@ const SESSION_KEY = 'amoore_dev_auth';
 const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
+// Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
+const AMOORE_VERSION = '3.0.0';
 
 // ---- права: ключи совпадают с SQL (role_default_perm / has_perm) ----
 const PERMS = [
@@ -37,7 +39,8 @@ const ACTION_LABELS = {
   news_add: 'Добавил новость', news_delete: 'Удалил новость',
   site_add: 'Добавил сайт', site_delete: 'Удалил сайт',
   admin_add: 'Добавил пользователя', admin_delete: 'Удалил пользователя',
-  role_change: 'Сменил роль', perms_change: 'Изменил права', media_upload: 'Загрузил медиа', backup: 'Скачал бэкап'
+  role_change: 'Сменил роль', perms_change: 'Изменил права', media_upload: 'Загрузил медиа', backup: 'Скачал бэкап',
+  lead_done: 'Обработал заявку', digest_request: 'Запросил дайджест', bot_toggle: 'Переключил бота', broadcast: 'Сделал рассылку'
 };
 const OVERLAY_LABELS = { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' };
 const NEWS_TYPES = { news: 'Новость', patch: 'Патч', soon: 'Скоро' };
@@ -219,9 +222,12 @@ function showApp(session) {
   if ($('news-date') && !$('news-date').value) $('news-date').value = todayISO();
   applyRoleUI();
   switchView('dashboard');
+  startLeadsWatcher();          // красный счётчик новых заявок
+  maybeShowWhatsNew();          // окно «Что нового», если это первый вход за версию
 }
 const VIEW_RULES = {
   leads: () => can('view_logs') || isSuper(),
+  digest:    () => can('view_logs') || isSuper(),
   dashboard: () => true,
   media:     () => can('manage_media'),
   team:      () => isSuper() || can('manage_admins'),
@@ -238,23 +244,46 @@ function applyRoleUI() {
   const sel = $('new-role');
   sel.innerHTML = ['moderator', 'admin'].concat(isSuper() ? ['super_admin'] : []).map(r => `<option value="${r}">${r}</option>`).join('');
 }
+// Переход между вкладками: старый экран гаснет с размытием (~140 мс), новый выезжает снизу из blur.
+// Анимации — в style.css (.view.leaving / .view.active); при prefers-reduced-motion переключение мгновенное.
+let viewTimer = 0;
 function switchView(name) {
   if (!VIEW_RULES[name] || !VIEW_RULES[name]()) name = 'dashboard';
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
-  $('topbar-tabs').classList.remove('open');
-  $('burger').setAttribute('aria-expanded', 'false');
+  const next = $('view-' + name), prev = document.querySelector('.view.active');
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  clearTimeout(viewTimer);
+  document.querySelectorAll('.view.leaving').forEach(v => v.classList.remove('leaving'));
+  const show = () => {
+    document.querySelectorAll('.view').forEach(v => { v.classList.remove('leaving'); v.classList.toggle('active', v === next); });
+  };
+  if (prev && prev !== next && !reduce) { prev.classList.add('leaving'); viewTimer = setTimeout(show, 140); }
+  else show();
+  closeMobileMenu();
   window.scrollTo(0, 0);
   if (name === 'dashboard') loadDashboard();
   if (name === 'media') loadMedia();
   if (name === 'team') loadTeam();
   if (name === 'logs') loadLogs();
   if (name === 'leads') loadLeads();
+  if (name === 'digest') loadDigestView();
+}
+function closeMobileMenu() {
+  $('topbar-tabs').classList.remove('open');
+  $('burger').setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('menu-open');
 }
 $('burger').addEventListener('click', () => {
   const open = $('topbar-tabs').classList.toggle('open');
   $('burger').setAttribute('aria-expanded', open ? 'true' : 'false');
+  document.body.classList.toggle('menu-open', open);       // блокирует прокрутку страницы под меню
 });
+// Меню как в нативных приложениях: закрывается по Esc, по тапу вне меню и при переходе на широкий экран
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('topbar-tabs').classList.contains('open')) { closeMobileMenu(); $('burger').focus(); } });
+document.addEventListener('click', e => {
+  if ($('topbar-tabs').classList.contains('open') && !e.target.closest('#topbar-tabs, #burger')) closeMobileMenu();
+});
+window.addEventListener('resize', () => { if (window.innerWidth > 1100) closeMobileMenu(); });
 document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 
 // ======================================================================= глобальный поиск по новостям, сайтам и администраторам
@@ -356,6 +385,7 @@ function renderSites() {
   $('stat-total').textContent = sitesCache.length;
   $('stat-open').textContent = sitesCache.filter(s => s.status === 'open').length;
   $('stat-closed').textContent = sitesCache.filter(s => s.status !== 'open').length;
+  setLeadsStat(leadsNewCount);
   if (!sitesCache.length) { grid.innerHTML = '<div class="loading-state">Здесь пока пусто. Добавьте первый сайт экосистемы.</div>'; return; }
   grid.innerHTML = sitesCache.map(site => {
     const id = esc(site.id);
@@ -675,6 +705,7 @@ async function toggleBotOnline() {
     const { error } = await sb.from('bot_status').upsert({ id: 'main', is_online: next, updated_at: new Date().toISOString() });
     if (error) return toast(friendlyError(error), 'error');
     toast(next ? 'Бот включён' : 'Бот на техобслуживании');
+    logAction('bot_toggle', null, null, next ? 'on' : 'off');
     loadBotStatus();
   } catch (e) { toast('Ошибка', 'error'); }
 }
@@ -716,7 +747,7 @@ async function loadLeads() {
   if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   if (!data?.length) { list.innerHTML = '<div class="loading-state">Здесь пока пусто. Новые заявки появятся после отправки формы.</div>'; return; }
   list.innerHTML = data.map(l => `
-    <div class="admin-card glass" data-lead="${esc(l.id)}">
+    <div class="admin-card glass" data-lead="${esc(l.id)}" data-new="${l.status === 'done' ? 0 : 1}">
       <div class="admin-card-info">
         <h4>${esc(l.name || 'Без имени')} <span class="role-badge ${l.status === 'done' ? 'admin' : 'moderator'}">${esc(l.status || 'new')}</span></h4>
         <p>${esc(l.contact || '')}</p>
@@ -735,9 +766,186 @@ document.addEventListener('click', async (e) => {
   if (!b) return;
   const { error } = await sb.from('leads').update({ status: 'done' }).eq('id', b.dataset.id);
   if (error) toast(friendlyError(error), 'error');
-  else { toast('Отмечено'); loadLeads(); }
+  else { toast('Отмечено'); logAction('lead_done'); loadLeads(); refreshLeadsBadge(); }
 });
 
+
+
+// ======================================================================= счётчик новых заявок (красный бейдж)
+let leadsNewCount = 0, leadsWatcherOn = false;
+function setLeadsStat(n) {
+  const v = $('stat-leads'); if (!v) return;
+  v.textContent = n == null ? '—' : String(n);
+  $('stat-leads-card').classList.toggle('has-new', n > 0);
+}
+function paintLeadsBadge(n) {
+  leadsNewCount = n;
+  const badge = $('leads-badge'), dot = $('burger-dot');
+  const txt = n > 99 ? '99+' : String(n);
+  if (badge) { badge.textContent = txt; badge.hidden = !(n > 0); badge.setAttribute('aria-label', `Новых заявок: ${n}`); }
+  if (dot) dot.hidden = !(n > 0);                       // на мобильном вкладки спрятаны — точка на бургере
+  setLeadsStat(n);
+}
+async function refreshLeadsBadge() {
+  if (!me || !VIEW_RULES.leads()) return;
+  try {
+    const { count, error } = await sb.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'new');
+    if (!error) paintLeadsBadge(count || 0);
+  } catch (_) {}
+}
+function startLeadsWatcher() {
+  refreshLeadsBadge();
+  if (leadsWatcherOn) return;
+  leadsWatcherOn = true;
+  // Realtime — мгновенно; опрос раз в 45 с — страховка, если Realtime не включён
+  try { sb.channel('amoore-dev-leads').on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => { refreshLeadsBadge(); if ($('view-leads').classList.contains('active')) loadLeads(); }).subscribe(); } catch (_) {}
+  setInterval(() => { if (document.visibilityState !== 'hidden') refreshLeadsBadge(); }, 45000);
+}
+$('stat-leads-card')?.addEventListener('click', () => switchView('leads'));
+
+// ======================================================================= Дайджест (Smart Digest)
+let lastDigest = null;
+function loadDigestView() {
+  if (lastDigest) renderDigest(lastDigest);
+}
+function dgSection(icon, title, count, rows, emptyText) {
+  return `<section class="digest-section glass"><h3><span>${icon}</span> ${esc(title)} <b>${count}</b></h3>` +
+    (rows.length ? `<ul>${rows.join('')}</ul>` : `<p class="muted">${esc(emptyText)}</p>`) + '</section>';
+}
+function renderDigest(r) {
+  const host = $('digest-result');
+  const cut = (arr, fn) => { const rows = arr.slice(0, 10).map(fn); if (arr.length > 10) rows.push(`<li class="muted">…и ещё ${arr.length - 10}</li>`); return rows; };
+  const visitsLine = r.visits.bySite.map(x => `${esc(x.site)} <b>${x.count}</b>`).join(' · ') || '—';
+  host.innerHTML = `
+    <div class="digest-meta">Период: <b>${esc(r.period.label)}</b> · сформировано ${esc(new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }))}</div>
+    <div class="digest-tiles">
+      <div class="stat-card glass"><div class="stat-value">${r.totals.news}</div><div class="stat-label">Новостей</div></div>
+      <div class="stat-card glass"><div class="stat-value">${r.totals.toggles}</div><div class="stat-label">Переключений</div></div>
+      <div class="stat-card glass ${r.leads.fresh ? 'hot' : ''}"><div class="stat-value">${r.leads.total}</div><div class="stat-label">Заявок (новых ${r.leads.fresh})</div></div>
+      <div class="stat-card glass"><div class="stat-value">${r.visits.total}</div><div class="stat-label">Визитов</div></div>
+    </div>
+    ${r.empty ? '<div class="loading-state">Тихая неделя: изменений, новостей и заявок не было.</div>' : `
+    <div class="digest-grid">
+      ${dgSection('📰', 'Новости', r.news.length, cut(r.news, n => `<li><span class="when">${esc(n.day)}</span> ${esc(n.title)} <em>${esc(NEWS_TYPES[n.type] || n.type)}</em></li>`), 'За неделю новостей не было')}
+      ${dgSection('🎛', 'Изменения тумблеров', r.toggles.length, cut(r.toggles, t => `<li><span class="when">${esc(t.day)} ${esc(t.time)}</span> <b>${esc(t.who)}</b> ${esc(t.label)}${t.site ? ` · <code>${esc(t.site)}</code>` : ''}</li>`), 'Без изменений')}
+      ${r.other.length ? dgSection('🗂', 'Прочие события', r.other.length, cut(r.other, t => `<li><span class="when">${esc(t.day)}</span> <b>${esc(t.who)}</b> ${esc(t.label)}${t.site ? ` · <code>${esc(t.site)}</code>` : ''}</li>`), '') : ''}
+      <section class="digest-section glass"><h3><span>👁</span> Визиты по сайтам</h3><p>${visitsLine}</p></section>
+    </div>`}
+    <div class="digest-actions">
+      <button type="button" class="btn btn-ghost" id="digest-copy">Скопировать текст</button>
+      <button type="button" class="btn btn-ghost" id="digest-download">Скачать .txt</button>
+      <button type="button" class="btn btn-primary" id="digest-send" style="width:auto">Отправить боту → админам в Telegram</button>
+    </div>
+    <p class="widget-meta" id="digest-send-status" role="status" aria-live="polite"></p>
+    <details class="digest-preview"><summary>Как сообщение выглядит в Telegram</summary><pre>${esc(r.text)}</pre></details>`;
+}
+async function generateDigest() {
+  if (!me || !VIEW_RULES.digest()) return toast('Недостаточно прав', 'error');
+  const btn = $('digest-build'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Собираю…';
+  $('digest-result').innerHTML = '<div class="skeleton-stack"><i></i><i></i><i></i></div>';
+  const since = new Date(Date.now() - 7 * 86400000).toISOString();
+  try {
+    // Все запросы — параллельно и только за период (по индексам created_at / published_at)
+    const q = (t, cols, col, lim) => sb.from(t).select(cols).gte(col, since).order(col, { ascending: false }).limit(lim);
+    const [news, logs, leads, visits, admins, sites] = await Promise.all([
+      q('news', 'title,type,is_published,published_at', 'published_at', 200),
+      q('audit_logs', 'admin_id,action,site_id,details,created_at', 'created_at', 1000),
+      q('leads', 'status,created_at', 'created_at', 1000),
+      q('site_visits', 'site_id,created_at', 'created_at', 5000),
+      sb.from('admins').select('id,nickname,name,email').limit(200),
+      sb.from('ecosystem_sites').select('id,name').limit(100)
+    ]);
+    const failed = [['news', news], ['audit_logs', logs], ['leads', leads]].filter(([, r]) => r.error);
+    if (failed.length) toast('Часть данных недоступна: ' + failed.map(([n]) => n).join(', '), 'error');
+    lastDigest = AmooreDigest.build({
+      news: news.data || [], logs: logs.data || [], leads: leads.data || [], visits: visits.data || [],
+      admins: admins.data || [], sites: sites.data || [], days: 7, tzOffsetMin: -new Date().getTimezoneOffset()
+    });
+    renderDigest(lastDigest);
+  } catch (e) {
+    $('digest-result').innerHTML = `<div class="loading-state">${esc(friendlyError(e))}</div>`;
+  } finally { btn.disabled = false; btn.textContent = old; }
+}
+$('digest-build')?.addEventListener('click', generateDigest);
+
+let digestPoll = 0;
+async function sendDigestToBot() {
+  const btn = $('digest-send'), st = $('digest-send-status');
+  btn.disabled = true;
+  const { data, error } = await sb.from('digest_queue').insert({ source: 'dev', status: 'pending', requested_by: me.admin_id }).select('id').maybeSingle();
+  if (error) {
+    btn.disabled = false;
+    if (/duplicate|unique/i.test(error.message || '')) { st.textContent = 'Запрос уже в очереди — бот отправит дайджест в течение минуты.'; return; }
+    if (/digest_queue|relation .* does not exist|schema cache/i.test(error.message || '')) { st.textContent = 'Очередь не создана: выполните SQL-миграцию 004_v30_singularity.sql.'; return toast('Нет таблицы digest_queue', 'error'); }
+    st.textContent = friendlyError(error); return toast(friendlyError(error), 'error');
+  }
+  logAction('digest_request');
+  st.textContent = 'Запрос отправлен боту. Ждём подтверждения…';
+  const id = data?.id; let tries = 0;
+  clearInterval(digestPoll);
+  digestPoll = setInterval(async () => {
+    tries++;
+    const { data: row } = id ? await sb.from('digest_queue').select('status,error_text').eq('id', id).maybeSingle() : { data: null };
+    if (row && row.status === 'sent') { clearInterval(digestPoll); st.textContent = '✓ Бот отправил дайджест админам в Telegram.'; btn.disabled = false; toast('Дайджест отправлен'); }
+    else if (row && row.status === 'error') { clearInterval(digestPoll); st.textContent = 'Бот не смог отправить: ' + (row.error_text || 'ошибка'); btn.disabled = false; }
+    else if (tries >= 24) { clearInterval(digestPoll); st.textContent = 'Бот пока не ответил (запрос в очереди). Проверьте, что бот запущен и в нём есть ключ service role.'; btn.disabled = false; }
+  }, 5000);
+}
+document.addEventListener('click', async (e) => {
+  if (e.target.closest('#digest-copy') && lastDigest) { toast((await copyText(lastDigest.text)) ? 'Дайджест скопирован' : 'Не удалось скопировать', 'success'); }
+  else if (e.target.closest('#digest-download') && lastDigest) {
+    const blob = new Blob([lastDigest.text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `amoore-digest-${todayISO()}.txt`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  }
+  else if (e.target.closest('#digest-send') && lastDigest) sendDigestToBot();
+});
+
+// ======================================================================= «Что нового» (changelog.json)
+const WN_KEY = 'amoore_dev_seen_version';
+const WN_FALLBACK = [{ version: AMOORE_VERSION, title: 'Singularity', items: [
+  'Дайджест: сводка за неделю и отправка админам в Telegram через бота.',
+  'Новый дизайн Deep Glass 3.0 и плавные переходы между вкладками.',
+  'Красный счётчик новых заявок с лендинга.',
+  'Новости на лендинге грузятся стабильно и не зависят от остальных запросов.'] }];
+async function loadChangelog() {
+  try {
+    const r = await fetch('changelog.json?v=' + AMOORE_VERSION, { cache: 'no-cache' });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const list = Array.isArray(d.versions) ? d.versions : [];
+    return list.length ? list : WN_FALLBACK;
+  } catch (_) { return WN_FALLBACK; }
+}
+let wnList = null;
+function renderWhatsNew(list, all) {
+  const cur = list[0] || WN_FALLBACK[0];
+  const [maj, min] = String(cur.version).split('.');
+  $('whatsnew-title').textContent = all ? 'История обновлений' : `Обновление v${maj}.${min}`;
+  $('whatsnew-sub').textContent = all ? `Текущая версия ${AMOORE_VERSION}` : `${cur.title || ''} — что изменилось`;
+  const shown = all ? list : [cur];
+  $('whatsnew-list').innerHTML = shown.map(v => `<li class="wn-version"><h4>v${esc(v.version)} <small>${esc(v.title || '')}</small></h4><ul>${(v.items || []).map(i => `<li>${esc(i)}</li>`).join('')}</ul></li>`).join('');
+  $('whatsnew-history').style.display = all || list.length < 2 ? 'none' : '';
+}
+async function openWhatsNew(all) {
+  if (!wnList) wnList = await loadChangelog();
+  renderWhatsNew(wnList, all);
+  $('whatsnew-modal').classList.add('visible');
+  $('whatsnew-ok').focus();
+}
+function closeWhatsNew() {
+  $('whatsnew-modal').classList.remove('visible');
+  try { localStorage.setItem(WN_KEY, AMOORE_VERSION); } catch (_) {}
+}
+function maybeShowWhatsNew() {
+  let seen = ''; try { seen = localStorage.getItem(WN_KEY) || ''; } catch (_) {}
+  if (seen !== AMOORE_VERSION) setTimeout(() => openWhatsNew(false), 700);
+}
+$('whatsnew-ok')?.addEventListener('click', closeWhatsNew);
+$('whatsnew-history')?.addEventListener('click', () => renderWhatsNew(wnList || WN_FALLBACK, true));
+$('whatsnew-modal')?.addEventListener('click', e => { if (e.target === $('whatsnew-modal')) closeWhatsNew(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('whatsnew-modal').classList.contains('visible')) closeWhatsNew(); });
+$('version-chip')?.addEventListener('click', () => openWhatsNew(true));
 
 // ======================================================================= медиа
 const dz = $('dropzone');

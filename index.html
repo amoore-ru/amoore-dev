@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
-  <title>amoore Dev — Mission Control</title>
+  <title>amoore Dev — Mission Control v3.0</title>
   <meta name="theme-color" content="#070b16">
   <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=8">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=3.0.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -45,21 +45,23 @@
       <div class="topbar-brand">
         <div class="mark">a.</div>
         <div><strong>amoore Dev</strong><span>Mission Control</span></div>
+        <button type="button" class="version-chip" id="version-chip" title="Что нового" aria-label="Что нового в версии">v3.0.0</button>
       </div>
-      <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false">
-        <span></span><span></span><span></span>
+      <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="topbar-tabs">
+        <span></span><span></span><span></span><i class="burger-dot" id="burger-dot" hidden></i>
       </button>
       <nav class="topbar-tabs" id="topbar-tabs">
         <button class="tab-btn active" data-view="dashboard" id="tab-dashboard">Дашборд</button>
         <button class="tab-btn" data-view="media" id="tab-media">Медиа</button>
         <button class="tab-btn" data-view="team" id="tab-team">Команда</button>
         <button class="tab-btn" data-view="logs" id="tab-logs">Логи</button>
-        <button class="tab-btn" data-view="leads" id="tab-leads">Заявки</button>
+        <button class="tab-btn" data-view="leads" id="tab-leads">Заявки<span class="tab-badge" id="leads-badge" hidden aria-label="Новых заявок">0</span></button>
+        <button class="tab-btn" data-view="digest" id="tab-digest">Дайджест</button>
         <button class="tab-btn" data-view="settings" id="tab-settings">Настройки</button>
       </nav>
       <div class="topbar-right">
         <div class="global-search-wrap">
-          <input id="global-search" type="search" placeholder="Поиск: новости, сайты, админы…" aria-label="Глобальный поиск" autocomplete="off">
+          <input id="global-search" type="search" placeholder="Поиск по панели…" title="Поиск: новости, сайты, админы" aria-label="Глобальный поиск" autocomplete="off">
           <div id="global-search-results" class="global-search-results" role="listbox" hidden></div>
         </div>
         <div class="admin-badge"><span class="dot"></span><span>Admin</span></div>
@@ -81,6 +83,7 @@
           <div class="stat-card glass"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Сайтов</div></div>
           <div class="stat-card glass"><div class="stat-value" id="stat-open">—</div><div class="stat-label">Открыто</div></div>
           <div class="stat-card glass danger"><div class="stat-value" id="stat-closed">—</div><div class="stat-label">Закрыто</div></div>
+          <button type="button" class="stat-card glass stat-leads" id="stat-leads-card" title="Открыть заявки"><div class="stat-value" id="stat-leads">—</div><div class="stat-label">Новых заявок</div></button>
         </div>
         <div class="widgets-row">
           <div class="widget glass">
@@ -210,6 +213,20 @@
 
       <!-- LOGS -->
       
+      <!-- DIGEST -->
+      <div class="view" id="view-digest">
+        <div class="section-head">
+          <div>
+            <h2 style="margin:0">Дайджест</h2>
+            <p class="muted" style="margin:4px 0 0">Сводка за 7 дней: новости, переключения тумблеров, заявки и визиты. Берётся из журнала действий (Event System).</p>
+          </div>
+          <button type="button" class="btn btn-primary" id="digest-build" style="width:auto">Сформировать сводку за неделю</button>
+        </div>
+        <div id="digest-result" class="digest-result" aria-live="polite">
+          <div class="loading-state">Нажмите «Сформировать сводку за неделю» — отчёт соберётся за несколько секунд.</div>
+        </div>
+      </div>
+
       <div class="view" id="view-leads">
         <h2>Заявки с лендинга</h2>
         <p class="muted">Форма «Оставить заявку» на amoore-ru</p>
@@ -286,7 +303,22 @@
     </div>
   </div>
 
+  <!-- What's New -->
+  <div class="modal-overlay" id="whatsnew-modal" role="dialog" aria-modal="true" aria-labelledby="whatsnew-title">
+    <div class="modal glass sheet whatsnew">
+      <div class="whatsnew-badge">NEW</div>
+      <h2 id="whatsnew-title">Обновление v3.0</h2>
+      <p class="muted" id="whatsnew-sub">Singularity — что изменилось</p>
+      <ul class="whatsnew-list" id="whatsnew-list"></ul>
+      <div class="modal-actions" style="margin-top:20px">
+        <button type="button" class="btn btn-ghost" id="whatsnew-history">Вся история</button>
+        <button type="button" class="btn btn-primary" id="whatsnew-ok" style="width:auto;flex:1;margin-top:0">Понятно</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=8"></script>
+  <script src="digest.js?v=3.0.0"></script>
+  <script src="app.js?v=3.0.0"></script>
 </body>
 </html>
