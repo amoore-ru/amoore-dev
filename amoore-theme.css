@@ -1,0 +1,199 @@
+/* =====================================================================
+   amoore-theme.css — v4.0 «NEXUS» · Unified Design System
+   ЕДИНЫЙ файл для amoore-dev / amoore-ru / amoore-studio.
+   Должен быть побайтно одинаковым во всех трёх папках (проверяет run_qa.sh).
+   Подключается ПОСЛЕ style.css каждого сайта и задаёт общий вид:
+   палитра, Liquid Glass 3.0, кнопки, шрифты, тумблеры, чип версии и changelog.
+   ===================================================================== */
+
+:root {
+  /* — жёсткая палитра NEXUS — */
+  --nx-bg: #070b16;            /* Deep Dark Blue */
+  --nx-gold: #d4af37;          /* Gold */
+  --nx-purple: #8b7cf7;        /* Purple */
+  --nx-gold-rgb: 212, 175, 55;
+  --nx-ink: #eef0f7;
+  --nx-muted: #8b90a5;
+  --nx-line: rgba(212, 175, 55, 0.2);
+
+  /* — Liquid Glass 3.0 — */
+  --nx-glass-bg: rgba(13, 18, 32, 0.58);
+  --nx-modal-bg: rgba(13, 18, 32, 0.95);
+  --nx-glass-blur: 20px;
+  --nx-glass-border: 1px solid rgba(212, 175, 55, 0.2);
+  --nx-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* — кнопки — */
+  --nx-btn-radius: 12px;
+  --nx-btn-font: "Manrope", "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --nx-btn-gradient: linear-gradient(135deg, #e8c96a 0%, #d4af37 55%, #b8932a 100%);
+
+  /* — шрифты: Manrope заголовки, DM Sans текст — */
+  --nx-font-head: "Manrope", "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --nx-font-body: "DM Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --font: var(--nx-font-body);
+  --font-head: var(--nx-font-head);
+}
+
+/* Светлая тема остаётся как вариант, но акценты и форма — те же */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --nx-glass-bg: rgba(255, 255, 255, 0.66);
+    --nx-modal-bg: rgba(255, 255, 255, 0.97);
+    --nx-glass-shadow: 0 8px 28px rgba(27, 20, 38, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    --nx-ink: #17151d;
+    --nx-muted: #6a6478;
+  }
+}
+:root[data-theme="light"] {
+  --nx-glass-bg: rgba(255, 255, 255, 0.66);
+  --nx-modal-bg: rgba(255, 255, 255, 0.97);
+  --nx-glass-shadow: 0 8px 28px rgba(27, 20, 38, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --nx-ink: #17151d;
+  --nx-muted: #6a6478;
+}
+
+/* В тёмной теме все три сайта берут один и тот же фон, золото и фиолетовый */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: var(--nx-bg); --gold: var(--nx-gold); --accent: var(--nx-purple);
+    --gold-rgb: var(--nx-gold-rgb);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: var(--nx-bg); --gold: var(--nx-gold); --accent: var(--nx-purple);
+  --gold-rgb: var(--nx-gold-rgb);
+}
+
+/* ---------- Шрифты ---------- */
+html, body, button, input, select, textarea { font-family: var(--nx-font-body); }
+h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .modal-card h2 {
+  font-family: var(--nx-font-head);
+}
+
+/* ---------- Liquid Glass 3.0: карточки, модалки, шапки ---------- */
+.glass, .glass-card, .admin-card, .team-form, .modal, .modal-card, .topbar,
+.news-item, .site-card, .eco-card, .nx-glass {
+  background-color: var(--nx-glass-bg);
+  -webkit-backdrop-filter: blur(var(--nx-glass-blur));
+  backdrop-filter: blur(var(--nx-glass-blur));
+  border: var(--nx-glass-border);
+  box-shadow: var(--nx-glass-shadow);
+}
+.topbar { border-width: 0 0 1px 0; }
+
+/* ---------- Кнопки: одно скругление, один шрифт, золотой градиент при наведении ---------- */
+.btn, button.btn, .btn-primary, .btn-ghost, .btn-danger, .btn-danger-outline, .btn-sm, .btn-lg,
+.nx-btn, .version-btn, .tab-btn, .tab {
+  border-radius: var(--nx-btn-radius);
+  font-family: var(--nx-btn-font);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+@media (hover: hover) {
+  .btn:hover:not(:disabled), .btn-primary:hover:not(:disabled), .nx-btn:hover:not(:disabled) {
+    background-image: var(--nx-btn-gradient);
+    color: #0a0e18;
+    border-color: transparent;
+  }
+}
+
+/* ---------- Тумблеры: жёсткие размеры, не растягиваются в Safari/iOS ---------- */
+.toggle {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-width: 46px;
+  width: 46px;
+  height: 28px;
+  min-height: 0;
+  max-height: 28px;
+  overflow: hidden;
+  position: relative;
+}
+.toggle .toggle-knob, .toggle-knob {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  top: 3px;
+  left: 3px;
+  position: absolute;
+  border-radius: 50%;
+}
+.toggle.open .toggle-knob, .toggle.on .toggle-knob { transform: translateX(18px); }
+.toggle.closed .toggle-knob, .toggle.off .toggle-knob { transform: translateX(0); }
+.toggle-row > .toggle, .perm-row > .toggle { flex: 0 0 46px; }
+
+/* ---------- Чип версии (рядом с логотипом) ---------- */
+.nx-version-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-left: 8px; padding: 0 12px; min-height: 32px; min-width: 44px;
+  font: 700 11px/1 var(--nx-btn-font); letter-spacing: .02em;
+  color: var(--nx-gold); background: transparent;
+  border: 1px solid rgba(var(--nx-gold-rgb), .35); border-radius: 999px;
+  cursor: pointer; vertical-align: middle; white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.nx-version-chip:hover { border-color: rgba(var(--nx-gold-rgb), .7); }
+.nx-version-chip:focus-visible { outline: 2px solid var(--nx-gold); outline-offset: 2px; }
+
+/* ---------- Changelog: модалка ядра ---------- */
+.nx-cl-overlay {
+  position: fixed; inset: 0; z-index: 2147483000; display: none;
+  align-items: center; justify-content: center; padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: rgba(4, 6, 12, .66); box-sizing: border-box;
+}
+.nx-cl-overlay.open { display: flex; }
+.nx-cl-card {
+  position: relative; width: 100%; max-width: 560px; max-height: 82vh; overflow: auto;
+  box-sizing: border-box; padding: 26px 24px; border-radius: 22px;
+  color: var(--nx-ink);
+  background-color: var(--nx-modal-bg);
+  -webkit-backdrop-filter: blur(var(--nx-glass-blur)); backdrop-filter: blur(var(--nx-glass-blur));
+  border: var(--nx-glass-border); box-shadow: var(--nx-glass-shadow);
+}
+.nx-cl-card h2 { margin: 0 0 14px; font-size: 20px; }
+.nx-cl-close {
+  position: absolute; top: 12px; right: 14px; width: 34px; height: 34px; padding: 0;
+  font-size: 22px; line-height: 1; color: var(--nx-muted); background: transparent;
+  border: 1px solid transparent; border-radius: var(--nx-btn-radius); cursor: pointer;
+}
+.nx-cl-close:hover { color: var(--nx-gold); border-color: rgba(var(--nx-gold-rgb), .35); }
+.nx-cl-entry { padding: 14px 0; border-top: 1px solid rgba(var(--nx-gold-rgb), .14); }
+.nx-cl-entry:first-of-type { border-top: 0; padding-top: 0; }
+.nx-cl-entry h3 { margin: 0 0 6px; font-size: 15px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.nx-cl-entry h3 small { font-size: 12px; color: var(--nx-gold); font-weight: 700; }
+.nx-cl-entry h3 time { margin-left: auto; font-size: 12px; color: var(--nx-muted); font-weight: 500; }
+.nx-cl-entry ul { margin: 0; padding-left: 18px; color: var(--nx-muted); font-size: 14px; line-height: 1.55; }
+.nx-cl-empty { color: var(--nx-muted); font-size: 14px; }
+html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-version-chip, .nx-cl-card { transition: none !important; animation: none !important; }
+}
+
+/* ---------- Кнопка NEXUS и поля формы входа ---------- */
+.nx-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 20px; box-sizing: border-box;
+  color: #0a0e18; background: var(--nx-btn-gradient); border: 0; cursor: pointer;
+}
+.nx-btn:disabled { opacity: .6; cursor: default; }
+.nx-field { display: grid; gap: 6px; margin: 0 0 12px; font-size: 13px; color: var(--nx-muted); }
+.nx-field input {
+  min-height: 44px; padding: 0 12px; box-sizing: border-box; width: 100%;
+  color: var(--nx-ink); background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(var(--nx-gold-rgb), .2); border-radius: 12px;
+  font: 16px var(--nx-font-body);
+}
+.nx-field input:focus { outline: 2px solid rgba(var(--nx-gold-rgb), .6); outline-offset: 1px; }
+.nx-login-error { margin: 0 0 12px; color: #f87171; font-size: 13px; }
+.nx-login-error[hidden] { display: none; }
+.nx-login-submit { width: 100%; }
+.nx-login-card { max-width: 400px; }
+/* вход админа должен быть выше заставки закрытого сайта (z-index заставки = 2147483647) */
+.nx-login-overlay { z-index: 2147483647; }

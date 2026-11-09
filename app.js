@@ -11,8 +11,12 @@ const SESSION_KEY = 'amoore_dev_auth';
 const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
+// Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
+const AMOORE_VERSION = '4.0.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+let liveVersion = null;
+const curVersion = () => liveVersion || AMOORE_VERSION;
 
-// ---- права: ключи совпадают с SQL (role_default_perm / has_perm) ----
+// ---- права: ключи совпадают с правами в базе данных ----
 const PERMS = [
   ['toggle_status',  'Открывать и закрывать сайты'],
   ['toggle_banner',  'Управлять баннером'],
@@ -26,8 +30,14 @@ const PERMS = [
   ['download_backup','Скачивать резервную копию']
 ];
 const PERM_KEYS = PERMS.map(p => p[0]);
+const MODERATOR_DEFAULT = ['view_logs'];
 const ADMIN_DEFAULT = ['toggle_status', 'toggle_banner', 'toggle_chat', 'toggle_news', 'manage_news', 'manage_media', 'view_logs'];
-const roleDefault = (role, key) => role === 'super_admin' ? true : role === 'admin' ? ADMIN_DEFAULT.includes(key) : false;
+const roleDefault = (role, key) => role === 'super_admin' ? true : role === 'admin' ? ADMIN_DEFAULT.includes(key) : role === 'moderator' ? MODERATOR_DEFAULT.includes(key) : false;
+
+// ---- названия ролей (global_settings.role_labels): ключи ролей неизменны, меняется только подпись ----
+const ROLE_DEFAULT_LABELS = { super_admin: 'Основатель', admin: 'Админ', moderator: 'Модератор' };
+let roleLabels = { ...ROLE_DEFAULT_LABELS };
+const rl = (role) => roleLabels[role] || role;
 
 const ACTION_LABELS = {
   close: 'Закрыл сайт', open: 'Открыл сайт',
@@ -37,10 +47,12 @@ const ACTION_LABELS = {
   news_add: 'Добавил новость', news_delete: 'Удалил новость',
   site_add: 'Добавил сайт', site_delete: 'Удалил сайт',
   admin_add: 'Добавил пользователя', admin_delete: 'Удалил пользователя',
-  role_change: 'Сменил роль', perms_change: 'Изменил права', media_upload: 'Загрузил медиа', backup: 'Скачал бэкап'
+  role_change: 'Сменил роль', perms_change: 'Изменил права', media_upload: 'Загрузил медиа', backup: 'Скачал бэкап',
+  admin_edit: 'Изменил профиль', news_edit: 'Изменил новость', digest_publish: 'Опубликовал дайджест', labels_edit: 'Изменил названия ролей', changelog_edit: 'Изменил changelog',
+  lead_done: 'Обработал заявку', digest_request: 'Запросил дайджест', bot_toggle: 'Переключил бота', broadcast: 'Сделал рассылку'
 };
 const OVERLAY_LABELS = { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' };
-const NEWS_TYPES = { news: 'Новость', patch: 'Патч', soon: 'Скоро' };
+const NEWS_TYPES = { news: 'Новость', patch: 'Патч', soon: 'Скоро', digest: 'Дайджест' };
 const TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
 
 const $ = (id) => document.getElementById(id);
@@ -93,7 +105,8 @@ function friendlyError(err) {
   }
   if (/invalid login credentials/i.test(msg)) return 'Неверный email или пароль';
   if (/row-level security|violates row-level|permission denied/i.test(msg)) return 'Недостаточно прав (RLS)';
-  if (/column .* does not exist|schema cache|could not find|function .* does not exist/i.test(msg)) return 'База не обновлена — выполните SQL-миграцию (shared/sql/001_amoore_schema.sql)';
+  // Любая «техническая» ошибка схемы БД показывается пользователю по-человечески, без имён файлов и таблиц
+  if (/column .* does not exist|schema cache|could not find|function .* does not exist|relation .* does not exist/i.test(msg)) return 'Ошибка связи с сервером. Попробуйте позже';
   if (/duplicate|already exists|unique/i.test(msg)) return 'Такая запись уже существует';
   return msg || 'Ошибка';
 }
@@ -219,9 +232,15 @@ function showApp(session) {
   if ($('news-date') && !$('news-date').value) $('news-date').value = todayISO();
   applyRoleUI();
   switchView('dashboard');
+  loadRoleLabels();               // названия ролей из БД (фоллбэк — стандартные)
+  touchSeen();                    // «в сети»: обновляем last_seen_at
+  startLeadsWatcher();          // красный счётчик новых заявок
+  maybeShowWhatsNew();          // окно «Что нового», если это первый вход за версию
 }
 const VIEW_RULES = {
+  news:      () => true,                       // модератор читает, админ добавляет, super_admin правит и публикует дайджесты
   leads: () => can('view_logs') || isSuper(),
+  digest:    () => can('view_logs') || isSuper(),
   dashboard: () => true,
   media:     () => can('manage_media'),
   team:      () => isSuper() || can('manage_admins'),
@@ -230,31 +249,59 @@ const VIEW_RULES = {
 };
 function applyRoleUI() {
   Object.keys(VIEW_RULES).forEach(k => { const b = $('tab-' + k); if (b) b.style.display = VIEW_RULES[k]() ? '' : 'none'; });
-  $('news-dashboard-block').style.display = can('manage_news') ? '' : 'none';
+  $('news-form-wrap').style.display = can('manage_news') ? '' : 'none';
+  $('news-role-note').textContent = isSuper() ? 'Полный доступ: добавление, правка, удаление и публикация дайджестов.' : can('manage_news') ? 'Вы можете добавлять новости.' : 'Режим чтения: просмотр опубликованных новостей.';
+  const nt = $('news-type'); if (nt && isSuper() && !nt.querySelector('option[value="digest"]')) nt.insertAdjacentHTML('beforeend', '<option value="digest">Дайджест</option>');
+  if ($('settings-super-blocks')) $('settings-super-blocks').style.display = isSuper() ? '' : 'none';
   $('add-site-btn').style.display = can('manage_sites') ? '' : 'none';
   $('add-admin-wrap').style.display = can('manage_admins') ? '' : 'none';
   $('mini-audit-widget').style.display = can('view_logs') ? '' : 'none';
   if ($('telegram-broadcast-btn')) $('telegram-broadcast-btn').style.display = isSuper() ? '' : 'none';
   const sel = $('new-role');
-  sel.innerHTML = ['moderator', 'admin'].concat(isSuper() ? ['super_admin'] : []).map(r => `<option value="${r}">${r}</option>`).join('');
+  sel.innerHTML = ['moderator', 'admin'].concat(isSuper() ? ['super_admin'] : []).map(r => `<option value="${r}">${esc(rl(r))}</option>`).join('');
 }
+// Переход между вкладками: старый экран гаснет с размытием (~140 мс), новый выезжает снизу из blur.
+// Анимации — в style.css (.view.leaving / .view.active); при prefers-reduced-motion переключение мгновенное.
+let viewTimer = 0;
 function switchView(name) {
   if (!VIEW_RULES[name] || !VIEW_RULES[name]()) name = 'dashboard';
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
-  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
-  $('topbar-tabs').classList.remove('open');
-  $('burger').setAttribute('aria-expanded', 'false');
+  const next = $('view-' + name), prev = document.querySelector('.view.active');
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  clearTimeout(viewTimer);
+  document.querySelectorAll('.view.leaving').forEach(v => v.classList.remove('leaving'));
+  const show = () => {
+    document.querySelectorAll('.view').forEach(v => { v.classList.remove('leaving'); v.classList.toggle('active', v === next); });
+  };
+  if (prev && prev !== next && !reduce) { prev.classList.add('leaving'); viewTimer = setTimeout(show, 140); }
+  else show();
+  closeMobileMenu();
   window.scrollTo(0, 0);
   if (name === 'dashboard') loadDashboard();
+  if (name === 'news') loadNewsAdmin();
   if (name === 'media') loadMedia();
+  if (name === 'settings') renderSettingsBlocks();
   if (name === 'team') loadTeam();
   if (name === 'logs') loadLogs();
   if (name === 'leads') loadLeads();
+  if (name === 'digest') loadDigestView();
+}
+function closeMobileMenu() {
+  $('topbar-tabs').classList.remove('open');
+  $('burger').setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('menu-open');
 }
 $('burger').addEventListener('click', () => {
   const open = $('topbar-tabs').classList.toggle('open');
   $('burger').setAttribute('aria-expanded', open ? 'true' : 'false');
+  document.body.classList.toggle('menu-open', open);       // блокирует прокрутку страницы под меню
 });
+// Меню как в нативных приложениях: закрывается по Esc, по тапу вне меню и при переходе на широкий экран
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('topbar-tabs').classList.contains('open')) { closeMobileMenu(); $('burger').focus(); } });
+document.addEventListener('click', e => {
+  if ($('topbar-tabs').classList.contains('open') && !e.target.closest('#topbar-tabs, #burger')) closeMobileMenu();
+});
+window.addEventListener('resize', () => { if (window.innerWidth > 1100) closeMobileMenu(); });
 document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 
 // ======================================================================= глобальный поиск по новостям, сайтам и администраторам
@@ -284,7 +331,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
         const rows = [];
         if (!news.error) (news.data || []).forEach(x => rows.push({ kind:'news', label:x.title || 'Без заголовка', meta:'Новость', view:'dashboard' }));
         if (!sites.error) (sites.data || []).forEach(x => rows.push({ kind:'site', label:x.name || x.id, meta:'Сайт · ' + x.id, view:'dashboard' }));
-        if (!admins.error && isSuper()) (admins.data || []).forEach(x => rows.push({ kind:'admin', label:x.nickname || x.email, meta:'Администратор · ' + x.role, view:'team' }));
+        if (!admins.error && isSuper()) (admins.data || []).forEach(x => rows.push({ kind:'admin', label:x.nickname || x.email, meta:'Администратор · ' + rl(x.role), view:'team' }));
         if (!rows.length) { panel.innerHTML = '<div class="global-search-empty">Ничего не найдено</div>'; return; }
         panel.innerHTML = rows.map((x,i) => `<button type="button" class="global-search-result" data-view="${x.view}" role="option"><span>${esc(x.label)}</span><small>${esc(x.meta)}</small></button>`).join('');
       } catch (err) {
@@ -305,9 +352,11 @@ function loadDashboard() {
   loadSites();
   loadVisits();
   if (can('view_logs')) loadMiniAudit();
-  if (can('manage_news')) loadNewsAdmin();
   loadOnboarding();
+  loadBotStatus();        // раньше статус бота запрашивался только после клика по тумблеру и вечно висел на «Загрузка…»
 }
+// Статус бота обновляем каждые 30 с, пока открыт дашборд (бот мог включиться/выключиться из другого места)
+setInterval(() => { if (document.visibilityState !== 'hidden' && me && $('view-dashboard') && $('view-dashboard').classList.contains('active')) loadBotStatus(); }, 30000);
 
 async function loadOnboarding() {
   const card = $('onboarding-card'); if (!card) return;
@@ -319,8 +368,8 @@ async function loadOnboarding() {
     try { const { error } = await sb.from(table).select('id', { count: 'exact', head: true }); checks.push({label:`Таблица ${table}`,ok:!error,detail:error?friendlyError(error):'доступна'}); }
     catch (e) { checks.push({label:`Таблица ${table}`,ok:false,detail:friendlyError(e)}); }
   }
-  try { const {data,error}=await sb.from('bot_status').select('is_online').eq('id','main').maybeSingle(); checks.push({label:'Telegram-бот',ok:!error,detail:error?'таблица bot_status не найдена':(data?.is_online===false?'Офлайн · техобслуживание':'Онлайн')}); }
-  catch(e){checks.push({label:'Telegram-бот',ok:false,detail:friendlyError(e)});}
+  try { const {data,error}=await withTimeout(sb.from('bot_status').select('is_online').eq('id','main').maybeSingle()); checks.push({label:'Telegram-бот',ok:!error,detail:error?'нет связи с ботом':(data?.is_online===false?'Офлайн · техобслуживание':'Онлайн')}); }
+  catch(e){checks.push({label:'Telegram-бот',ok:false,detail:'Офлайн · нет ответа'});}
   const [admins,news] = await Promise.all([
     sb.from('admins').select('id',{count:'exact',head:true}),
     sb.from('news').select('id',{count:'exact',head:true})
@@ -329,14 +378,14 @@ async function loadOnboarding() {
   card.hidden = !needsSetup && checks.every(x=>x.ok);
   host.innerHTML = checks.map(x=>`<div class="onboarding-check"><span>${x.ok?'✓':'!'}</span><b>${esc(x.label)}</b><small>${esc(x.detail)}</small></div>`).join('') + `<p class="widget-meta">${news.error?'Не удалось проверить новости.':(news.count||0)===0?'Новости ещё не опубликованы.':`${news.count} новостей в базе.`}</p>`;
 }
-$('onboarding-news')?.addEventListener('click',()=>{const f=$('news-title');f?.focus();f?.scrollIntoView({behavior:'smooth',block:'center'});});
+$('onboarding-news')?.addEventListener('click',()=>{switchView('news');setTimeout(()=>{const f=$('news-title');f?.focus();f?.scrollIntoView({behavior:'smooth',block:'center'});},180);});
 $('onboarding-refresh')?.addEventListener('click',loadOnboarding);
 $('onboarding-god')?.addEventListener('click',()=>{const landing=sitesCache.find(x=>x.id===LANDING_ID);if(!landing?.url||!me?.access_token)return toast('Не найден лендинг или токен God Mode','error');const u=new URL(landing.url);u.searchParams.set('god',me.access_token);window.open(u.href,'_blank','noopener,noreferrer');});
 
 async function loadSites() {
   const grid = $('sites-grid');
   grid.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div>';
-  const { data, error } = await sb.from('ecosystem_sites').select('id,name,url,status,overlay_type,banner_active,banner_text,demo_chat_active,news_active,sort_order,updated_at').order('id');
+  const { data, error } = await sb.from('ecosystem_sites').select('*').order('id');
   if (error) { grid.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   sitesCache = data || [];
   renderSites();
@@ -356,6 +405,7 @@ function renderSites() {
   $('stat-total').textContent = sitesCache.length;
   $('stat-open').textContent = sitesCache.filter(s => s.status === 'open').length;
   $('stat-closed').textContent = sitesCache.filter(s => s.status !== 'open').length;
+  setLeadsStat(leadsNewCount);
   if (!sitesCache.length) { grid.innerHTML = '<div class="loading-state">Здесь пока пусто. Добавьте первый сайт экосистемы.</div>'; return; }
   grid.innerHTML = sitesCache.map(site => {
     const id = esc(site.id);
@@ -596,7 +646,7 @@ $('news-form').addEventListener('submit', async (e) => {
     const payload = {
       title,
       body,
-      type: $('news-type').value || 'news',
+      type: ($('news-type').value === 'digest' && !isSuper()) ? 'news' : ($('news-type').value || 'news'),
       display_date: $('news-date').value || todayISO(),
       is_published: true,
       published_at: new Date().toISOString()
@@ -620,21 +670,26 @@ $('news-form').addEventListener('submit', async (e) => {
 async function loadNewsAdmin() {
   const list = $('news-admin-list');
   list.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка новостей"><i></i><i></i><i></i></div>';
-  const { data, error } = await sb.from('news').select('id, title, body, type, display_date, published_at').order('published_at', { ascending: false }).limit(10);
+  const { data, error } = await sb.from('news').select('id, title, body, type, display_date, published_at, is_published').order('published_at', { ascending: false }).limit(30);
   if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
-  if (!data?.length) { list.innerHTML = '<div class="loading-state">Здесь пока пусто. Добавьте первую новость.</div>'; return; }
+  if (!data?.length) { list.innerHTML = '<div class="loading-state">Здесь пока пусто.' + (can('manage_news') ? ' Добавьте первую новость.' : '') + '</div>'; return; }
+  newsCache = data;
   list.innerHTML = data.map(n => `
     <div class="admin-card glass news-card">
       <div class="admin-card-info"><div class="admin-meta">
-        <h4>${esc(n.title)} <span class="role-badge admin">${esc(NEWS_TYPES[n.type] || n.type)}</span> <span class="news-date">${esc(fmtDate(n.display_date || n.published_at))}</span></h4>
+        <h4>${esc(n.title)} <span class="role-badge admin">${esc(NEWS_TYPES[n.type] || n.type)}</span> <span class="news-date">${esc(fmtDate(n.display_date || n.published_at))}</span>${n.is_published === false ? ' <span class="role-badge moderator">скрыта</span>' : ''}</h4>
         <p>${esc((n.body || '').slice(0, 140))}</p>
       </div></div>
-      <button type="button" class="btn-icon news-del" data-id="${esc(n.id)}" data-title="${esc(n.title)}" aria-label="Удалить" title="Удалить">×</button>
+      ${isSuper() ? `<div class="admin-card-actions"><button type="button" class="btn btn-ghost btn-sm news-edit" data-id="${esc(n.id)}" aria-label="Редактировать" title="Редактировать">✎</button>
+      <button type="button" class="btn-icon news-del" data-id="${esc(n.id)}" data-title="${esc(n.title)}" aria-label="Удалить" title="Удалить">×</button></div>` : ''}
     </div>`).join('');
 }
+let newsCache = [];
 $('news-admin-list').addEventListener('click', async (e) => {
+  const ed = e.target.closest('.news-edit');
+  if (ed && isSuper()) { openNewsEdit(ed.dataset.id); return; }
   const b = e.target.closest('.news-del');
-  if (!b || !can('manage_news')) return;
+  if (!b || !isSuper()) return;
   if (!confirm('Удалить новость?')) return;
   const { error } = await sb.from('news').delete().eq('id', b.dataset.id);
   if (error) toast(friendlyError(error), 'error');
@@ -642,41 +697,89 @@ $('news-admin-list').addEventListener('click', async (e) => {
   loadNewsAdmin();
 });
 
-
+// ---- правка новости (только super_admin)
+let newsEditId = null, newsEditPublished = true;
+function paintNewsPub() { const t = $('ne-published'); t.classList.toggle('open', newsEditPublished); t.classList.toggle('closed', !newsEditPublished); t.setAttribute('aria-checked', newsEditPublished); }
+function openNewsEdit(id) {
+  const n = newsCache.find(x => String(x.id) === String(id)); if (!n) return;
+  newsEditId = n.id; newsEditPublished = n.is_published !== false;
+  $('ne-title').value = n.title || ''; $('ne-body').value = n.body || '';
+  $('ne-type').innerHTML = Object.keys(NEWS_TYPES).map(k => `<option value="${k}"${n.type === k ? ' selected' : ''}>${esc(NEWS_TYPES[k])}</option>`).join('');
+  $('ne-date').value = String(n.display_date || n.published_at || '').slice(0, 10);
+  paintNewsPub(); $('news-edit-modal').classList.add('visible');
+}
+$('ne-published').addEventListener('click', () => { newsEditPublished = !newsEditPublished; paintNewsPub(); });
+$('ne-cancel').addEventListener('click', () => $('news-edit-modal').classList.remove('visible'));
+$('news-edit-modal').addEventListener('click', e => { if (e.target === $('news-edit-modal')) $('news-edit-modal').classList.remove('visible'); });
+$('ne-save').addEventListener('click', async () => {
+  if (!isSuper() || !newsEditId) return;
+  const title = $('ne-title').value.trim().slice(0, 140), body = $('ne-body').value.trim().slice(0, 4000);
+  if (title.length < 3) return toast('Заголовок: минимум 3 символа', 'error');
+  if (body.length < 5) return toast('Текст: минимум 5 символов', 'error');
+  if (/<script|javascript:|on\w+=/i.test(title + body)) return toast('Недопустимые символы в тексте', 'error');
+  const patch = { title, body, type: $('ne-type').value, display_date: $('ne-date').value || todayISO(), is_published: newsEditPublished };
+  const { error } = await sb.from('news').update(patch).eq('id', newsEditId);
+  if (error) return toast(friendlyError(error), 'error');
+  logAction('news_edit', null, null, title); toast('Новость обновлена');
+  $('news-edit-modal').classList.remove('visible'); loadNewsAdmin();
+});
 
 // ======================================================================= bot status + leads (v2.0.2)
+// Любой запрос к БД, который не уложился в 3 секунды, считаем неудачей: статус «Офлайн», спиннер не крутится вечно.
+const BOT_TIMEOUT_MS = 3000;
+function withTimeout(promise, ms = BOT_TIMEOUT_MS) {
+  let t;
+  const timer = new Promise((_, rej) => { t = setTimeout(() => rej(new Error('timeout')), ms); });
+  return Promise.race([Promise.resolve(promise).finally(() => clearTimeout(t)), timer]);
+}
+function paintBotStatus(state, hbText) {
+  // state: 'online' | 'offline' | 'unknown' — «unknown» (нет ответа от БД) показываем как Офлайн
+  const line = $('bot-status-line'), hb = $('bot-hb-line'), btn = $('bot-toggle-btn');
+  if (line) {
+    line.textContent = state === 'online' ? 'Статус: Онлайн' : state === 'offline' ? 'Статус: Офлайн (техобслуживание)' : 'Статус: Офлайн';
+    line.style.color = state === 'online' ? '#7dcea0' : '#e8a0a0';
+    line.removeAttribute('aria-busy');
+  }
+  if (hb && hbText != null) hb.textContent = hbText;
+  if (btn) btn.textContent = state === 'online' ? 'Выключить бота' : 'Включить бота';
+}
 async function loadBotStatus() {
-  const line = $('bot-status-line');
-  const hb = $('bot-hb-line');
-  if (!line) return;
+  if (!$('bot-status-line')) return;
   try {
-    const { data, error } = await sb.from('bot_status').select('is_online,last_heartbeat').eq('id', 'main').maybeSingle();
+    // читаем ТОЛЬКО те колонки, что есть в любой версии таблицы
+    const { data, error } = await withTimeout(sb.from('bot_status').select('is_online,last_heartbeat').eq('id', 'main').maybeSingle());
     if (error) throw error;
     const online = data ? data.is_online !== false : true;
-    line.textContent = online ? 'Статус: Онлайн' : 'Статус: Офлайн (техобслуживание)';
-    line.style.color = online ? '#7dcea0' : '#e8a0a0';
-    if (hb) {
-      hb.textContent = data && data.last_heartbeat
-        ? 'Пульс: ' + new Date(data.last_heartbeat).toLocaleString('ru-RU')
-        : 'Пульс: ещё не было';
-    }
-    const btn = $('bot-toggle-btn');
-    if (btn) btn.textContent = online ? 'Выключить бота' : 'Включить бота';
+    paintBotStatus(online ? 'online' : 'offline',
+      data && data.last_heartbeat ? 'Пульс: ' + new Date(data.last_heartbeat).toLocaleString('ru-RU') : 'Пульс: ещё не было');
   } catch (e) {
-    line.textContent = 'Статус: нет данных (запустите SQL 002_v202)';
+    paintBotStatus('unknown', 'Пульс: нет связи');
   }
 }
 
 async function toggleBotOnline() {
   if (!isSuper() && !can('manage_sites')) return toast('Недостаточно прав', 'error');
+  const btn = $('bot-toggle-btn'); if (btn) btn.disabled = true;
   try {
-    const { data } = await sb.from('bot_status').select('is_online').eq('id', 'main').maybeSingle();
+    const { data, error: readErr } = await withTimeout(sb.from('bot_status').select('is_online').eq('id', 'main').maybeSingle());
+    if (readErr) throw readErr;
     const next = !(data && data.is_online !== false);
-    const { error } = await sb.from('bot_status').upsert({ id: 'main', is_online: next, updated_at: new Date().toISOString() });
-    if (error) return toast(friendlyError(error), 'error');
+    // Обновляем ТОЛЬКО is_online (раньше уходил ещё updated_at — этой колонки в базе нет, и запрос падал).
+    // Если строки 'main' ещё нет — создаём её с одной колонкой is_online.
+    let res = await withTimeout(sb.from('bot_status').update({ is_online: next }).eq('id', 'main').select('id'));
+    if (res.error) throw res.error;
+    if (!res.data || !res.data.length) {
+      res = await withTimeout(sb.from('bot_status').insert({ id: 'main', is_online: next }));
+      if (res.error) throw res.error;
+    }
     toast(next ? 'Бот включён' : 'Бот на техобслуживании');
+    logAction('bot_toggle', null, null, next ? 'on' : 'off');
+    paintBotStatus(next ? 'online' : 'offline');     // мгновенно, без ожидания второго запроса
     loadBotStatus();
-  } catch (e) { toast('Ошибка', 'error'); }
+  } catch (e) {
+    toast(friendlyError(e), 'error');
+    paintBotStatus('unknown');
+  } finally { if (btn) btn.disabled = false; }
 }
 
 async function sendBotTest() {
@@ -693,7 +796,7 @@ async function sendBotTest() {
 async function downloadBotLogsCsv() {
   if (!isSuper() && !can('view_logs')) return toast('Недостаточно прав', 'error');
   try {
-    const { data, error } = await sb.from('bot_logs').select('id,created_at,status,message,error_text,source').order('created_at', { ascending: false }).limit(500);
+    const { data, error } = await sb.from('bot_logs').select('*').order('created_at', { ascending: false }).limit(500);
     if (error) return toast(friendlyError(error), 'error');
     const rows = data || [];
     const header = 'id,created_at,status,message,error_text,source';
@@ -712,11 +815,11 @@ async function loadLeads() {
   const list = $('leads-list');
   if (!list) return;
   list.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка заявок"><i></i><i></i><i></i></div>';
-  const { data, error } = await sb.from('leads').select('id,name,contact,message,status,created_at').order('created_at', { ascending: false }).limit(50);
+  const { data, error } = await sb.from('leads').select('*').order('created_at', { ascending: false }).limit(50);
   if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   if (!data?.length) { list.innerHTML = '<div class="loading-state">Здесь пока пусто. Новые заявки появятся после отправки формы.</div>'; return; }
   list.innerHTML = data.map(l => `
-    <div class="admin-card glass" data-lead="${esc(l.id)}">
+    <div class="admin-card glass" data-lead="${esc(l.id)}" data-new="${l.status === 'done' ? 0 : 1}">
       <div class="admin-card-info">
         <h4>${esc(l.name || 'Без имени')} <span class="role-badge ${l.status === 'done' ? 'admin' : 'moderator'}">${esc(l.status || 'new')}</span></h4>
         <p>${esc(l.contact || '')}</p>
@@ -735,9 +838,207 @@ document.addEventListener('click', async (e) => {
   if (!b) return;
   const { error } = await sb.from('leads').update({ status: 'done' }).eq('id', b.dataset.id);
   if (error) toast(friendlyError(error), 'error');
-  else { toast('Отмечено'); loadLeads(); }
+  else { toast('Отмечено'); logAction('lead_done'); loadLeads(); refreshLeadsBadge(); }
 });
 
+
+
+// ======================================================================= счётчик новых заявок (красный бейдж)
+let leadsNewCount = 0, leadsWatcherOn = false;
+function setLeadsStat(n) {
+  const v = $('stat-leads'); if (!v) return;
+  v.textContent = n == null ? '—' : String(n);
+  $('stat-leads-card').classList.toggle('has-new', n > 0);
+}
+function paintLeadsBadge(n) {
+  leadsNewCount = n;
+  const badge = $('leads-badge'), dot = $('burger-dot');
+  const txt = n > 99 ? '99+' : String(n);
+  if (badge) { badge.textContent = txt; badge.hidden = !(n > 0); badge.setAttribute('aria-label', `Новых заявок: ${n}`); }
+  if (dot) dot.hidden = !(n > 0);                       // на мобильном вкладки спрятаны — точка на бургере
+  setLeadsStat(n);
+}
+async function refreshLeadsBadge() {
+  if (!me || !VIEW_RULES.leads()) return;
+  try {
+    const { count, error } = await sb.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'new');
+    if (!error) paintLeadsBadge(count || 0);
+  } catch (_) {}
+}
+function startLeadsWatcher() {
+  refreshLeadsBadge();
+  if (leadsWatcherOn) return;
+  leadsWatcherOn = true;
+  // Realtime — мгновенно; опрос раз в 45 с — страховка, если Realtime не включён
+  try { sb.channel('amoore-dev-leads').on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => { refreshLeadsBadge(); if ($('view-leads').classList.contains('active')) loadLeads(); }).subscribe(); } catch (_) {}
+  setInterval(() => { if (document.visibilityState !== 'hidden') refreshLeadsBadge(); }, 45000);
+}
+$('stat-leads-card')?.addEventListener('click', () => switchView('leads'));
+
+// ======================================================================= Дайджест (Smart Digest)
+let lastDigest = null;
+function loadDigestView() {
+  if (lastDigest) renderDigest(lastDigest);
+}
+function dgSection(icon, title, count, rows, emptyText) {
+  return `<section class="digest-section glass"><h3><span>${icon}</span> ${esc(title)} <b>${count}</b></h3>` +
+    (rows.length ? `<ul>${rows.join('')}</ul>` : `<p class="muted">${esc(emptyText)}</p>`) + '</section>';
+}
+function renderDigest(r) {
+  const host = $('digest-result');
+  const cut = (arr, fn) => { const rows = arr.slice(0, 10).map(fn); if (arr.length > 10) rows.push(`<li class="muted">…и ещё ${arr.length - 10}</li>`); return rows; };
+  const visitsLine = r.visits.bySite.map(x => `${esc(x.site)} <b>${x.count}</b>`).join(' · ') || '—';
+  host.innerHTML = `
+    <div class="digest-meta">Период: <b>${esc(r.period.label)}</b> · сформировано ${esc(new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }))}</div>
+    <div class="digest-tiles">
+      <div class="stat-card glass"><div class="stat-value">${r.totals.news}</div><div class="stat-label">Новостей</div></div>
+      <div class="stat-card glass"><div class="stat-value">${r.totals.toggles}</div><div class="stat-label">Переключений</div></div>
+      <div class="stat-card glass ${r.leads.fresh ? 'hot' : ''}"><div class="stat-value">${r.leads.total}</div><div class="stat-label">Заявок (новых ${r.leads.fresh})</div></div>
+      <div class="stat-card glass"><div class="stat-value">${r.visits.total}</div><div class="stat-label">Визитов</div></div>
+    </div>
+    ${r.empty ? '<div class="loading-state">Тихая неделя: изменений, новостей и заявок не было.</div>' : `
+    <div class="digest-grid">
+      ${dgSection('📰', 'Новости', r.news.length, cut(r.news, n => `<li><span class="when">${esc(n.day)}</span> ${esc(n.title)} <em>${esc(NEWS_TYPES[n.type] || n.type)}</em></li>`), 'За неделю новостей не было')}
+      ${dgSection('🎛', 'Изменения тумблеров', r.toggles.length, cut(r.toggles, t => `<li><span class="when">${esc(t.day)} ${esc(t.time)}</span> <b>${esc(t.who)}</b> ${esc(t.label)}${t.site ? ` · <code>${esc(t.site)}</code>` : ''}</li>`), 'Без изменений')}
+      ${r.other.length ? dgSection('🗂', 'Прочие события', r.other.length, cut(r.other, t => `<li><span class="when">${esc(t.day)}</span> <b>${esc(t.who)}</b> ${esc(t.label)}${t.site ? ` · <code>${esc(t.site)}</code>` : ''}</li>`), '') : ''}
+      <section class="digest-section glass"><h3><span>👁</span> Визиты по сайтам</h3><p>${visitsLine}</p></section>
+    </div>`}
+    <div class="digest-actions">
+      <button type="button" class="btn btn-ghost" id="digest-copy">Скопировать текст</button>
+      <button type="button" class="btn btn-ghost" id="digest-download">Скачать .txt</button>
+      <button type="button" class="btn btn-primary" id="digest-send" style="width:auto">Отправить боту → админам в Telegram</button>
+      ${isSuper() ? '<button type="button" class="btn btn-ghost" id="digest-publish">Опубликовать на сайте как «Дайджест»</button>' : ''}
+    </div>
+    <p class="widget-meta" id="digest-send-status" role="status" aria-live="polite"></p>
+    <details class="digest-preview"><summary>Как сообщение выглядит в Telegram</summary><pre>${esc(r.text)}</pre></details>`;
+}
+async function generateDigest() {
+  if (!me || !VIEW_RULES.digest()) return toast('Недостаточно прав', 'error');
+  const btn = $('digest-build'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Собираю…';
+  $('digest-result').innerHTML = '<div class="skeleton-stack"><i></i><i></i><i></i></div>';
+  const since = new Date(Date.now() - 7 * 86400000).toISOString();
+  try {
+    // Все запросы — параллельно и только за период (по индексам created_at / published_at)
+    const q = (t, cols, col, lim) => sb.from(t).select(cols).gte(col, since).order(col, { ascending: false }).limit(lim);
+    const [news, logs, leads, visits, admins, sites] = await Promise.all([
+      q('news', 'title,type,is_published,published_at', 'published_at', 200),
+      q('audit_logs', 'admin_id,action,site_id,details,created_at', 'created_at', 1000),
+      q('leads', 'status,created_at', 'created_at', 1000),
+      q('site_visits', 'site_id,created_at', 'created_at', 5000),
+      sb.from('admins').select('id,nickname,name,email').limit(200),
+      sb.from('ecosystem_sites').select('id,name').limit(100)
+    ]);
+    const failed = [['news', news], ['audit_logs', logs], ['leads', leads]].filter(([, r]) => r.error);
+    if (failed.length) toast('Часть данных недоступна: ' + failed.map(([n]) => n).join(', '), 'error');
+    lastDigest = AmooreDigest.build({
+      news: news.data || [], logs: logs.data || [], leads: leads.data || [], visits: visits.data || [],
+      admins: admins.data || [], sites: sites.data || [], days: 7, tzOffsetMin: -new Date().getTimezoneOffset()
+    });
+    renderDigest(lastDigest);
+  } catch (e) {
+    $('digest-result').innerHTML = `<div class="loading-state">${esc(friendlyError(e))}</div>`;
+  } finally { btn.disabled = false; btn.textContent = old; }
+}
+$('digest-build')?.addEventListener('click', generateDigest);
+
+async function publishDigestNews() {
+  if (!isSuper() || !lastDigest) return toast('Недостаточно прав', 'error');
+  const btn = $('digest-publish'); if (btn) btn.disabled = true;
+  const label = lastDigest.period && lastDigest.period.label ? lastDigest.period.label : todayISO();
+  const row = { title: 'Дайджест недели · ' + label, body: String(lastDigest.text || '').slice(0, 4000), type: 'digest', display_date: todayISO(), is_published: true, published_at: new Date().toISOString() };
+  const { error } = await sb.from('news').insert(row);
+  if (btn) btn.disabled = false;
+  if (error) return toast(friendlyError(error), 'error');
+  logAction('digest_publish', null, null, row.title); toast('Дайджест опубликован: вкладка «Дайджесты» на лендинге');
+}
+let digestPoll = 0;
+async function sendDigestToBot() {
+  const btn = $('digest-send'), st = $('digest-send-status');
+  btn.disabled = true;
+  const { data, error } = await sb.from('digest_queue').insert({ source: 'dev', status: 'pending', requested_by: me.admin_id }).select('id').maybeSingle();
+  if (error) {
+    btn.disabled = false;
+    if (/duplicate|unique/i.test(error.message || '')) { st.textContent = 'Запрос уже в очереди — бот отправит дайджест в течение минуты.'; return; }
+    if (/digest_queue|relation .* does not exist|schema cache/i.test(error.message || '')) { st.textContent = 'Ошибка связи с сервером. Попробуйте позже'; return toast('Ошибка связи с сервером. Попробуйте позже', 'error'); }
+    st.textContent = friendlyError(error); return toast(friendlyError(error), 'error');
+  }
+  logAction('digest_request');
+  st.textContent = 'Запрос отправлен боту. Ждём подтверждения…';
+  const id = data?.id; let tries = 0;
+  clearInterval(digestPoll);
+  digestPoll = setInterval(async () => {
+    tries++;
+    const { data: row } = id ? await sb.from('digest_queue').select('status,error_text').eq('id', id).maybeSingle() : { data: null };
+    if (row && row.status === 'sent') { clearInterval(digestPoll); st.textContent = '✓ Бот отправил дайджест админам в Telegram.'; btn.disabled = false; toast('Дайджест отправлен'); }
+    else if (row && row.status === 'error') { clearInterval(digestPoll); st.textContent = 'Бот не смог отправить: ' + (row.error_text || 'ошибка'); btn.disabled = false; }
+    else if (tries >= 24) { clearInterval(digestPoll); st.textContent = 'Бот пока не ответил (запрос в очереди). Проверьте, что бот запущен и в нём есть ключ service role.'; btn.disabled = false; }
+  }, 5000);
+}
+document.addEventListener('click', async (e) => {
+  if (e.target.closest('#digest-copy') && lastDigest) { toast((await copyText(lastDigest.text)) ? 'Дайджест скопирован' : 'Не удалось скопировать', 'success'); }
+  else if (e.target.closest('#digest-download') && lastDigest) {
+    const blob = new Blob([lastDigest.text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `amoore-digest-${todayISO()}.txt`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  }
+  else if (e.target.closest('#digest-send') && lastDigest) sendDigestToBot();
+  else if (e.target.closest('#digest-publish') && lastDigest) publishDigestNews();
+});
+
+// ======================================================================= «Что нового» (changelog.json)
+const WN_KEY = 'amoore_dev_seen_version';
+const WN_FALLBACK = [{ version: AMOORE_VERSION, title: 'NEXUS', items: [
+  'Единая дизайн-система NEXUS на всех сайтах экосистемы.',
+  'Тумблеры в мобильном Safari больше не растягиваются.',
+  'Вкладка «Новости», «Админы в сети», редактирование профилей, названия ролей и редактор changelog.'] }];
+const verKey = v => String(v || '').split('.').map(x => parseInt(x, 10) || 0);
+const sortVersions = list => (list || []).filter(v => v && v.version).sort((a, b) => { const x = verKey(a.version), y = verKey(b.version); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); return 0; });
+function paintVersionChip() { const c = $('version-chip'); if (c) c.textContent = 'v' + curVersion(); }
+async function loadChangelog() {
+  // 1) БД (global_settings.changelog) → 2) changelog.json → 3) жёсткий фоллбэк из кода
+  try {
+    const { data, error } = await sb.from('global_settings').select('value').eq('key', 'changelog').maybeSingle();
+    const list = !error && data && data.value && Array.isArray(data.value.versions) ? sortVersions(data.value.versions) : [];
+    if (list.length) { liveVersion = String(list[0].version); paintVersionChip(); return list; }
+  } catch (_) {}
+  try {
+    const r = await fetch('changelog.json?v=' + AMOORE_VERSION, { cache: 'no-cache' });
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const list = Array.isArray(d.versions) ? sortVersions(d.versions) : [];
+    return list.length ? list : WN_FALLBACK;
+  } catch (_) { return WN_FALLBACK; }
+}
+let wnList = null;
+function renderWhatsNew(list, all) {
+  const cur = list[0] || WN_FALLBACK[0];
+  const [maj, min] = String(cur.version).split('.');
+  $('whatsnew-title').textContent = all ? 'История обновлений' : `Обновление v${maj}.${min}`;
+  $('whatsnew-sub').textContent = all ? `Текущая версия ${curVersion()}` : `${cur.title || ''} — что изменилось`;
+  const shown = all ? list : [cur];
+  $('whatsnew-list').innerHTML = shown.map(v => `<li class="wn-version"><h4>v${esc(v.version)} <small>${esc(v.title || '')}</small></h4><ul>${(v.items || []).map(i => `<li>${esc(i)}</li>`).join('')}</ul></li>`).join('');
+  $('whatsnew-history').style.display = all || list.length < 2 ? 'none' : '';
+}
+async function openWhatsNew(all) {
+  if (!wnList) wnList = await loadChangelog();
+  renderWhatsNew(wnList, all);
+  $('whatsnew-modal').classList.add('visible');
+  $('whatsnew-ok').focus();
+}
+function closeWhatsNew() {
+  $('whatsnew-modal').classList.remove('visible');
+  try { localStorage.setItem(WN_KEY, curVersion()); } catch (_) {}
+}
+async function maybeShowWhatsNew() {
+  if (!wnList) wnList = await loadChangelog();          // заодно узнаём живую версию из БД
+  let seen = ''; try { seen = localStorage.getItem(WN_KEY) || ''; } catch (_) {}
+  if (seen !== curVersion()) setTimeout(() => openWhatsNew(false), 700);
+}
+$('whatsnew-ok')?.addEventListener('click', closeWhatsNew);
+$('whatsnew-history')?.addEventListener('click', () => renderWhatsNew(wnList || WN_FALLBACK, true));
+$('whatsnew-modal')?.addEventListener('click', e => { if (e.target === $('whatsnew-modal')) closeWhatsNew(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('whatsnew-modal').classList.contains('visible')) closeWhatsNew(); });
+$('version-chip')?.addEventListener('click', () => openWhatsNew(true));
 
 // ======================================================================= медиа
 const dz = $('dropzone');
@@ -803,8 +1104,8 @@ $('backup-btn').addEventListener('click', async () => {
   btn.disabled = true; label.textContent = 'Собираю данные…';
   try {
     const [sites, news, admins] = await Promise.all([
-      sb.from('ecosystem_sites').select('id,name,url,status,overlay_type,banner_active,banner_text,demo_chat_active,news_active,sort_order,updated_at').order('id'),
-      sb.from('news').select('id,title,body,type,display_date,is_published,published_at').order('published_at', { ascending: false }),
+      sb.from('ecosystem_sites').select('*').order('id'),
+      sb.from('news').select('*').order('published_at', { ascending: false }),
       sb.from('admins').select('id, email, name, nickname, role, permissions, created_at')
     ]);
     for (const r of [sites, news, admins]) if (r.error) throw r.error;
@@ -840,32 +1141,66 @@ $('add-admin-form').addEventListener('submit', async (e) => {
   toast('Добавлен. Не забудьте создать этот email в Supabase → Authentication'); e.target.reset(); loadTeam();
 });
 
+const isOnline = (a) => a.id === me?.admin_id || (a.last_seen_at && Date.now() - Date.parse(a.last_seen_at) < 5 * 60 * 1000);
+async function touchSeen() { try { await sb.rpc('touch_admin_seen'); } catch (_) {} }
+setInterval(() => { if (me && document.visibilityState !== 'hidden') touchSeen(); }, 60000);
+let teamCache = [];
 async function loadTeam() {
   const list = $('team-list');
   list.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка команды"><i></i><i></i><i></i></div>';
-  const { data, error } = await sb.from('admins').select('id, email, name, nickname, role, permissions').order('created_at');
+  let { data, error } = await sb.from('admins').select('id, email, name, nickname, role, permissions, last_seen_at').order('created_at');
+  if (error) ({ data, error } = await sb.from('admins').select('id, email, name, nickname, role, permissions').order('created_at'));   // миграция 005 ещё не применена
   if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   if (!data?.length) { list.innerHTML = '<div class="loading-state">Пока нет добавленных администраторов</div>'; return; }
+  teamCache = data;
+  $('team-online-line').innerHTML = '<b>Админы в сети:</b> ' + data.map(a => `${esc(a.nickname || a.name || a.email)} (${isOnline(a) ? 'в сети' : 'офлайн'})`).join(', ');
   list.innerHTML = (data || []).map(a => {
     const self = a.id === me.admin_id;
+    const on = isOnline(a);
     return `<div class="admin-card glass team-card">
       <div class="admin-card-info">
         <div class="admin-avatar">${esc((a.nickname || '?')[0].toUpperCase())}</div>
         <div class="admin-meta">
-          <h4>${esc(a.nickname)}${self ? ' <span class="role-badge super_admin">вы</span>' : ''}</h4>
+          <h4>${esc(a.nickname)}${self ? ' <span class="role-badge super_admin">вы</span>' : ''} <span class="presence ${on ? 'on' : ''}" title="${on ? 'в сети' : 'офлайн'}">${on ? '● в сети' : '○ офлайн'}</span></h4>
           <p>${esc(a.email)} · ${esc(a.name)}</p>
-          <p class="widget-meta">роль: ${esc(a.role)}${a.permissions ? ' · личные права' : ''}</p>
+          <p class="widget-meta">роль: ${esc(rl(a.role))}${a.permissions ? ' · личные права' : ''}</p>
         </div>
       </div>
       <div class="admin-card-actions">
         ${isSuper() ? `<select class="role-select" data-id="${a.id}" aria-label="Роль"${self ? ' disabled' : ''}>
-          ${['moderator', 'admin', 'super_admin'].map(r => `<option value="${r}"${a.role === r ? ' selected' : ''}>${r}</option>`).join('')}</select>`
-          : `<span class="role-badge ${esc(a.role)}">${esc(a.role)}</span>`}
+          ${['moderator', 'admin', 'super_admin'].map(r => `<option value="${r}"${a.role === r ? ' selected' : ''}>${esc(rl(r))}</option>`).join('')}</select>`
+          : `<span class="role-badge ${esc(a.role)}">${esc(rl(a.role))}</span>`}
+        ${isSuper() ? `<button class="btn btn-ghost btn-sm edit-admin" data-id="${a.id}" aria-label="Редактировать" title="Редактировать">✎</button>` : ''}
         ${isSuper() && !self ? `<button class="btn btn-ghost btn-sm perms-btn" data-id="${a.id}">Права</button>` : ''}
         ${isSuper() && !self ? `<button class="btn btn-danger-outline btn-sm del-admin" data-id="${a.id}" data-nick="${esc(a.nickname)}">Удалить</button>` : ''}
       </div></div>`;
   }).join('');
 }
+
+// ---- редактирование профиля: name, nickname, email, role (только super_admin; БД защищает политикой RLS)
+let editAdminId = null;
+function openEditAdmin(id) {
+  const a = teamCache.find(x => x.id === id); if (!a) return;
+  editAdminId = id;
+  $('ea-name').value = a.name || ''; $('ea-nickname').value = a.nickname || ''; $('ea-email').value = a.email || '';
+  $('ea-role').innerHTML = ['moderator', 'admin', 'super_admin'].map(r => `<option value="${r}"${a.role === r ? ' selected' : ''}>${esc(rl(r))}</option>`).join('');
+  $('ea-role').disabled = id === me.admin_id;
+  $('edit-admin-modal').classList.add('visible');
+}
+$('ea-cancel').addEventListener('click', () => $('edit-admin-modal').classList.remove('visible'));
+$('edit-admin-modal').addEventListener('click', e => { if (e.target === $('edit-admin-modal')) $('edit-admin-modal').classList.remove('visible'); });
+$('ea-save').addEventListener('click', async () => {
+  if (!isSuper() || !editAdminId) return;
+  const patch = { name: $('ea-name').value.trim().slice(0, 80), nickname: $('ea-nickname').value.trim().slice(0, 40), email: $('ea-email').value.trim().toLowerCase() };
+  if (!patch.nickname) return toast('Никнейм не может быть пустым', 'error');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patch.email)) return toast('Проверьте email', 'error');
+  if (editAdminId !== me.admin_id) patch.role = $('ea-role').value;
+  const { error } = await sb.from('admins').update(patch).eq('id', editAdminId);
+  if (error) return toast(friendlyError(error), 'error');
+  if (editAdminId === me.admin_id) { me.nickname = patch.nickname; me.name = patch.name; me.email = patch.email; $('admin-nickname').textContent = me.nickname || me.name || me.email; }
+  logAction('admin_edit', null, null, patch.nickname);
+  toast('Профиль обновлён'); $('edit-admin-modal').classList.remove('visible'); loadTeam();
+});
 $('team-list').addEventListener('change', async (e) => {
   const sel = e.target.closest('.role-select');
   if (!sel || !isSuper()) return;
@@ -884,6 +1219,8 @@ $('team-list').addEventListener('click', async (e) => {
     loadTeam();
     return;
   }
+  const eb = e.target.closest('.edit-admin');
+  if (eb && isSuper()) { openEditAdmin(eb.dataset.id); return; }
   const pb = e.target.closest('.perms-btn');
   if (pb) openPermsModal(pb.dataset.id);
 });
@@ -900,7 +1237,7 @@ async function openPermsModal(id) {
   const { data, error } = await sb.from('admins').select('id, email, nickname, role, permissions').eq('id', id).single();
   if (error || !data) return toast(friendlyError(error) || 'Не найден', 'error');
   permsTarget = { id: data.id, role: data.role };
-  $('perms-user-label').textContent = `${data.nickname || data.email} · ${data.role}`;
+  $('perms-user-label').textContent = `${data.nickname || data.email} · ${rl(data.role)}`;
   permsDraft = resolvePermissions(data.role, data.permissions);
   renderPermsList();
   $('perms-modal').classList.add('visible');
@@ -927,6 +1264,65 @@ $('perms-save').addEventListener('click', () => {
 });
 $('perms-reset').addEventListener('click', () => savePerms(null));
 $('perms-modal').addEventListener('click', e => { if (e.target === $('perms-modal')) $('perms-modal').classList.remove('visible'); });
+
+// ======================================================================= настройки: названия ролей и редактор changelog
+async function loadRoleLabels() {
+  try {
+    const { data, error } = await sb.from('global_settings').select('value').eq('key', 'role_labels').maybeSingle();
+    if (!error && data && data.value && typeof data.value === 'object') roleLabels = { ...ROLE_DEFAULT_LABELS, ...data.value };
+  } catch (_) {}
+  if (me) { applyRoleUI(); if ($('view-team').classList.contains('active')) loadTeam(); }
+}
+let clDraft = [];
+function paintClEditor() {
+  $('cl-editor').innerHTML = clDraft.map((v, i) => `
+    <div class="admin-card glass cl-card" data-i="${i}" style="display:block;margin-bottom:12px">
+      <div class="form-row">
+        <div class="form-group"><label>Версия</label><input class="cl-version" value="${esc(v.version)}" placeholder="4.0.0" inputmode="decimal"></div>
+        <div class="form-group"><label>Название</label><input class="cl-title" value="${esc(v.title || '')}" maxlength="60"></div>
+        <div class="form-group"><label>Дата</label><input type="date" class="cl-date" value="${esc(v.date || '')}"></div>
+      </div>
+      <div class="form-group"><label>Что изменилось (по одному пункту в строке)</label><textarea class="ta cl-items" rows="4">${esc((v.items || []).join('\n'))}</textarea></div>
+      <button type="button" class="btn btn-danger-outline btn-sm cl-del">Удалить версию</button>
+    </div>`).join('') || '<div class="loading-state">Версий пока нет.</div>';
+}
+function readClEditor() {
+  return [...$('cl-editor').querySelectorAll('.cl-card')].map(c => ({
+    version: c.querySelector('.cl-version').value.trim(),
+    title: c.querySelector('.cl-title').value.trim(),
+    date: c.querySelector('.cl-date').value || '',
+    items: c.querySelector('.cl-items').value.split('\n').map(x => x.trim()).filter(Boolean)
+  }));
+}
+async function renderSettingsBlocks() {
+  if (!isSuper()) return;
+  ['super_admin', 'admin', 'moderator'].forEach(k => { const i = $('rl-' + k); if (i) i.value = roleLabels[k] || ''; });
+  wnList = await loadChangelog();
+  clDraft = wnList === WN_FALLBACK ? [] : wnList.map(v => ({ ...v }));
+  paintClEditor();
+}
+$('role-labels-save').addEventListener('click', async () => {
+  if (!isSuper()) return;
+  const value = {};
+  ['super_admin', 'admin', 'moderator'].forEach(k => { value[k] = ($('rl-' + k).value.trim().slice(0, 32)) || ROLE_DEFAULT_LABELS[k]; });
+  const { error } = await sb.from('global_settings').upsert({ key: 'role_labels', value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) return toast(friendlyError(error), 'error');
+  roleLabels = { ...ROLE_DEFAULT_LABELS, ...value };
+  logAction('labels_edit'); toast('Названия ролей сохранены (бот подхватит за минуту)'); applyRoleUI();
+});
+$('cl-add').addEventListener('click', () => { clDraft = readClEditor(); clDraft.unshift({ version: '', title: '', date: todayISO(), items: [] }); paintClEditor(); });
+$('cl-editor').addEventListener('click', e => { const d = e.target.closest('.cl-del'); if (!d) return; clDraft = readClEditor(); clDraft.splice(+d.closest('.cl-card').dataset.i, 1); paintClEditor(); });
+$('cl-save').addEventListener('click', async () => {
+  if (!isSuper()) return;
+  const list = sortVersions(readClEditor());
+  if (!list.length) return toast('Добавьте хотя бы одну версию', 'error');
+  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 4.0.0', 'error');
+  const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: list[0].version, versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) return toast(friendlyError(error), 'error');
+  wnList = list; liveVersion = String(list[0].version); paintVersionChip();
+  clDraft = list.map(v => ({ ...v })); paintClEditor();
+  logAction('changelog_edit', null, null, liveVersion); toast('Changelog сохранён: чипы версий на всех сайтах обновятся');
+});
 
 // ======================================================================= логи
 function logRow(l, names, sites, full) {
@@ -1014,6 +1410,3 @@ $('logout-btn').addEventListener('click', () => {
   } catch (_) {}
   showLogin(false);
 })();
-
-// Скрытая вкладка: декоративные анимации на паузу (см. .amoore-hidden в style.css)
-document.addEventListener('visibilitychange', () => document.documentElement.classList.toggle('amoore-hidden', document.hidden));

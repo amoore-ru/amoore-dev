@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
-  <title>amoore Dev — Mission Control</title>
+  <title>amoore Dev — Mission Control v3.1</title>
   <meta name="theme-color" content="#070b16">
   <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=9">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=4.0.0">
+  <link rel="stylesheet" href="amoore-theme.css?v=4.0.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -45,21 +46,24 @@
       <div class="topbar-brand">
         <div class="mark">a.</div>
         <div><strong>amoore Dev</strong><span>Mission Control</span></div>
+        <button type="button" class="version-chip" id="version-chip" title="Что нового" aria-label="Что нового в версии">v4.0.0</button>
       </div>
-      <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false">
-        <span></span><span></span><span></span>
+      <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="topbar-tabs">
+        <span></span><span></span><span></span><i class="burger-dot" id="burger-dot" hidden></i>
       </button>
       <nav class="topbar-tabs" id="topbar-tabs">
         <button class="tab-btn active" data-view="dashboard" id="tab-dashboard">Дашборд</button>
+        <button class="tab-btn" data-view="news" id="tab-news">Новости</button>
         <button class="tab-btn" data-view="media" id="tab-media">Медиа</button>
+        <button class="tab-btn" data-view="digest" id="tab-digest">Дайджест</button>
+        <button class="tab-btn" data-view="settings" id="tab-settings">Настройки</button>
         <button class="tab-btn" data-view="team" id="tab-team">Команда</button>
         <button class="tab-btn" data-view="logs" id="tab-logs">Логи</button>
-        <button class="tab-btn" data-view="leads" id="tab-leads">Заявки</button>
-        <button class="tab-btn" data-view="settings" id="tab-settings">Настройки</button>
+        <button class="tab-btn" data-view="leads" id="tab-leads">Заявки<span class="tab-badge" id="leads-badge" hidden aria-label="Новых заявок">0</span></button>
       </nav>
       <div class="topbar-right">
         <div class="global-search-wrap">
-          <input id="global-search" type="search" placeholder="Поиск: новости, сайты, админы…" aria-label="Глобальный поиск" autocomplete="off">
+          <input id="global-search" type="search" placeholder="Поиск по панели…" title="Поиск: новости, сайты, админы" aria-label="Глобальный поиск" autocomplete="off">
           <div id="global-search-results" class="global-search-results" role="listbox" hidden></div>
         </div>
         <div class="admin-badge"><span class="dot"></span><span>Admin</span></div>
@@ -81,6 +85,7 @@
           <div class="stat-card glass"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Сайтов</div></div>
           <div class="stat-card glass"><div class="stat-value" id="stat-open">—</div><div class="stat-label">Открыто</div></div>
           <div class="stat-card glass danger"><div class="stat-value" id="stat-closed">—</div><div class="stat-label">Закрыто</div></div>
+          <button type="button" class="stat-card glass stat-leads" id="stat-leads-card" title="Открыть заявки"><div class="stat-value" id="stat-leads">—</div><div class="stat-label">Новых заявок</div></button>
         </div>
         <div class="widgets-row">
           <div class="widget glass">
@@ -114,8 +119,27 @@
           </div>
         </div>
 
-        <div id="news-dashboard-block" style="margin-top:32px">
-          <div class="section-title">Управление новостями</div>
+      </div>
+
+      <!-- MEDIA -->
+      <div class="view" id="view-media">
+        <div class="section-title">Медиатека</div>
+        <div class="hint-card" id="media-hint">
+          <span class="hint-icon" aria-hidden="true">ⓘ</span>
+          <p>Медиатека — это облачное хранилище картинок. Загрузите фото, нажмите "Скопировать" и вставьте ссылку в текст новости или настройки сайта.</p>
+        </div>
+        <div class="dropzone glass" id="dropzone">
+          <p>Перетащите файл сюда или <label class="linkish">выберите<input type="file" id="media-file" accept="image/*,.pdf,.json,application/pdf,application/json" hidden></label></p><p class="muted" style="margin-top:8px;font-size:12px;opacity:.7">Картинки, PDF и JSON</p>
+          <p class="widget-meta">Bucket: media · публичный доступ</p>
+        </div>
+        <div class="media-grid" id="media-grid"><div class="loading-state">Загрузка…</div></div>
+      </div>
+
+      <!-- NEWS -->
+      <div class="view" id="view-news">
+        <div class="section-title">Новости</div>
+        <p class="widget-meta" id="news-role-note"></p>
+        <div id="news-form-wrap">
           <form class="team-form glass" id="news-form">
             <div class="form-row">
               <div class="form-group">
@@ -141,23 +165,9 @@
             </div>
             <button type="submit" class="btn btn-primary" id="news-submit-btn" style="width:auto;padding:12px 28px">Опубликовать</button>
           </form>
-          <div class="section-title" style="margin-top:20px">Последние новости</div>
-          <div id="news-admin-list" class="team-list"><div class="loading-state">Загрузка…</div></div>
         </div>
-      </div>
-
-      <!-- MEDIA -->
-      <div class="view" id="view-media">
-        <div class="section-title">Медиатека</div>
-        <div class="hint-card" id="media-hint">
-          <span class="hint-icon" aria-hidden="true">ⓘ</span>
-          <p>Медиатека — это облачное хранилище картинок. Загрузите фото, нажмите "Скопировать" и вставьте ссылку в текст новости или настройки сайта.</p>
-        </div>
-        <div class="dropzone glass" id="dropzone">
-          <p>Перетащите файл сюда или <label class="linkish">выберите<input type="file" id="media-file" accept="image/*,.pdf,.json,application/pdf,application/json" hidden></label></p><p class="muted" style="margin-top:8px;font-size:12px;opacity:.7">Картинки, PDF и JSON</p>
-          <p class="widget-meta">Bucket: media · публичный доступ</p>
-        </div>
-        <div class="media-grid" id="media-grid"><div class="loading-state">Загрузка…</div></div>
+        <div class="section-title" style="margin-top:20px">Последние новости</div>
+        <div id="news-admin-list" class="team-list"><div class="loading-state">Загрузка…</div></div>
       </div>
 
       <!-- SETTINGS -->
@@ -166,6 +176,27 @@
         <div class="team-form glass" style="margin-bottom:24px">
           <div class="form-group"><label for="telegram-broadcast-text">Текст сообщения для Telegram</label><textarea id="telegram-broadcast-text" rows="4" maxlength="4000" placeholder="Сообщение всем активным пользователям бота…"></textarea><p class="widget-meta">Рассылка доступна только super_admin. Получатели — пользователи, которые ранее писали боту в личные сообщения.</p></div>
           <button type="button" class="btn btn-primary" id="telegram-broadcast-btn">Отправить всем пользователям бота</button>
+        </div>
+        <div id="settings-super-blocks">
+          <div class="section-title">Названия ролей</div>
+          <div class="team-form glass" style="margin-bottom:24px">
+            <p class="widget-meta" style="margin:0 0 14px">Переименуйте роли под себя (например, «Шеф»). Названия видны в админке, на сайтах и в боте. Внутренние ключи ролей не меняются.</p>
+            <div class="form-row">
+              <div class="form-group"><label for="rl-super_admin">super_admin</label><input id="rl-super_admin" maxlength="32" placeholder="Основатель"></div>
+              <div class="form-group"><label for="rl-admin">admin</label><input id="rl-admin" maxlength="32" placeholder="Админ"></div>
+              <div class="form-group"><label for="rl-moderator">moderator</label><input id="rl-moderator" maxlength="32" placeholder="Модератор"></div>
+            </div>
+            <button type="button" class="btn btn-primary" id="role-labels-save" style="width:auto;padding:12px 28px">Сохранить названия</button>
+          </div>
+          <div class="section-title">Версии и Changelog</div>
+          <div class="team-form glass" style="margin-bottom:24px">
+            <p class="widget-meta" style="margin:0 0 14px">Первая версия в списке — текущая: её показывают чипы версии на всех сайтах и бот. Один пункт — одна строка.</p>
+            <div id="cl-editor"></div>
+            <div class="modal-actions" style="margin-top:14px">
+              <button type="button" class="btn btn-ghost" id="cl-add">+ Добавить версию</button>
+              <button type="button" class="btn btn-primary" id="cl-save" style="width:auto;flex:1">Сохранить и обновить везде</button>
+            </div>
+          </div>
         </div>
         <div class="section-title">Резервная копия</div>
         <div class="team-form glass backup-card">
@@ -205,11 +236,26 @@
           </form>
         </div>
         <div class="section-title">Команда</div>
+        <p class="widget-meta" id="team-online-line" style="margin:-6px 0 12px"></p>
         <div class="team-list" id="team-list"><div class="loading-state">Загрузка…</div></div>
       </div>
 
       <!-- LOGS -->
       
+      <!-- DIGEST -->
+      <div class="view" id="view-digest">
+        <div class="section-head">
+          <div>
+            <h2 style="margin:0">Дайджест</h2>
+            <p class="muted" style="margin:4px 0 0">Сводка за 7 дней: новости, переключения тумблеров, заявки и визиты. Берётся из журнала действий (Event System).</p>
+          </div>
+          <button type="button" class="btn btn-primary" id="digest-build" style="width:auto">Сформировать сводку за неделю</button>
+        </div>
+        <div id="digest-result" class="digest-result" aria-live="polite">
+          <div class="loading-state">Нажмите «Сформировать сводку за неделю» — отчёт соберётся за несколько секунд.</div>
+        </div>
+      </div>
+
       <div class="view" id="view-leads">
         <h2>Заявки с лендинга</h2>
         <p class="muted">Форма «Оставить заявку» на amoore-ru</p>
@@ -272,6 +318,40 @@
     </div>
   </div>
 
+  <!-- Edit admin modal -->
+  <div class="modal-overlay" id="edit-admin-modal">
+    <div class="modal glass sheet">
+      <h2>Профиль пользователя</h2>
+      <div class="form-group"><label for="ea-name">Имя</label><input id="ea-name" maxlength="80"></div>
+      <div class="form-group"><label for="ea-nickname">Никнейм</label><input id="ea-nickname" maxlength="40"></div>
+      <div class="form-group"><label for="ea-email">Email</label><input type="email" id="ea-email" autocapitalize="none" spellcheck="false"></div>
+      <div class="form-group"><label for="ea-role">Роль</label><select id="ea-role"></select></div>
+      <p class="widget-meta" style="margin:8px 0 0">Email должен совпадать с пользователем в Supabase → Authentication, иначе вход перестанет работать.</p>
+      <div class="modal-actions" style="margin-top:20px">
+        <button class="btn btn-ghost" id="ea-cancel">Отмена</button>
+        <button class="btn btn-primary" id="ea-save" style="width:auto;flex:1">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit news modal -->
+  <div class="modal-overlay" id="news-edit-modal">
+    <div class="modal glass sheet">
+      <h2>Редактировать новость</h2>
+      <div class="form-group"><label for="ne-title">Заголовок</label><input id="ne-title" maxlength="140"></div>
+      <div class="form-row">
+        <div class="form-group"><label for="ne-type">Тип</label><select id="ne-type"></select></div>
+        <div class="form-group"><label for="ne-date">Дата</label><input type="date" id="ne-date"></div>
+      </div>
+      <div class="form-group"><label for="ne-body">Текст</label><textarea id="ne-body" rows="5" maxlength="4000" class="ta"></textarea></div>
+      <label class="perm-row" style="margin-top:8px"><span>Опубликовано на сайтах</span><div class="toggle open" id="ne-published" role="switch" tabindex="0" aria-checked="true"><div class="toggle-knob"></div></div></label>
+      <div class="modal-actions" style="margin-top:20px">
+        <button class="btn btn-ghost" id="ne-cancel">Отмена</button>
+        <button class="btn btn-primary" id="ne-save" style="width:auto;flex:1">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Permissions modal -->
   <div class="modal-overlay" id="perms-modal">
     <div class="modal glass sheet">
@@ -286,7 +366,22 @@
     </div>
   </div>
 
+  <!-- What's New -->
+  <div class="modal-overlay" id="whatsnew-modal" role="dialog" aria-modal="true" aria-labelledby="whatsnew-title">
+    <div class="modal glass sheet whatsnew">
+      <div class="whatsnew-badge">NEW</div>
+      <h2 id="whatsnew-title">Обновление v4.0</h2>
+      <p class="muted" id="whatsnew-sub">Singularity — что изменилось</p>
+      <ul class="whatsnew-list" id="whatsnew-list"></ul>
+      <div class="modal-actions" style="margin-top:20px">
+        <button type="button" class="btn btn-ghost" id="whatsnew-history">Вся история</button>
+        <button type="button" class="btn btn-primary" id="whatsnew-ok" style="width:auto;flex:1;margin-top:0">Понятно</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=9"></script>
+  <script src="digest.js?v=4.0.0"></script>
+  <script src="app.js?v=4.0.0"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 /**
- * digest.js — v3.0.0: сборка «умного дайджеста» за период (по умолчанию 7 дней).
+ * digest.js — v4.0.0: сборка «умного дайджеста» за период (по умолчанию 7 дней).
  * Чистая логика без DOM и сети: работает в админке (браузер) и в тестах (Node).
  * Зеркальная реализация для бота — amoore-ai/digest.py (формат текста совпадает, это проверяет QA).
  *
@@ -120,6 +120,6 @@
     return out.join('\n');
   }
 
-  var api = { build: build, render: render, LABELS: LABELS, TOGGLE: TOGGLE, version: '3.0.0' };
+  var api = { build: build, render: render, LABELS: LABELS, TOGGLE: TOGGLE, version: '4.0.0' };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.AmooreDigest = api;
 })(typeof window !== 'undefined' ? window : globalThis);

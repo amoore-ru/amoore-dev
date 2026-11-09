@@ -1,5 +1,8 @@
 /**
- * amoore-core.js — v9.0.0 (Global Update v2.0 Evolve)
+ * amoore-core.js — v4.0.0 «NEXUS»
+ * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
+ * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
+ *
  * Подключение:
  *   <script>window.AMOORE_SITE_ID = 'landing';</script>
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,6 +16,14 @@
   'use strict';
   if (window.__amooreCoreLoaded) return;
   window.__amooreCoreLoaded = true;
+
+  // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
+  // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
+  // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
+  var AMOORE_VERSION = '4.0.0';
+  window.AMOORE_VERSION = AMOORE_VERSION;
+  var DEV_URL = 'https://amoore-dev.pages.dev/';
+  var STUDIO_URL = 'https://amoore-studio.pages.dev/';
 
   var SITE_ID = window.AMOORE_SITE_ID || 'landing';
   (function networkNotice() {
@@ -48,7 +59,7 @@
     news: [],
     sites: [],
     god: false,
-    version: '9.0.0'
+    version: AMOORE_VERSION
   };
   function publishState() {
     window.AMOORE_STATE.config = cfg ? Object.assign({}, cfg) : null;
@@ -84,6 +95,35 @@
     s.textContent = css;
     document.head.appendChild(s);
   }
+  // Любой сетевой вызов обёрнут таймаутом: «зависший» запрос не должен блокировать страницу.
+  function withTimeout(promise, ms) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var timer = setTimeout(function () { if (!done) { done = true; reject(new Error('timeout')); } }, ms);
+      Promise.resolve(promise).then(
+        function (v) { if (!done) { done = true; clearTimeout(timer); resolve(v); } },
+        function (e) { if (!done) { done = true; clearTimeout(timer); reject(e); } }
+      );
+    });
+  }
+  // Первый УСПЕШНЫЙ результат из списка промисов (аналог Promise.any, работает в старом Safari).
+  function firstOk(list) {
+    return new Promise(function (resolve, reject) {
+      var left = list.length, lastErr = null;
+      list.forEach(function (p) {
+        Promise.resolve(p).then(resolve, function (e) { lastErr = e; if (--left === 0) reject(lastErr); });
+      });
+    });
+  }
+  // Заголовки REST. Новые ключи Supabase (sb_publishable_…) — НЕ JWT: класть их в Authorization нельзя
+  // (шлюз отвечает 401), поэтому Bearer добавляем только для классического JWT-ключа (eyJ…).
+  function restHeaders(extra) {
+    var h = { 'apikey': SB_ANON, 'Accept': 'application/json' };
+    if (/^eyJ/.test(SB_ANON)) h['Authorization'] = 'Bearer ' + SB_ANON;
+    for (var k in (extra || {})) h[k] = extra[k];
+    return h;
+  }
+  function restUrl(path) { return SB_URL.replace(/\/$/, '') + '/rest/v1/' + path; }
   function pad2(n) { return n < 10 ? '0' + n : String(n); }
   function fmtDate(n) {                       // display_date | published_at -> ДД.ММ.ГГГГ
     var v = n.display_date, m;
@@ -154,21 +194,28 @@
     '.amoore-lock-screen[data-type=private] .amoore-lock-card{border:1px solid #333;border-radius:4px;max-width:380px}' +
     '.amoore-lock-screen[data-type=private] .amoore-lock-title{font-size:18px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}' +
     '.amoore-lock-screen[data-type=private] .amoore-lock-text{font-size:13px;color:#888;letter-spacing:.04em}' +
+    '.nx-lock-footer{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:14px 0 calc(16px + env(safe-area-inset-bottom,0px))}' +
+    '.nx-lock-btn{width:44px;height:44px;padding:0;font-size:18px;line-height:1;color:#d4af37;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.3);border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent}' +
+    '.nx-lock-btn:hover{border-color:rgba(212,175,55,.7)}' +
     '@media(max-width:768px){.amoore-lock-card{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}}';
 
   var LOCK_HTML = {
     maintenance: '<div class="amoore-lock-card"><div class="amoore-lock-icon">⚙️</div><div class="amoore-lock-title">Технические работы</div><div class="amoore-lock-text">Мы проводим технические работы.<br>Скоро вернёмся.</div></div>',
     crash:       '<div class="amoore-lock-card"><div class="amoore-glitch">САЙТ УПАЛ</div><div class="amoore-lock-text">Мы уже чиним.<br>Пожалуйста, подождите.</div></div>',
-    'private':   '<div class="amoore-lock-card"><div class="amoore-lock-icon">🔒</div><div class="amoore-lock-title">Доступ ограничен</div><div class="amoore-lock-text">Private access only</div></div>'
+    'private':   '<div class="amoore-lock-card"><div class="amoore-lock-icon">🔒</div><div class="amoore-lock-title">Доступ ограничен</div><div class="amoore-lock-text">Private access only</div></div>' +
+                 '<footer class="nx-lock-footer"><button type="button" class="nx-lock-btn" data-act="private-login" aria-label="Вход для администратора" title="Вход для администратора">🔒</button></footer>'
   };
 
-  function stopTouch(e) { e.preventDefault(); }
+  function stopTouch(e) {
+    try { if (e.target && e.target.closest && e.target.closest('.nx-login-overlay')) return; } catch (x) {}
+    e.preventDefault();
+  }
   var lockScreen = null;
 
   function showLock(type) {
     type = LOCK_HTML[type] ? type : 'maintenance';
     styleOnce('amoore-lock-css', LOCK_CSS);
-    if (lockScreen) { lockScreen.setAttribute('data-type', type); lockScreen.innerHTML = LOCK_HTML[type]; return; }
+    if (lockScreen) { lockScreen.setAttribute('data-type', type); lockScreen.innerHTML = LOCK_HTML[type]; wireLock(); return; }
     document.documentElement.classList.add('amoore-locked');
     document.body.classList.add('amoore-locked');
     lockScreen = el('div', 'amoore-lock-screen', LOCK_HTML[type]);
@@ -182,6 +229,12 @@
       if (n.tagName !== 'SCRIPT' && n.tagName !== 'STYLE') { n.setAttribute('inert', ''); n.setAttribute('data-amoore-inert', '1'); }
     });
     document.body.appendChild(lockScreen);
+    wireLock();
+  }
+  function wireLock() {
+    if (!lockScreen) return;
+    var b = lockScreen.querySelector('[data-act=private-login]');
+    if (b) b.addEventListener('click', openLoginModal);
   }
   function hideLock() {
     if (!lockScreen) return;
@@ -195,25 +248,141 @@
     lockScreen = null;
   }
 
-  // ------------------------------------------------------------------ God bar
-  var GOD_CSS =
-    '.amoore-god-bar{position:relative!important;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:100%;box-sizing:border-box;z-index:999998;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top,0px));background:linear-gradient(90deg,#1a1508,#2a220c);border-bottom:1px solid #d4af37;font-family:Manrope,system-ui,sans-serif;font-size:14px;color:#e8c96a}' +
-    '.amoore-god-btn{padding:8px 14px;min-height:40px;background:#d4af37;color:#0a0e18;border:0;border-radius:8px;font:700 13px Manrope,system-ui,sans-serif;cursor:pointer}' +
-    '.amoore-god-btn:active{transform:scale(.97)}';
+  // ------------------------------------------------------------------ Private Login (🔒 в футере закрытого сайта)
+  // Email + пароль (Supabase Auth) + токен из таблицы admins. Успех → сессия в localStorage на 6 часов
+  // (тот же ключ amoore_dev_auth, что и у админки), перезагрузка страницы и плавающее меню Quick Admin.
+  function authSession() {
+    try {
+      var raw = ls('get', AUTH_KEY);
+      if (!raw) return null;
+      var d = JSON.parse(raw);
+      if (!d || !d.access_token) return null;
+      if (d.expires_at && Date.now() > d.expires_at) return null;
+      return d;
+    } catch (e) { return null; }
+  }
+  async function privateLogin(email, password, token) {
+    if (!client) throw new Error('Сервер недоступен. Попробуйте позже.');
+    var r = await withTimeout(client.auth.signInWithPassword({ email: email, password: password }), 9000);
+    if (r.error) throw new Error('Неверный email или пароль');
+    var v = await withTimeout(client.rpc('verify_admin', { p_token: token }), 9000);
+    var d = v && v.data;
+    if (!d || v.error) { try { await client.auth.signOut(); } catch (e) {} throw new Error('Неверный токен или аккаунт не найден'); }
+    if (d.role !== 'super_admin' && d.role !== 'admin') { try { await client.auth.signOut(); } catch (e) {} throw new Error('Недостаточно прав для просмотра закрытого сайта'); }
+    ls('set', AUTH_KEY, JSON.stringify({
+      admin_id: d.id, email: d.email, nickname: d.nickname, name: d.name, role: d.role,
+      permissions: d.permissions || null, access_token: token, expires_at: Date.now() + TTL_MS
+    }));
+    try { await client.auth.signOut(); } catch (e) {}
+  }
+  function openLoginModal() {
+    var ov = document.getElementById('nx-login');
+    if (!ov) {
+      ov = el('div', 'nx-cl-overlay nx-login-overlay',
+        '<form class="nx-cl-card nx-login-card" novalidate>' +
+        '<button type="button" class="nx-cl-close" data-act="close" aria-label="Закрыть">×</button>' +
+        '<h2>Вход для администратора</h2>' +
+        '<label class="nx-field"><span>Email</span><input type="email" name="email" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>' +
+        '<label class="nx-field"><span>Пароль</span><input type="password" name="password" autocomplete="current-password" required></label>' +
+        '<label class="nx-field"><span>Токен</span><input type="password" name="token" autocomplete="off" autocapitalize="none" spellcheck="false" required></label>' +
+        '<p class="nx-login-error" role="alert" hidden></p>' +
+        '<button type="submit" class="nx-btn nx-login-submit">Войти</button>' +
+        '</form>');
+      ov.id = 'nx-login';
+      var form = ov.querySelector('form'), err = ov.querySelector('.nx-login-error'), sub = ov.querySelector('.nx-login-submit');
+      function shut() { ov.classList.remove('open'); }
+      ov.addEventListener('click', function (e) { if (e.target === ov) shut(); });
+      ov.querySelector('[data-act=close]').addEventListener('click', shut);
+      ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') shut(); });
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var em = form.email.value.trim(), pw = form.password.value, tk = form.token.value.trim();
+        err.hidden = true;
+        if (!em || !pw || !tk) { err.textContent = 'Заполните email, пароль и токен'; err.hidden = false; return; }
+        sub.disabled = true; sub.textContent = 'Проверяем…';
+        try {
+          await privateLogin(em, pw, tk);
+          location.reload();
+        } catch (ex) {
+          err.textContent = (ex && ex.message === 'timeout') ? 'Сервер не ответил. Попробуйте ещё раз.' : (ex && ex.message) || 'Не удалось войти';
+          err.hidden = false; sub.disabled = false; sub.textContent = 'Войти';
+        }
+      });
+      document.body.appendChild(ov);
+    }
+    ov.classList.add('open');
+    var first = ov.querySelector('input[name=email]'); if (first) setTimeout(function () { try { first.focus(); } catch (e) {} }, 30);
+  }
 
-  function showGodBar() {
+  // ------------------------------------------------------------------ Quick Admin (плавающее меню)
+  var ROLE_FALLBACK = { super_admin: 'Основатель', admin: 'Админ', moderator: 'Модератор' };
+  var roleLabelsCache = null;
+  async function fetchGlobalSetting(key) {
+    try {
+      if (client) {
+        var r = await withTimeout(client.from('global_settings').select('value').eq('key', key).maybeSingle(), 6000);
+        if (r && !r.error && r.data) return r.data.value;
+      }
+      var res = await withTimeout(fetch(restUrl('global_settings?select=value&key=eq.' + encodeURIComponent(key)), { headers: restHeaders() }), 6000);
+      if (!res.ok) return null;
+      var arr = await res.json();
+      return arr && arr[0] ? arr[0].value : null;
+    } catch (e) { return null; }
+  }
+  async function getRoleLabels() {
+    if (roleLabelsCache) return roleLabelsCache;
+    var v = await fetchGlobalSetting('role_labels');
+    roleLabelsCache = Object.assign({}, ROLE_FALLBACK, v && typeof v === 'object' ? v : {});
+    return roleLabelsCache;
+  }
+  function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  var QA_CSS =
+    '.nx-qa{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:2147482000;font-family:Manrope,system-ui,sans-serif;color:#eef0f7}' +
+    '.nx-qa-fab{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;font:700 13px Manrope,system-ui,sans-serif;color:#0a0e18;background:linear-gradient(135deg,#e8c96a,#d4af37 55%,#b8932a);border:0;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.4);cursor:pointer}' +
+    '.nx-qa-panel{position:absolute;right:0;bottom:calc(100% + 10px);width:min(300px,calc(100vw - 28px));box-sizing:border-box;padding:14px;border-radius:18px;background:rgba(13,18,32,.9);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:1px solid rgba(212,175,55,.2);box-shadow:0 8px 32px rgba(0,0,0,.45)}' +
+    '.nx-qa-panel[hidden]{display:none}' +
+    '.nx-qa-user{font-size:13px;font-weight:700;margin:0 0 2px}.nx-qa-role{font-size:12px;color:#8b90a5;margin:0 0 10px}' +
+    '.nx-qa-note{font-size:12px;color:#d4af37;margin:0 0 10px}' +
+    '.nx-qa-online{margin:0 0 12px;padding:10px 0;border-top:1px solid rgba(212,175,55,.14);border-bottom:1px solid rgba(212,175,55,.14);font-size:12px;line-height:1.7;color:#c4c9d8}' +
+    '.nx-qa-online b{display:block;margin-bottom:2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8b90a5}' +
+    '.nx-qa-dot{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:50%;background:#5a6478}.nx-qa-dot.on{background:#34d399}' +
+    '.nx-qa-actions{display:grid;gap:8px}' +
+    '.nx-qa-btn{display:flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;box-sizing:border-box;font:700 13px Manrope,system-ui,sans-serif;color:#eef0f7;text-decoration:none;background:transparent;border:1px solid rgba(212,175,55,.3);border-radius:12px;cursor:pointer}' +
+    '.nx-qa-btn:hover{color:#0a0e18;background:linear-gradient(135deg,#e8c96a,#d4af37 55%,#b8932a);border-color:transparent}';
+
+  function adminLine(a, labels) { return '<span class="nx-qa-dot' + (a.online ? ' on' : '') + '"></span>' + esc(a.nickname || a.name || '—') + ' (' + (a.online ? 'в сети' : 'офлайн') + ')'; }
+
+  async function showQuickAdmin(closed) {
     if (document.getElementById('amoore-god-bar')) return;
-    styleOnce('amoore-god-css', GOD_CSS +
-      '.amoore-god-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}' +
-      '.amoore-god-btn-ghost{padding:8px 14px;min-height:40px;background:transparent;color:#e8c96a;border:1px solid rgba(212,175,55,.45);border-radius:8px;font:600 13px Manrope,system-ui,sans-serif;cursor:pointer;text-decoration:none}');
-    var bar = el('div', 'amoore-god-bar',
-      '<span><strong>God Mode:</strong> сайт закрыт для посетителей</span>' +
-      '<div class="amoore-god-actions">' +
-      '<button class="amoore-god-btn" type="button" data-act="open">Открыть сайт</button>' +
-      '<a class="amoore-god-btn-ghost" href="https://amoore-dev.pages.dev/" target="_blank" rel="noopener">В админку</a>' +
-      '</div>');
-    bar.id = 'amoore-god-bar';
-    bar.querySelector('[data-act=open]').addEventListener('click', async function () {
+    styleOnce('amoore-qa-css', QA_CSS);
+    var sess = authSession();
+    var labels = await getRoleLabels();
+    var root = el('div', 'nx-qa',
+      '<div class="nx-qa-panel" hidden>' +
+      '<p class="nx-qa-user"></p><p class="nx-qa-role"></p>' +
+      (closed ? '<p class="nx-qa-note">Сайт закрыт для посетителей</p>' : '') +
+      '<div class="nx-qa-online"><b>Админы в сети</b><div data-qa-list>Загрузка…</div></div>' +
+      '<div class="nx-qa-actions">' +
+      (closed ? '<button type="button" class="nx-qa-btn" data-act="open">Открыть сайт</button>' : '') +
+      '<a class="nx-qa-btn" data-act="admin" href="' + DEV_URL + '" target="_blank" rel="noopener">Открыть Админку</a>' +
+      (SITE_ID === 'studio' ? '' : '<a class="nx-qa-btn" data-act="edit" href="' + STUDIO_URL + '" target="_blank" rel="noopener">Редактировать</a>') +
+      '<button type="button" class="nx-qa-btn" data-act="logout">Выйти</button>' +
+      '</div></div>' +
+      '<button type="button" class="nx-qa-fab" aria-expanded="false" aria-haspopup="true">⚡ Admin</button>');
+    root.id = 'amoore-god-bar';
+    var panel = root.querySelector('.nx-qa-panel'), fab = root.querySelector('.nx-qa-fab');
+    root.querySelector('.nx-qa-user').textContent = (sess && (sess.nickname || sess.name || sess.email)) || 'Администратор';
+    root.querySelector('.nx-qa-role').textContent = labels[sess && sess.role] || (sess && sess.role) || '';
+    fab.addEventListener('click', function () {
+      var open = panel.hidden; panel.hidden = !open; fab.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) refreshOnline();
+    });
+    root.querySelector('[data-act=logout]').addEventListener('click', function () {
+      ls('del', AUTH_KEY); ls('del', GOD_KEY); location.reload();
+    });
+    var openBtn = root.querySelector('[data-act=open]');
+    if (openBtn) openBtn.addEventListener('click', async function () {
       var btn = this; btn.disabled = true;
       try {
         var r = await client.rpc('god_open_site', { p_token: godToken, p_site: SITE_ID });
@@ -221,18 +390,35 @@
       } catch (e) {}
       btn.disabled = false; btn.textContent = 'Нет прав';
     });
-    document.body.prepend(bar);
+    async function refreshOnline() {
+      var box = root.querySelector('[data-qa-list]');
+      try {
+        if (client && godToken) client.rpc('touch_admin_by_token', { p_token: godToken }).then(function () {}, function () {});
+        var r = await withTimeout(client.rpc('quick_admins', { p_token: godToken }), 6000);
+        var list = r && r.data;
+        if (list instanceof Array && list.length) box.innerHTML = list.map(function (a) { return '<div>' + adminLine(a, labels) + '</div>'; }).join('');
+        else box.textContent = 'Нет данных';
+      } catch (e) { box.textContent = 'Нет данных'; }
+    }
+    document.body.appendChild(root);
+    setInterval(function () { if (!panel.hidden) refreshOnline(); }, 60000);
+    if (client && godToken) { try { client.rpc('touch_admin_by_token', { p_token: godToken }).then(function () {}, function () {}); } catch (e) {} }
   }
   function hideGodBar() {
     var b = document.getElementById('amoore-god-bar');
     if (b && b.parentNode) b.parentNode.removeChild(b);
   }
+  function showGodBar() { return showQuickAdmin(true); }
 
   // ------------------------------------------------------------------ site status
   async function applyStatus() {
     if (!cfg) return;
-    if (cfg.status === 'open') { hideLock(); hideGodBar(); return; }
-    if (await resolveGod()) { hideLock(); showGodBar(); }
+    if (cfg.status === 'open') {
+      hideLock();
+      if (storedTokens().length && await resolveGod()) showQuickAdmin(false); else hideGodBar();
+      return;
+    }
+    if (await resolveGod()) { hideLock(); showQuickAdmin(true); }
     else { hideGodBar(); showLock(cfg.overlay_type); }
   }
 
@@ -317,132 +503,244 @@
   }
 
   // ------------------------------------------------------------------ news
-  var TYPE_LABEL = { news: 'Новость', patch: 'Патч', soon: 'Скоро' };
+  // Конвейер новостей v3 (исправление «новости не отображаются»):
+  //  1) рисуем из локального кэша мгновенно (stale-while-revalidate);
+  //  2) параллельно спрашиваем supabase-js И чистый REST — берём первый успешный ответ;
+  //  3) загрузка новостей НЕ ждёт конфиг/статус бота/список сайтов (раньше boot() был цепочкой await);
+  //  4) запрос идёт только по опубликованным (is_published=true) — под частичный индекс news_pub_idx.
+  var TYPE_LABEL = { news: 'Новость', patch: 'Патч', soon: 'Скоро', digest: 'Дайджест' };
+  var NEWS_CACHE_KEY = 'amoore_news_v3';
+  var NEWS_COLS = 'id,title,body,type,display_date,published_at';
+  var newsSeq = 0;           // номер запроса: устаревший ответ не перетирает свежий
+  var cfgPromise = null;     // промис загрузки конфига (новости ждут его не дольше 2.5 с)
+
+  function readNewsCache() {
+    try { var d = JSON.parse(ls('get', NEWS_CACHE_KEY) || 'null'); return d && d.items instanceof Array ? d.items : null; }
+    catch (e) { return null; }
+  }
+  function writeNewsCache(items) { ls('set', NEWS_CACHE_KEY, JSON.stringify({ t: Date.now(), items: items.slice(0, 20) })); }
+
+  function fetchNewsViaClient() {
+    if (!client) return Promise.reject(new Error('no-client'));
+    return withTimeout(client.from('news').select(NEWS_COLS)
+      .eq('is_published', true).order('published_at', { ascending: false }).limit(20)
+      .then(function (res) { if (res.error) throw res.error; return res.data || []; }), 7000);
+  }
+  function fetchNewsViaRest() {
+    return withTimeout(fetch(restUrl('news?select=' + NEWS_COLS + '&is_published=eq.true&order=published_at.desc&limit=20'),
+      { method: 'GET', headers: restHeaders() })
+      .then(function (r) { if (!r.ok) throw new Error('http-' + r.status); return r.json(); }), 7000);
+  }
+
+  function newsTarget() { return document.querySelector('#news-list, [data-amoore-news]'); }
+
+  function setNewsPlaceholder(target, msg, isError) {
+    target.textContent = '';
+    var item = document.createElement('div');
+    item.className = 'news-item glass-card';
+    item.setAttribute(isError ? 'data-amoore-news-error' : 'data-amoore-news-placeholder', '1');
+    var span = document.createElement('span');
+    span.textContent = msg;                                   // textContent — без XSS
+    item.appendChild(span);
+    if (isError) {
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn btn-ghost news-retry'; btn.textContent = 'Повторить';
+      btn.addEventListener('click', function () { renderNews(); });
+      item.appendChild(btn);
+    }
+    target.appendChild(item);
+  }
+
+  // Свежесть новости: дата, которую выбрал админ (display_date), иначе дата публикации; при равенстве — время публикации.
+  // Это же правило использует любая вкладка-фильтр на лендинге: самое свежее всегда сверху.
+  function newsFreshness(n) {
+    var p = Date.parse(n.published_at) || 0;
+    var m = n.display_date && String(n.display_date).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    var d = m ? Date.parse(m[1] + '-' + m[2] + '-' + m[3] + 'T12:00:00') : NaN;
+    return [isNaN(d) ? p : d, p];
+  }
+  function sortNews(items) {
+    return (items || []).slice().sort(function (a, b) {
+      var x = newsFreshness(a), y = newsFreshness(b);
+      return (y[0] - x[0]) || (y[1] - x[1]);
+    });
+  }
+
+  function paintNews(target, items) {
+    target.textContent = '';
+    items = sortNews(items);
+    if (!items.length) { setNewsPlaceholder(target, 'Здесь пока пусто. Новости появятся из панели amoore Dev.', false); try { document.dispatchEvent(new CustomEvent('amoore:news', { detail: { count: 0 } })); } catch (e) {} return; }
+    var frag = document.createDocumentFragment();
+    items.forEach(function (n) {
+      var item = document.createElement('div');
+      item.className = 'news-item glass-card' + (n.type === 'digest' ? ' news-item-digest' : '');
+      item.setAttribute('data-type', n.type || 'news');
+      var small = document.createElement('small');
+      small.textContent = [TYPE_LABEL[n.type] || '', fmtDate(n)].filter(Boolean).join(' · ');
+      var title = document.createElement('b'); title.textContent = n.title || '';
+      var body = document.createElement('span'); body.textContent = n.body || '';
+      item.appendChild(small); item.appendChild(title); item.appendChild(body);
+      frag.appendChild(item);
+    });
+    target.appendChild(frag);
+    try { document.dispatchEvent(new CustomEvent('amoore:news', { detail: { count: items.length } })); } catch (e) {}
+  }
 
   async function renderNews() {
-    var target = document.querySelector('#news-list, [data-amoore-news]');
+    var target = newsTarget();
     if (!target) return;
+    var seq = ++newsSeq;
 
-    function setPlaceholder(msg, isError) {
-      target.textContent = '';
-      var item = document.createElement('div');
-      item.className = 'news-item glass-card';
-      if (isError) item.setAttribute('data-amoore-news-error', '1');
-      else item.setAttribute('data-amoore-news-placeholder', '1');
-      var span = document.createElement('span');
-      span.textContent = msg;
-      item.appendChild(span);
-      target.appendChild(item);
+    // Мгновенная отрисовка из кэша (пока идёт сеть)
+    var hasReal = !!target.querySelector('[data-type]');
+    if (!hasReal) {
+      var cached = readNewsCache();
+      if (cached && cached.length) { paintNews(target, cached); hasReal = true; }
     }
 
-    function paintItems(items) {
-      target.textContent = '';
-      if (!items || !items.length) {
-        setPlaceholder('Здесь пока пусто. Новости появятся из панели amoore Dev.', false);
-        return;
-      }
-      var frag = document.createDocumentFragment();
-      items.forEach(function (n) {
-        var item = document.createElement('div');
-        item.className = 'news-item glass-card';
-        item.setAttribute('data-type', n.type || 'news');
-        var small = document.createElement('small');
-        small.textContent = [TYPE_LABEL[n.type] || '', fmtDate(n)].filter(Boolean).join(' · ');
-        var title = document.createElement('b');
-        title.textContent = n.title || '';
-        var body = document.createElement('span');
-        body.textContent = n.body || '';
-        item.appendChild(small);
-        item.appendChild(title);
-        item.appendChild(body);
-        frag.appendChild(item);
-      });
-      target.appendChild(frag);
-    }
-
-    // Тумблер новостей выключен
-    if (cfg && cfg.news_active === false) {
-      setPlaceholder('Редакция готовит материалы. Загляните позже', false);
-      return;
-    }
-
-    // Skeleton cards avoid a blank/lagging state during the first fetch.
-    if (!target.querySelector('[data-type]')) {
-      target.innerHTML = '<div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div><div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div><div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div>';
-    }
-
-    // 1) Пробуем supabase-js
-    // 2) Fallback: прямой REST (тот же anon-ключ) — если клиент завис
-    function fetchViaClient() {
-      if (!client) return Promise.reject(new Error('no-client'));
-      return client
-        .from('news')
-        .select('id, title, body, type, display_date, published_at')
-        .eq('is_published', true)
-        .order('published_at', { ascending: false })
-        .limit(20)
-        .then(function (res) {
-          if (res.error) throw res.error;
-          return res.data || [];
-        });
-    }
-
-    function fetchViaRest() {
-      var url = SB_URL.replace(/\/$/, '') +
-        '/rest/v1/news?select=id,title,body,type,display_date,published_at' +
-        '&is_published=eq.true&order=published_at.desc&limit=20';
-      return fetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': SB_ANON,
-          'Authorization': 'Bearer ' + SB_ANON,
-          'Accept': 'application/json'
-        }
-      }).then(function (r) {
-        if (!r.ok) throw new Error('http-' + r.status);
-        return r.json();
-      });
-    }
-
-    function withTimeout(promise, ms) {
-      return new Promise(function (resolve, reject) {
-        var done = false;
-        var timer = setTimeout(function () {
-          if (done) return;
-          done = true;
-          reject(new Error('timeout'));
-        }, ms);
-        Promise.resolve(promise).then(
-          function (v) { if (!done) { done = true; clearTimeout(timer); resolve(v); } },
-          function (e) { if (!done) { done = true; clearTimeout(timer); reject(e); } }
-        );
-      });
-    }
+    // Тумблер «Новости» выключен? Ждём конфиг, но не дольше 2.5 с — сеть для новостей стартует параллельно.
+    if (cfgPromise) { try { await withTimeout(cfgPromise, 2500); } catch (e) {} }
+    if (seq !== newsSeq) return;
+    if (cfg && cfg.news_active === false) { setNewsPlaceholder(target, 'Редакция готовит материалы. Загляните позже', false); return; }
 
     try {
-      var items = null;
-      try {
-        items = await withTimeout(fetchViaClient(), 6000);
-      } catch (e1) {
-        try {
-          items = await withTimeout(fetchViaRest(), 6000);
-        } catch (e2) {
-          throw e2;
-        }
-      }
+      var list = [fetchNewsViaRest()];
+      if (client) list.push(fetchNewsViaClient());
+      var items = await firstOk(list);
+      if (seq !== newsSeq) return;
       newsCache = items || [];
+      writeNewsCache(newsCache);
       publishState();
-      paintItems(items);
+      paintNews(target, newsCache);
       applySeo();
     } catch (e) {
+      if (seq !== newsSeq) return;
+      try { console.warn('[amoore-core] news load failed', e); } catch (x) {}
       if (!target.querySelector('[data-type]')) {
-        var msg = (e && e.message === 'timeout')
-          ? 'Сервер новостей не ответил. Обновите страницу.'
-          : 'Не удалось загрузить новости. Проверьте соединение.';
-        setPlaceholder(msg, true);
-        try { console.warn('[amoore-core] news load failed', e); } catch (x) {}
+        setNewsPlaceholder(target, (e && e.message === 'timeout')
+          ? 'Сервер новостей не ответил. Попробуйте ещё раз.'
+          : 'Не удалось загрузить новости. Проверьте соединение.', true);
       }
     }
+  }
+
+  // ------------------------------------------------------------------ leads (форма «Оставить заявку»)
+  // Возвращает { ok:true } или { ok:false, status, message }. Клиент supabase-js сам ставит правильные заголовки;
+  // если он недоступен — REST (только apikey). Тексты обрезаются под RLS-проверку длины в SQL.
+  async function submitLead(lead) {
+    var row = {
+      name: String(lead && lead.name || '').trim().slice(0, 120),
+      contact: String(lead && lead.contact || '').trim().slice(0, 200),
+      message: String(lead && lead.message || '').trim().slice(0, 2000),
+      status: 'new'
+    };
+    if (!row.name || !row.contact) return { ok: false, status: 0, message: 'empty' };
+    var lastErr = null;
+    if (client) {
+      try {
+        var r = await withTimeout(client.from('leads').insert(row), 9000);
+        if (!r.error) return { ok: true };
+        lastErr = { status: r.status || 0, message: r.error.message || 'error' };
+      } catch (e) { lastErr = { status: 0, message: e && e.message || 'error' }; }
+    }
+    try {
+      var res = await withTimeout(fetch(restUrl('leads'), {
+        method: 'POST',
+        headers: restHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+        body: JSON.stringify(row)
+      }), 9000);
+      if (res.ok) return { ok: true };
+      return { ok: false, status: res.status, message: 'http-' + res.status };
+    } catch (e) { return { ok: false, status: 0, message: (lastErr && lastErr.message) || (e && e.message) || 'network' }; }
+  }
+
+  // changelog.json лежит рядом с сайтом: [{version, date, title, items:[...]}]
+  async function fetchChangelog(url) {
+    try {
+      var r = await withTimeout(fetch(url || 'changelog.json', { cache: 'no-cache' }), 6000);
+      if (!r.ok) return [];
+      var d = await r.json();
+      return d && d.versions instanceof Array ? d.versions : (d instanceof Array ? d : []);
+    } catch (e) { return []; }
+  }
+
+  // ------------------------------------------------------------------ версия и Changelog из БД (v4.0)
+  // Источник правды — global_settings.changelog ({versions:[...]}), редактируется в админке.
+  // Нет БД → локальный changelog.json → жёсткий v4.0.0 из кода.
+  var changelogList = null;
+  function verKey(v) { return String(v || '').split('.').map(function (x) { return parseInt(x, 10) || 0; }); }
+  function verCmp(a, b) { var x = verKey(a), y = verKey(b); for (var i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); } return 0; }
+  function sortVersions(list) { return (list || []).filter(function (v) { return v && v.version; }).sort(function (a, b) { return verCmp(a.version, b.version); }); }
+  function applyVersion(v) {
+    if (!v) return;
+    AMOORE_VERSION = String(v);
+    window.AMOORE_VERSION = AMOORE_VERSION;
+    window.AMOORE_STATE.version = AMOORE_VERSION;
+    if (window.amooreCore) window.amooreCore.version = AMOORE_VERSION;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-amoore-version]'), function (n) { n.textContent = AMOORE_VERSION; });
+    var chip = document.getElementById('nx-version-chip');
+    if (chip) chip.textContent = 'v' + AMOORE_VERSION;
+  }
+  async function loadChangelogList() {
+    if (changelogList) return changelogList;
+    var list = null;
+    var db = await fetchGlobalSetting('changelog');
+    if (db && db.versions instanceof Array && db.versions.length) list = sortVersions(db.versions);
+    if (!list || !list.length) {
+      var local = await fetchChangelog('changelog.json');
+      if (local && local.length) list = sortVersions(local);
+    }
+    changelogList = list && list.length ? list : [{ version: '4.0.0', title: 'NEXUS', items: ['Единый дизайн экосистемы, умный бот, обновлённая админка.'] }];
+    applyVersion(changelogList[0].version);
+    return changelogList;
+  }
+  function renderChangelog(box, list) {
+    box.textContent = '';
+    if (!list.length) { var e = el('p', 'nx-cl-empty'); e.textContent = 'История пока пуста.'; box.appendChild(e); return; }
+    list.forEach(function (v) {
+      var sec = el('section', 'nx-cl-entry');
+      var h = document.createElement('h3');
+      h.appendChild(document.createTextNode('v' + v.version));
+      if (v.title) { var sm = document.createElement('small'); sm.textContent = v.title; h.appendChild(sm); }
+      if (v.date) { var dt = document.createElement('time'); dt.textContent = String(v.date).split('-').reverse().join('.'); h.appendChild(dt); }
+      sec.appendChild(h);
+      var ul = document.createElement('ul');
+      (v.items || []).forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+      sec.appendChild(ul);
+      box.appendChild(sec);
+    });
+  }
+  var clLastFocus = null;
+  async function openChangelog() {
+    var ov = document.getElementById('nx-changelog');
+    if (!ov) {
+      ov = el('div', 'nx-cl-overlay',
+        '<div class="nx-cl-card" role="dialog" aria-modal="true" aria-labelledby="nx-cl-title">' +
+        '<button type="button" class="nx-cl-close" aria-label="Закрыть">×</button>' +
+        '<h2 id="nx-cl-title">История обновлений</h2><div class="nx-cl-body"><p class="nx-cl-empty">Загрузка…</p></div></div>');
+      ov.id = 'nx-changelog';
+      function shut() { ov.classList.remove('open'); document.documentElement.classList.remove('nx-cl-open'); if (clLastFocus && clLastFocus.focus) { try { clLastFocus.focus(); } catch (e) {} } }
+      ov.addEventListener('click', function (e) { if (e.target === ov) shut(); });
+      ov.querySelector('.nx-cl-close').addEventListener('click', shut);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) shut(); });
+      document.body.appendChild(ov);
+    }
+    clLastFocus = document.activeElement;
+    ov.classList.add('open');
+    document.documentElement.classList.add('nx-cl-open');
+    var btn = ov.querySelector('.nx-cl-close'); if (btn) btn.focus();
+    renderChangelog(ov.querySelector('.nx-cl-body'), await loadChangelogList());
+  }
+  function mountVersionChip() {
+    if (document.getElementById('nx-version-chip') || document.getElementById('version-chip')) return;
+    var brand = document.querySelector('[data-amoore-brand], .brand, .topbar-brand');
+    if (!brand || !brand.parentNode) return;
+    var chip = el('button', 'nx-version-chip');
+    chip.type = 'button'; chip.id = 'nx-version-chip';
+    chip.setAttribute('aria-haspopup', 'dialog'); chip.setAttribute('aria-label', 'История обновлений');
+    chip.textContent = 'v' + AMOORE_VERSION;
+    chip.addEventListener('click', openChangelog);
+    brand.parentNode.insertBefore(chip, brand.nextSibling);
   }
 
   // ------------------------------------------------------------------ analytics
@@ -459,13 +757,11 @@
   async function fetchSites() {
     try {
       if (client) {
-        var r = await client.from('ecosystem_sites').select('id,name,url,status').order('id');
+        var r = await withTimeout(client.from('ecosystem_sites').select('id,name,url,status').order('id'), 7000);
         if (r && !r.error && r.data) return r.data;
       }
       var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=id,name,url,status&order=id';
-      var res = await fetch(url, {
-        headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Accept': 'application/json' }
-      });
+      var res = await withTimeout(fetch(url, { headers: restHeaders() }), 7000);
       if (!res.ok) return [];
       return await res.json();
     } catch (e) { return []; }
@@ -527,72 +823,28 @@
   }
 
   // ------------------------------------------------------------------ config + live
-  // Кэш настроек сайта: localStorage, 5 минут, версия ключа в имени (v1). Хранятся только
-  // публичные поля ecosystem_sites — ни токенов, ни данных админов.
-  var CFG_CACHE_KEY = 'amoore:cfg:v1:' + SITE_ID;
-  var CFG_TTL_MS = 5 * 60 * 1000;
-  var CFG_FIELDS = 'id,name,status,overlay_type,banner_active,banner_text,demo_chat_active,news_active';
-  var CFG_FIELDS_SEO = CFG_FIELDS + ',seo_title,seo_description';
-  var seoColumns = true; // seo_* нет в миграциях 001–003: при ошибке «нет колонки» один раз переключаемся на базовый список
-  function readCfgCache() {
-    try {
-      var raw = localStorage.getItem(CFG_CACHE_KEY);
-      if (!raw) return null;
-      var o = JSON.parse(raw);
-      var now = Date.now();
-      if (!o || typeof o !== 'object' || !o.data || typeof o.data !== 'object' || typeof o.t !== 'number') throw new Error('bad cache');
-      if (now - o.t > CFG_TTL_MS || o.t > now + 60000) { localStorage.removeItem(CFG_CACHE_KEY); return null; }
-      return o.data;
-    } catch (e) {
-      try { localStorage.removeItem(CFG_CACHE_KEY); } catch (e2) {}
-      return null;
-    }
-  }
-  function writeCfgCache(data) {
-    try { localStorage.setItem(CFG_CACHE_KEY, JSON.stringify({ t: Date.now(), data: data })); } catch (e) {}
-  }
-  function invalidateCfgCache() {
-    try { localStorage.removeItem(CFG_CACHE_KEY); } catch (e) {}
-  }
-  function isMissingColumn(err) {
-    return !!err && (err.code === '42703' || err.code === 'PGRST204' || /column/i.test(String(err.message || '')));
-  }
-  async function fetchConfigRemote() {
-    var fields = seoColumns ? CFG_FIELDS_SEO : CFG_FIELDS;
+  async function fetchConfig() {
     try {
       if (client) {
-        var r = await client.from('ecosystem_sites').select(fields).eq('id', SITE_ID).maybeSingle();
+        var r = await withTimeout(client.from('ecosystem_sites').select('*').eq('id', SITE_ID).maybeSingle(), 7000);
         if (r && !r.error && r.data) return r.data;
-        if (r && r.error && seoColumns && isMissingColumn(r.error)) { seoColumns = false; return fetchConfigRemote(); }
       }
       // REST fallback
-      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=' + fields + '&id=eq.' + encodeURIComponent(SITE_ID);
-      var res = await fetch(url, {
-        headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Accept': 'application/json' }
-      });
-      if (!res.ok) {
-        if (res.status === 400 && seoColumns) { seoColumns = false; return fetchConfigRemote(); }
-        return null;
-      }
+      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=*&id=eq.' + encodeURIComponent(SITE_ID);
+      var res = await withTimeout(fetch(url, { headers: restHeaders() }), 7000);
+      if (!res.ok) return null;
       var arr = await res.json();
       return arr && arr[0] ? arr[0] : null;
     } catch (e) { return null; }
   }
-  // force=true — игнорировать кэш (Realtime, возврат на вкладку, ручной refresh)
-  async function fetchConfig(force) {
-    if (!force) { var hit = readCfgCache(); if (hit) return hit; }
-    var fresh = await fetchConfigRemote();
-    if (fresh) writeCfgCache(fresh);
-    return fresh;
-  }
   async function fetchBotStatus() {
     try {
       if (client) {
-        var r = await client.from('bot_status').select('is_online').eq('id', 'main').maybeSingle();
+        var r = await withTimeout(client.from('bot_status').select('is_online').eq('id', 'main').maybeSingle(), 6000);
         if (r && !r.error && r.data) { botOnline = r.data.is_online !== false; return botOnline; }
       }
       var url = SB_URL.replace(/\/$/, '') + '/rest/v1/bot_status?select=is_online&id=eq.main';
-      var res = await fetch(url, { headers: { apikey: SB_ANON, Authorization: 'Bearer ' + SB_ANON, Accept: 'application/json' }, signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined });
+      var res = await fetch(url, { headers: restHeaders(), signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined });
       if (res.ok) { var rows = await res.json(); if (rows && rows[0]) botOnline = rows[0].is_online !== false; }
     } catch (e) { /* Keep last known status; do not falsely mark the bot offline on transient network loss. */ }
     return botOnline;
@@ -609,92 +861,71 @@
   }
   function startLive() {
     var refreshNews = debounce(renderNews, 300);
-    var refreshCfg = async function (force) {
-      var c = await fetchConfig(force === true);
+    var refreshCfg = async function () {
+      var c = await fetchConfig();
       await fetchBotStatus();
       if (c) { cfg = c; publishState(); applyConfig(); applySeo(); renderNews(); }
       else applyVisibility();
       var s = await fetchSites();
       if (s && s.length) { sitesCache = s; publishState(); renderEcosystem(); }
     };
-    var channel = null, pollTimer = null, dropTimer = null;
-    function subscribe() {
-      if (channel || !client.channel) return; // не плодим дубли каналов
-      try {
-        channel = client.channel('amoore-live-' + SITE_ID)
+    try {
+      if (client.channel) {
+        client.channel('amoore-live-' + SITE_ID)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'news' }, refreshNews)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'ecosystem_sites', filter: 'id=eq.' + SITE_ID }, function () {
-            invalidateCfgCache();
-            refreshCfg(true);
-          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ecosystem_sites', filter: 'id=eq.' + SITE_ID }, refreshCfg)
           .subscribe();
-      } catch (e) { channel = null; }
-    }
-    function unsubscribe() {
-      if (!channel) return;
-      try { client.removeChannel(channel); } catch (e) {}
-      channel = null;
-    }
-    function startPoll() { if (!pollTimer) pollTimer = setInterval(function () { refreshCfg(false); }, POLL_MS); } // страховка Realtime (20 с)
-    function stopPoll() { clearInterval(pollTimer); pollTimer = null; }
-    function onVisibility() {
-      if (document.hidden) {
-        stopPoll();
-        clearTimeout(dropTimer);
-        dropTimer = setTimeout(unsubscribe, 30000); // быстрые переключения вкладок не рвут соединение
-      } else {
-        clearTimeout(dropTimer); dropTimer = null;
-        subscribe();
-        startPoll();
-        refreshCfg(true); // один актуальный refresh при возврате
       }
+    } catch (e) {}
+    function tick() {
+      if (document.visibilityState && document.visibilityState !== 'visible') return;
+      refreshCfg(); // уже вызывает renderNews
     }
-    subscribe();
-    if (!document.hidden) startPoll();
-    document.addEventListener('visibilitychange', onVisibility);
+    setInterval(tick, POLL_MS);                     // страховка Realtime (20 с)
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') {
+        renderNews();
+        tick();
+      }
+    });
   }
 
-  // класс на <html>: CSS ставит декоративные анимации на паузу, пока вкладка скрыта
-  function syncHiddenClass() {
-    try { document.documentElement.classList.toggle('amoore-hidden', !!document.hidden); } catch (e) {}
-  }
+  // Каждый шаг загрузки изолирован: сбой одного (например, bot_status) не останавливает остальные.
+  async function safe(fn) { try { return await fn(); } catch (e) { try { console.warn('[amoore-core]', e); } catch (x) {} return null; } }
 
   async function boot() {
     captureGodParam();
-    syncHiddenClass();
-    document.addEventListener('visibilitychange', syncHiddenClass);
+    mountVersionChip();
     if (window.supabase && window.supabase.createClient) {
       client = window.supabase.createClient(SB_URL, SB_ANON, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
       });
     } else {
-      console.warn('[amoore-core] supabase-js не загружен — новости через REST fallback');
+      console.warn('[amoore-core] supabase-js не загружен — работаем через REST');
       client = null;
     }
-    trackVisit();
-    cfg = await fetchConfig();
-    await fetchBotStatus();
-    sitesCache = await fetchSites();
-    publishState();
-    applyConfig();
-    applySeo();
-    renderEcosystem();
-    await renderNews();
+    safe(trackVisit);
+    safe(loadChangelogList);
+
+    // Конфиг сайта грузим параллельно с новостями; новости не блокируются ничем.
+    cfgPromise = safe(async function () {
+      cfg = await fetchConfig();
+      await fetchBotStatus();
+      publishState(); applyConfig(); applySeo();
+    });
+    var newsPromise = safe(renderNews);
+    var sitesPromise = safe(async function () {
+      sitesCache = await fetchSites(); publishState(); renderEcosystem();
+    });
+    await Promise.all([cfgPromise, newsPromise, sitesPromise]);
     if (client) startLive();
     else {
-      var fbTimer = null;
-      var fbTick = function () {
+      setInterval(function () {
+        if (document.visibilityState && document.visibilityState !== 'visible') return;
         renderNews();
         fetchBotStatus().then(applyVisibility);
         fetchSites().then(function (s) { sitesCache = s; publishState(); renderEcosystem(); });
-      };
-      var fbStart = function () { if (!fbTimer) fbTimer = setInterval(fbTick, POLL_MS); };
-      var fbStop = function () { clearInterval(fbTimer); fbTimer = null; };
-      if (!document.hidden) fbStart();
-      document.addEventListener('visibilitychange', function () {
-        if (document.hidden) fbStop();
-        else { fbStart(); fbTick(); }
-      });
+      }, POLL_MS);
     }
   }
 
@@ -703,14 +934,19 @@
   }
 
   window.amooreCore = {
-    version: '9.0.0',
+    version: AMOORE_VERSION,
     siteId: SITE_ID,
+    submitLead: submitLead,
+    fetchChangelog: fetchChangelog,
+    openChangelog: openChangelog,
+    getChangelog: loadChangelogList,
+    getRoleLabels: getRoleLabels,
+    fetchGlobalSetting: fetchGlobalSetting,
     getConfig: function () { return cfg ? Object.assign({}, cfg) : null; },
     isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false) && botOnline !== false; },
     isNewsEnabled: function () { return !(cfg && cfg.news_active === false); },
     refresh: async function () {
-      invalidateCfgCache();
-      var c = await fetchConfig(true);
+      var c = await fetchConfig();
       await fetchBotStatus();
       if (c) { cfg = c; publishState(); applyConfig(); applySeo(); }
       else applyVisibility();

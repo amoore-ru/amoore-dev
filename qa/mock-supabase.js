@@ -42,12 +42,12 @@
     b.maybeSingle = function () { st.single = 'maybe'; return b; };
     b.single = function () { st.single = 'one'; return b; };
     b.insert = function (p) { st.op = 'insert'; st.payload = p; return b; };
-    b.upsert = function (p) { st.op = 'upsert'; st.payload = p; return b; };
+    b.upsert = function (p, o) { st.op = 'upsert'; st.payload = p; st.onConflict = o && o.onConflict; return b; };
     b.update = function (p) { st.op = 'update'; st.payload = p; return b; };
     b.delete = function () { st.op = 'delete'; return b; };
     function run() {
       window.__mock.calls.push({ table: name, op: st.op, payload: st.payload, filters: st.filters.slice() });
-      if (window.__mock.fail.indexOf(name) >= 0) return { data: null, error: { message: 'mock failure: ' + name }, status: 500 };
+      if (window.__mock.fail.indexOf(name) >= 0) return { data: null, error: { message: window.__mock.failMsg || ('mock failure: ' + name) }, status: 500 };
       var rows = table(name), m = matcher(st.filters), res;
       if (st.op === 'insert') {
         var list = Array.isArray(st.payload) ? st.payload : [st.payload];
@@ -61,6 +61,12 @@
         ins.forEach(function (r) { rows.unshift(r); });
         window.__emit(name, { eventType: 'INSERT', new: ins[0] });
         return { data: st.single ? ins[0] : ins, error: null, status: 201 };
+      }
+      if (st.op === 'upsert') {
+        var key = st.onConflict || 'id', lst = Array.isArray(st.payload) ? st.payload : [st.payload];
+        lst.forEach(function (r) { var ex = rows.filter(function (x) { return x[key] === r[key]; })[0]; if (ex) Object.assign(ex, r); else rows.unshift(Object.assign({}, r)); });
+        window.__emit(name, { eventType: 'UPDATE', new: lst[0] });
+        return { data: lst, error: null, status: 200 };
       }
       if (st.op === 'update') {
         var hit = rows.filter(m); hit.forEach(function (r) { Object.assign(r, st.payload); });
@@ -94,6 +100,7 @@
           window.__mock.calls.push({ rpc: fn, args: args });
           if (fn === 'verify_admin') return Promise.resolve({ data: admin, error: null });
           if (fn === 'verify_god') return Promise.resolve({ data: true, error: null });
+          if (fn === 'quick_admins') return Promise.resolve({ data: [{ nickname: 'Boss', online: true }, { nickname: 'Tester', online: false }], error: null });
           return Promise.resolve({ data: true, error: null });
         },
         auth: {
