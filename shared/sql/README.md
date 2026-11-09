@@ -37,12 +37,3 @@ values ('admin@example.com', 'Имя', 'Ник', 'moderator', 'ЗАМЕНИТЬ_
 Миграция собрана из SQL, найденного в предоставленных архивах. В исходном `shared/sql/001_amoore_schema.sql` определены `admins`, `ecosystem_sites`, `news`, `site_visits`, `audit_logs`, `bot_logs`, функции, триггеры, RLS, Storage bucket `media`, Realtime и начальные данные.
 
 В доступных исходниках **не найдено** определения таблиц `bot_status` и `feature_flags`, а также функции `current_admin_role`. Они не добавлены искусственно: перед production-развёртыванием предоставьте их актуальные определения/миграции и объедините с Golden Schema. Проверьте SQL на тестовом Supabase-проекте.
-
-
-## Миграции v3.0
-| Файл | Назначение |
-| --- | --- |
-| `004_v30_singularity.sql` | индекс `news_pub_idx` (только опубликованные), индексы заявок/журнала, очередь `digest_queue`, Realtime для `leads` |
-| `cleanup.sql` | удаление «битых» записей news/ecosystem_sites; сначала предпросмотр, удалённое копируется в `_cleanup_backup_*` |
-
-Порядок: 001 → 002 → 003 → 004 (→ cleanup.sql). RLS нигде не отключается.

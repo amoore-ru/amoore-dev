@@ -1,21 +1,3 @@
-# amoore Dev — Mission Control v3.0.0 «Singularity»
-
-**Новое в 3.0:** вкладка «Дайджест» (сводка за 7 дней + отправка админам в Telegram через бота), красный счётчик новых заявок,
-окно «Что нового» (`changelog.json`), дизайн Deep Glass 3.0 с плавными переходами между вкладками, Event System (все действия — в журнал и в дайджест).
-
-## Быстрый старт обновления
-1. Supabase → SQL Editor: выполните `shared/sql/004_v30_singularity.sql` (индексы, очередь `digest_queue`, Realtime для заявок).
-   По желанию — `shared/sql/cleanup.sql` (сначала блок «ПРЕДПРОСМОТР»).
-2. Задеплойте папки сайтов. **Важно:** в `amoore-ru/_headers` CSS больше не кэшируется «навсегда», а файлы подключены с `?v=3.0.0` —
-   браузеры подхватят новые стили (из-за старого `immutable` на год форма заявки и скелетоны новостей были без оформления).
-3. Для отправки дайджеста ботом: у бота должен быть ключ `SUPABASE_SERVICE_ROLE_KEY` (см. `amoore-ai/README.md`).
-
-## Тесты
-`bash ../run_qa.sh` — быстрые проверки; `bash ../run_qa.sh --browser` — ещё и браузерные (нужен Playwright: `npm i -D playwright`).
-Стенд QA: `qa/` (имитация Supabase в памяти, наборы `landing`, `panel`, `studio`, `digest`).
-
----
-
 # amoore Dev — Mission Control (Clean Build v1.0)
 
 Админка экосистемы amoore: чистый HTML/CSS/JS + Supabase. Корень репозитория — это сама админка

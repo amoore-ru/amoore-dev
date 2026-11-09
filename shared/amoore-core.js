@@ -1,8 +1,5 @@
 /**
- * amoore-core.js — v3.0.0 «Singularity»
- * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
- * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
- *
+ * amoore-core.js — v9.0.0 (Global Update v2.0 Evolve)
  * Подключение:
  *   <script>window.AMOORE_SITE_ID = 'landing';</script>
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -16,10 +13,6 @@
   'use strict';
   if (window.__amooreCoreLoaded) return;
   window.__amooreCoreLoaded = true;
-
-  // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
-  var AMOORE_VERSION = '3.0.0';
-  window.AMOORE_VERSION = AMOORE_VERSION;
 
   var SITE_ID = window.AMOORE_SITE_ID || 'landing';
   (function networkNotice() {
@@ -55,7 +48,7 @@
     news: [],
     sites: [],
     god: false,
-    version: AMOORE_VERSION
+    version: '9.0.0'
   };
   function publishState() {
     window.AMOORE_STATE.config = cfg ? Object.assign({}, cfg) : null;
@@ -91,35 +84,6 @@
     s.textContent = css;
     document.head.appendChild(s);
   }
-  // Любой сетевой вызов обёрнут таймаутом: «зависший» запрос не должен блокировать страницу.
-  function withTimeout(promise, ms) {
-    return new Promise(function (resolve, reject) {
-      var done = false;
-      var timer = setTimeout(function () { if (!done) { done = true; reject(new Error('timeout')); } }, ms);
-      Promise.resolve(promise).then(
-        function (v) { if (!done) { done = true; clearTimeout(timer); resolve(v); } },
-        function (e) { if (!done) { done = true; clearTimeout(timer); reject(e); } }
-      );
-    });
-  }
-  // Первый УСПЕШНЫЙ результат из списка промисов (аналог Promise.any, работает в старом Safari).
-  function firstOk(list) {
-    return new Promise(function (resolve, reject) {
-      var left = list.length, lastErr = null;
-      list.forEach(function (p) {
-        Promise.resolve(p).then(resolve, function (e) { lastErr = e; if (--left === 0) reject(lastErr); });
-      });
-    });
-  }
-  // Заголовки REST. Новые ключи Supabase (sb_publishable_…) — НЕ JWT: класть их в Authorization нельзя
-  // (шлюз отвечает 401), поэтому Bearer добавляем только для классического JWT-ключа (eyJ…).
-  function restHeaders(extra) {
-    var h = { 'apikey': SB_ANON, 'Accept': 'application/json' };
-    if (/^eyJ/.test(SB_ANON)) h['Authorization'] = 'Bearer ' + SB_ANON;
-    for (var k in (extra || {})) h[k] = extra[k];
-    return h;
-  }
-  function restUrl(path) { return SB_URL.replace(/\/$/, '') + '/rest/v1/' + path; }
   function pad2(n) { return n < 10 ? '0' + n : String(n); }
   function fmtDate(n) {                       // display_date | published_at -> ДД.ММ.ГГГГ
     var v = n.display_date, m;
@@ -353,148 +317,132 @@
   }
 
   // ------------------------------------------------------------------ news
-  // Конвейер новостей v3 (исправление «новости не отображаются»):
-  //  1) рисуем из локального кэша мгновенно (stale-while-revalidate);
-  //  2) параллельно спрашиваем supabase-js И чистый REST — берём первый успешный ответ;
-  //  3) загрузка новостей НЕ ждёт конфиг/статус бота/список сайтов (раньше boot() был цепочкой await);
-  //  4) запрос идёт только по опубликованным (is_published=true) — под частичный индекс news_pub_idx.
   var TYPE_LABEL = { news: 'Новость', patch: 'Патч', soon: 'Скоро' };
-  var NEWS_CACHE_KEY = 'amoore_news_v3';
-  var NEWS_COLS = 'id,title,body,type,display_date,published_at';
-  var newsSeq = 0;           // номер запроса: устаревший ответ не перетирает свежий
-  var cfgPromise = null;     // промис загрузки конфига (новости ждут его не дольше 2.5 с)
-
-  function readNewsCache() {
-    try { var d = JSON.parse(ls('get', NEWS_CACHE_KEY) || 'null'); return d && d.items instanceof Array ? d.items : null; }
-    catch (e) { return null; }
-  }
-  function writeNewsCache(items) { ls('set', NEWS_CACHE_KEY, JSON.stringify({ t: Date.now(), items: items.slice(0, 20) })); }
-
-  function fetchNewsViaClient() {
-    if (!client) return Promise.reject(new Error('no-client'));
-    return withTimeout(client.from('news').select(NEWS_COLS)
-      .eq('is_published', true).order('published_at', { ascending: false }).limit(20)
-      .then(function (res) { if (res.error) throw res.error; return res.data || []; }), 7000);
-  }
-  function fetchNewsViaRest() {
-    return withTimeout(fetch(restUrl('news?select=' + NEWS_COLS + '&is_published=eq.true&order=published_at.desc&limit=20'),
-      { method: 'GET', headers: restHeaders() })
-      .then(function (r) { if (!r.ok) throw new Error('http-' + r.status); return r.json(); }), 7000);
-  }
-
-  function newsTarget() { return document.querySelector('#news-list, [data-amoore-news]'); }
-
-  function setNewsPlaceholder(target, msg, isError) {
-    target.textContent = '';
-    var item = document.createElement('div');
-    item.className = 'news-item glass-card';
-    item.setAttribute(isError ? 'data-amoore-news-error' : 'data-amoore-news-placeholder', '1');
-    var span = document.createElement('span');
-    span.textContent = msg;                                   // textContent — без XSS
-    item.appendChild(span);
-    if (isError) {
-      var btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'btn btn-ghost news-retry'; btn.textContent = 'Повторить';
-      btn.addEventListener('click', function () { renderNews(); });
-      item.appendChild(btn);
-    }
-    target.appendChild(item);
-  }
-
-  function paintNews(target, items) {
-    target.textContent = '';
-    if (!items || !items.length) { setNewsPlaceholder(target, 'Здесь пока пусто. Новости появятся из панели amoore Dev.', false); return; }
-    var frag = document.createDocumentFragment();
-    items.forEach(function (n) {
-      var item = document.createElement('div');
-      item.className = 'news-item glass-card';
-      item.setAttribute('data-type', n.type || 'news');
-      var small = document.createElement('small');
-      small.textContent = [TYPE_LABEL[n.type] || '', fmtDate(n)].filter(Boolean).join(' · ');
-      var title = document.createElement('b'); title.textContent = n.title || '';
-      var body = document.createElement('span'); body.textContent = n.body || '';
-      item.appendChild(small); item.appendChild(title); item.appendChild(body);
-      frag.appendChild(item);
-    });
-    target.appendChild(frag);
-  }
 
   async function renderNews() {
-    var target = newsTarget();
+    var target = document.querySelector('#news-list, [data-amoore-news]');
     if (!target) return;
-    var seq = ++newsSeq;
 
-    // Мгновенная отрисовка из кэша (пока идёт сеть)
-    var hasReal = !!target.querySelector('[data-type]');
-    if (!hasReal) {
-      var cached = readNewsCache();
-      if (cached && cached.length) { paintNews(target, cached); hasReal = true; }
+    function setPlaceholder(msg, isError) {
+      target.textContent = '';
+      var item = document.createElement('div');
+      item.className = 'news-item glass-card';
+      if (isError) item.setAttribute('data-amoore-news-error', '1');
+      else item.setAttribute('data-amoore-news-placeholder', '1');
+      var span = document.createElement('span');
+      span.textContent = msg;
+      item.appendChild(span);
+      target.appendChild(item);
     }
 
-    // Тумблер «Новости» выключен? Ждём конфиг, но не дольше 2.5 с — сеть для новостей стартует параллельно.
-    if (cfgPromise) { try { await withTimeout(cfgPromise, 2500); } catch (e) {} }
-    if (seq !== newsSeq) return;
-    if (cfg && cfg.news_active === false) { setNewsPlaceholder(target, 'Редакция готовит материалы. Загляните позже', false); return; }
+    function paintItems(items) {
+      target.textContent = '';
+      if (!items || !items.length) {
+        setPlaceholder('Здесь пока пусто. Новости появятся из панели amoore Dev.', false);
+        return;
+      }
+      var frag = document.createDocumentFragment();
+      items.forEach(function (n) {
+        var item = document.createElement('div');
+        item.className = 'news-item glass-card';
+        item.setAttribute('data-type', n.type || 'news');
+        var small = document.createElement('small');
+        small.textContent = [TYPE_LABEL[n.type] || '', fmtDate(n)].filter(Boolean).join(' · ');
+        var title = document.createElement('b');
+        title.textContent = n.title || '';
+        var body = document.createElement('span');
+        body.textContent = n.body || '';
+        item.appendChild(small);
+        item.appendChild(title);
+        item.appendChild(body);
+        frag.appendChild(item);
+      });
+      target.appendChild(frag);
+    }
+
+    // Тумблер новостей выключен
+    if (cfg && cfg.news_active === false) {
+      setPlaceholder('Редакция готовит материалы. Загляните позже', false);
+      return;
+    }
+
+    // Skeleton cards avoid a blank/lagging state during the first fetch.
+    if (!target.querySelector('[data-type]')) {
+      target.innerHTML = '<div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div><div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div><div class="news-skeleton" aria-hidden="true"><i></i><b></b><span></span></div>';
+    }
+
+    // 1) Пробуем supabase-js
+    // 2) Fallback: прямой REST (тот же anon-ключ) — если клиент завис
+    function fetchViaClient() {
+      if (!client) return Promise.reject(new Error('no-client'));
+      return client
+        .from('news')
+        .select('id, title, body, type, display_date, published_at')
+        .eq('is_published', true)
+        .order('published_at', { ascending: false })
+        .limit(20)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          return res.data || [];
+        });
+    }
+
+    function fetchViaRest() {
+      var url = SB_URL.replace(/\/$/, '') +
+        '/rest/v1/news?select=id,title,body,type,display_date,published_at' +
+        '&is_published=eq.true&order=published_at.desc&limit=20';
+      return fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': SB_ANON,
+          'Authorization': 'Bearer ' + SB_ANON,
+          'Accept': 'application/json'
+        }
+      }).then(function (r) {
+        if (!r.ok) throw new Error('http-' + r.status);
+        return r.json();
+      });
+    }
+
+    function withTimeout(promise, ms) {
+      return new Promise(function (resolve, reject) {
+        var done = false;
+        var timer = setTimeout(function () {
+          if (done) return;
+          done = true;
+          reject(new Error('timeout'));
+        }, ms);
+        Promise.resolve(promise).then(
+          function (v) { if (!done) { done = true; clearTimeout(timer); resolve(v); } },
+          function (e) { if (!done) { done = true; clearTimeout(timer); reject(e); } }
+        );
+      });
+    }
 
     try {
-      var list = [fetchNewsViaRest()];
-      if (client) list.push(fetchNewsViaClient());
-      var items = await firstOk(list);
-      if (seq !== newsSeq) return;
+      var items = null;
+      try {
+        items = await withTimeout(fetchViaClient(), 6000);
+      } catch (e1) {
+        try {
+          items = await withTimeout(fetchViaRest(), 6000);
+        } catch (e2) {
+          throw e2;
+        }
+      }
       newsCache = items || [];
-      writeNewsCache(newsCache);
       publishState();
-      paintNews(target, newsCache);
+      paintItems(items);
       applySeo();
     } catch (e) {
-      if (seq !== newsSeq) return;
-      try { console.warn('[amoore-core] news load failed', e); } catch (x) {}
       if (!target.querySelector('[data-type]')) {
-        setNewsPlaceholder(target, (e && e.message === 'timeout')
-          ? 'Сервер новостей не ответил. Попробуйте ещё раз.'
-          : 'Не удалось загрузить новости. Проверьте соединение.', true);
+        var msg = (e && e.message === 'timeout')
+          ? 'Сервер новостей не ответил. Обновите страницу.'
+          : 'Не удалось загрузить новости. Проверьте соединение.';
+        setPlaceholder(msg, true);
+        try { console.warn('[amoore-core] news load failed', e); } catch (x) {}
       }
     }
-  }
-
-  // ------------------------------------------------------------------ leads (форма «Оставить заявку»)
-  // Возвращает { ok:true } или { ok:false, status, message }. Клиент supabase-js сам ставит правильные заголовки;
-  // если он недоступен — REST (только apikey). Тексты обрезаются под RLS-проверку длины в SQL.
-  async function submitLead(lead) {
-    var row = {
-      name: String(lead && lead.name || '').trim().slice(0, 120),
-      contact: String(lead && lead.contact || '').trim().slice(0, 200),
-      message: String(lead && lead.message || '').trim().slice(0, 2000),
-      status: 'new'
-    };
-    if (!row.name || !row.contact) return { ok: false, status: 0, message: 'empty' };
-    var lastErr = null;
-    if (client) {
-      try {
-        var r = await withTimeout(client.from('leads').insert(row), 9000);
-        if (!r.error) return { ok: true };
-        lastErr = { status: r.status || 0, message: r.error.message || 'error' };
-      } catch (e) { lastErr = { status: 0, message: e && e.message || 'error' }; }
-    }
-    try {
-      var res = await withTimeout(fetch(restUrl('leads'), {
-        method: 'POST',
-        headers: restHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-        body: JSON.stringify(row)
-      }), 9000);
-      if (res.ok) return { ok: true };
-      return { ok: false, status: res.status, message: 'http-' + res.status };
-    } catch (e) { return { ok: false, status: 0, message: (lastErr && lastErr.message) || (e && e.message) || 'network' }; }
-  }
-
-  // changelog.json лежит рядом с сайтом: [{version, date, title, items:[...]}]
-  async function fetchChangelog(url) {
-    try {
-      var r = await withTimeout(fetch(url || 'changelog.json', { cache: 'no-cache' }), 6000);
-      if (!r.ok) return [];
-      var d = await r.json();
-      return d && d.versions instanceof Array ? d.versions : (d instanceof Array ? d : []);
-    } catch (e) { return []; }
   }
 
   // ------------------------------------------------------------------ analytics
@@ -511,11 +459,13 @@
   async function fetchSites() {
     try {
       if (client) {
-        var r = await withTimeout(client.from('ecosystem_sites').select('id,name,url,status').order('id'), 7000);
+        var r = await client.from('ecosystem_sites').select('id,name,url,status').order('id');
         if (r && !r.error && r.data) return r.data;
       }
       var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=id,name,url,status&order=id';
-      var res = await withTimeout(fetch(url, { headers: restHeaders() }), 7000);
+      var res = await fetch(url, {
+        headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Accept': 'application/json' }
+      });
       if (!res.ok) return [];
       return await res.json();
     } catch (e) { return []; }
@@ -577,28 +527,72 @@
   }
 
   // ------------------------------------------------------------------ config + live
-  async function fetchConfig() {
+  // Кэш настроек сайта: localStorage, 5 минут, версия ключа в имени (v1). Хранятся только
+  // публичные поля ecosystem_sites — ни токенов, ни данных админов.
+  var CFG_CACHE_KEY = 'amoore:cfg:v1:' + SITE_ID;
+  var CFG_TTL_MS = 5 * 60 * 1000;
+  var CFG_FIELDS = 'id,name,status,overlay_type,banner_active,banner_text,demo_chat_active,news_active';
+  var CFG_FIELDS_SEO = CFG_FIELDS + ',seo_title,seo_description';
+  var seoColumns = true; // seo_* нет в миграциях 001–003: при ошибке «нет колонки» один раз переключаемся на базовый список
+  function readCfgCache() {
+    try {
+      var raw = localStorage.getItem(CFG_CACHE_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      var now = Date.now();
+      if (!o || typeof o !== 'object' || !o.data || typeof o.data !== 'object' || typeof o.t !== 'number') throw new Error('bad cache');
+      if (now - o.t > CFG_TTL_MS || o.t > now + 60000) { localStorage.removeItem(CFG_CACHE_KEY); return null; }
+      return o.data;
+    } catch (e) {
+      try { localStorage.removeItem(CFG_CACHE_KEY); } catch (e2) {}
+      return null;
+    }
+  }
+  function writeCfgCache(data) {
+    try { localStorage.setItem(CFG_CACHE_KEY, JSON.stringify({ t: Date.now(), data: data })); } catch (e) {}
+  }
+  function invalidateCfgCache() {
+    try { localStorage.removeItem(CFG_CACHE_KEY); } catch (e) {}
+  }
+  function isMissingColumn(err) {
+    return !!err && (err.code === '42703' || err.code === 'PGRST204' || /column/i.test(String(err.message || '')));
+  }
+  async function fetchConfigRemote() {
+    var fields = seoColumns ? CFG_FIELDS_SEO : CFG_FIELDS;
     try {
       if (client) {
-        var r = await withTimeout(client.from('ecosystem_sites').select('*').eq('id', SITE_ID).maybeSingle(), 7000);
+        var r = await client.from('ecosystem_sites').select(fields).eq('id', SITE_ID).maybeSingle();
         if (r && !r.error && r.data) return r.data;
+        if (r && r.error && seoColumns && isMissingColumn(r.error)) { seoColumns = false; return fetchConfigRemote(); }
       }
       // REST fallback
-      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=*&id=eq.' + encodeURIComponent(SITE_ID);
-      var res = await withTimeout(fetch(url, { headers: restHeaders() }), 7000);
-      if (!res.ok) return null;
+      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=' + fields + '&id=eq.' + encodeURIComponent(SITE_ID);
+      var res = await fetch(url, {
+        headers: { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON, 'Accept': 'application/json' }
+      });
+      if (!res.ok) {
+        if (res.status === 400 && seoColumns) { seoColumns = false; return fetchConfigRemote(); }
+        return null;
+      }
       var arr = await res.json();
       return arr && arr[0] ? arr[0] : null;
     } catch (e) { return null; }
   }
+  // force=true — игнорировать кэш (Realtime, возврат на вкладку, ручной refresh)
+  async function fetchConfig(force) {
+    if (!force) { var hit = readCfgCache(); if (hit) return hit; }
+    var fresh = await fetchConfigRemote();
+    if (fresh) writeCfgCache(fresh);
+    return fresh;
+  }
   async function fetchBotStatus() {
     try {
       if (client) {
-        var r = await withTimeout(client.from('bot_status').select('is_online').eq('id', 'main').maybeSingle(), 6000);
+        var r = await client.from('bot_status').select('is_online').eq('id', 'main').maybeSingle();
         if (r && !r.error && r.data) { botOnline = r.data.is_online !== false; return botOnline; }
       }
       var url = SB_URL.replace(/\/$/, '') + '/rest/v1/bot_status?select=is_online&id=eq.main';
-      var res = await fetch(url, { headers: restHeaders(), signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined });
+      var res = await fetch(url, { headers: { apikey: SB_ANON, Authorization: 'Bearer ' + SB_ANON, Accept: 'application/json' }, signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined });
       if (res.ok) { var rows = await res.json(); if (rows && rows[0]) botOnline = rows[0].is_online !== false; }
     } catch (e) { /* Keep last known status; do not falsely mark the bot offline on transient network loss. */ }
     return botOnline;
@@ -615,69 +609,92 @@
   }
   function startLive() {
     var refreshNews = debounce(renderNews, 300);
-    var refreshCfg = async function () {
-      var c = await fetchConfig();
+    var refreshCfg = async function (force) {
+      var c = await fetchConfig(force === true);
       await fetchBotStatus();
       if (c) { cfg = c; publishState(); applyConfig(); applySeo(); renderNews(); }
       else applyVisibility();
       var s = await fetchSites();
       if (s && s.length) { sitesCache = s; publishState(); renderEcosystem(); }
     };
-    try {
-      if (client.channel) {
-        client.channel('amoore-live-' + SITE_ID)
+    var channel = null, pollTimer = null, dropTimer = null;
+    function subscribe() {
+      if (channel || !client.channel) return; // не плодим дубли каналов
+      try {
+        channel = client.channel('amoore-live-' + SITE_ID)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'news' }, refreshNews)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'ecosystem_sites', filter: 'id=eq.' + SITE_ID }, refreshCfg)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'ecosystem_sites', filter: 'id=eq.' + SITE_ID }, function () {
+            invalidateCfgCache();
+            refreshCfg(true);
+          })
           .subscribe();
-      }
-    } catch (e) {}
-    function tick() {
-      if (document.visibilityState && document.visibilityState !== 'visible') return;
-      refreshCfg(); // уже вызывает renderNews
+      } catch (e) { channel = null; }
     }
-    setInterval(tick, POLL_MS);                     // страховка Realtime (20 с)
-    document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible') {
-        renderNews();
-        tick();
+    function unsubscribe() {
+      if (!channel) return;
+      try { client.removeChannel(channel); } catch (e) {}
+      channel = null;
+    }
+    function startPoll() { if (!pollTimer) pollTimer = setInterval(function () { refreshCfg(false); }, POLL_MS); } // страховка Realtime (20 с)
+    function stopPoll() { clearInterval(pollTimer); pollTimer = null; }
+    function onVisibility() {
+      if (document.hidden) {
+        stopPoll();
+        clearTimeout(dropTimer);
+        dropTimer = setTimeout(unsubscribe, 30000); // быстрые переключения вкладок не рвут соединение
+      } else {
+        clearTimeout(dropTimer); dropTimer = null;
+        subscribe();
+        startPoll();
+        refreshCfg(true); // один актуальный refresh при возврате
       }
-    });
+    }
+    subscribe();
+    if (!document.hidden) startPoll();
+    document.addEventListener('visibilitychange', onVisibility);
   }
 
-  // Каждый шаг загрузки изолирован: сбой одного (например, bot_status) не останавливает остальные.
-  async function safe(fn) { try { return await fn(); } catch (e) { try { console.warn('[amoore-core]', e); } catch (x) {} return null; } }
+  // класс на <html>: CSS ставит декоративные анимации на паузу, пока вкладка скрыта
+  function syncHiddenClass() {
+    try { document.documentElement.classList.toggle('amoore-hidden', !!document.hidden); } catch (e) {}
+  }
 
   async function boot() {
     captureGodParam();
+    syncHiddenClass();
+    document.addEventListener('visibilitychange', syncHiddenClass);
     if (window.supabase && window.supabase.createClient) {
       client = window.supabase.createClient(SB_URL, SB_ANON, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
       });
     } else {
-      console.warn('[amoore-core] supabase-js не загружен — работаем через REST');
+      console.warn('[amoore-core] supabase-js не загружен — новости через REST fallback');
       client = null;
     }
-    safe(trackVisit);
-
-    // Конфиг сайта грузим параллельно с новостями; новости не блокируются ничем.
-    cfgPromise = safe(async function () {
-      cfg = await fetchConfig();
-      await fetchBotStatus();
-      publishState(); applyConfig(); applySeo();
-    });
-    var newsPromise = safe(renderNews);
-    var sitesPromise = safe(async function () {
-      sitesCache = await fetchSites(); publishState(); renderEcosystem();
-    });
-    await Promise.all([cfgPromise, newsPromise, sitesPromise]);
+    trackVisit();
+    cfg = await fetchConfig();
+    await fetchBotStatus();
+    sitesCache = await fetchSites();
+    publishState();
+    applyConfig();
+    applySeo();
+    renderEcosystem();
+    await renderNews();
     if (client) startLive();
     else {
-      setInterval(function () {
-        if (document.visibilityState && document.visibilityState !== 'visible') return;
+      var fbTimer = null;
+      var fbTick = function () {
         renderNews();
         fetchBotStatus().then(applyVisibility);
         fetchSites().then(function (s) { sitesCache = s; publishState(); renderEcosystem(); });
-      }, POLL_MS);
+      };
+      var fbStart = function () { if (!fbTimer) fbTimer = setInterval(fbTick, POLL_MS); };
+      var fbStop = function () { clearInterval(fbTimer); fbTimer = null; };
+      if (!document.hidden) fbStart();
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) fbStop();
+        else { fbStart(); fbTick(); }
+      });
     }
   }
 
@@ -686,15 +703,14 @@
   }
 
   window.amooreCore = {
-    version: AMOORE_VERSION,
+    version: '9.0.0',
     siteId: SITE_ID,
-    submitLead: submitLead,
-    fetchChangelog: fetchChangelog,
     getConfig: function () { return cfg ? Object.assign({}, cfg) : null; },
     isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false) && botOnline !== false; },
     isNewsEnabled: function () { return !(cfg && cfg.news_active === false); },
     refresh: async function () {
-      var c = await fetchConfig();
+      invalidateCfgCache();
+      var c = await fetchConfig(true);
       await fetchBotStatus();
       if (c) { cfg = c; publishState(); applyConfig(); applySeo(); }
       else applyVisibility();
