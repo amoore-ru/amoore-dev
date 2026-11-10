@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v4.0.0 «NEXUS»
+ * amoore-core.js — v4.2.0 «NEXUS TOTAL FIX»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '4.0.0';
+  var AMOORE_VERSION = '4.2.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -485,6 +485,7 @@
           try { chatLog.scrollTop = chatLog.scrollHeight; } catch (e) {}
         }
       } else {
+        try { if (window.amooreDemoChat && typeof window.amooreDemoChat.rebind === 'function') window.amooreDemoChat.rebind(); } catch (e) {}
         if (chatInput) { chatInput.disabled = false; chatInput.removeAttribute('aria-disabled'); if (chatInput.placeholder === 'Чат на паузе') chatInput.placeholder = 'Напишите сообщение…'; }
         if (chatSend) { chatSend.disabled = false; chatSend.removeAttribute('aria-disabled'); }
         if (chatLog) {
@@ -670,7 +671,11 @@
   var changelogList = null;
   function verKey(v) { return String(v || '').split('.').map(function (x) { return parseInt(x, 10) || 0; }); }
   function verCmp(a, b) { var x = verKey(a), y = verKey(b); for (var i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); } return 0; }
-  function sortVersions(list) { return (list || []).filter(function (v) { return v && v.version; }).sort(function (a, b) { return verCmp(a.version, b.version); }); }
+  function sortVersions(list) {
+    var arr = (list || []).filter(function (v) { return v && v.version; });
+    var manual = arr.length > 0 && arr.every(function (v) { return typeof v.order === 'number'; });
+    return arr.slice().sort(function (a, b) { return manual ? a.order - b.order : verCmp(a.version, b.version); });
+  }
   function applyVersion(v) {
     if (!v) return;
     AMOORE_VERSION = String(v);
@@ -690,7 +695,7 @@
       var local = await fetchChangelog('changelog.json');
       if (local && local.length) list = sortVersions(local);
     }
-    changelogList = list && list.length ? list : [{ version: '4.0.0', title: 'NEXUS', items: ['Единый дизайн экосистемы, умный бот, обновлённая админка.'] }];
+    changelogList = list && list.length ? list : [{ version: '4.2.0', title: 'NEXUS Total Fix', items: ['Единый дизайн экосистемы, умный бот, обновлённая админка.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }

@@ -197,3 +197,20 @@ html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
 .nx-login-card { max-width: 400px; }
 /* вход админа должен быть выше заставки закрытого сайта (z-index заставки = 2147483647) */
 .nx-login-overlay { z-index: 2147483647; }
+
+/* =====================================================================
+   v4.2 «NEXUS TOTAL FIX» — тумблеры iOS: жёстко 46×28, кружок 20×20, без min-height
+   Идёт в конце файла и бьёт любые другие правила (в т.ч. общие min-height: 44px для кнопок).
+   ===================================================================== */
+.toggle {
+  width: 46px !important; min-width: 46px !important; max-width: 46px !important;
+  height: 28px !important; min-height: 0 !important; max-height: 28px !important;
+  box-sizing: border-box !important; overflow: hidden !important; position: relative !important;
+  flex: 0 0 46px !important; padding: 0 !important;
+}
+.toggle .toggle-knob, .toggle-knob {
+  width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 0 !important;
+  max-width: 20px !important; max-height: 20px !important;
+  top: 3px !important; left: 3px !important; position: absolute !important; border-radius: 50% !important;
+  box-sizing: border-box !important;
+}

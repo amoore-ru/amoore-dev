@@ -1,16 +1,17 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
-  <title>amoore Dev — Mission Control v3.1</title>
+  <title>amoore Dev — Mission Control v4.2</title>
   <meta name="theme-color" content="#070b16">
   <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4.0.0">
-  <link rel="stylesheet" href="amoore-theme.css?v=4.0.0">
+  <link rel="stylesheet" href="style.css?v=4.2.0">
+  <link rel="stylesheet" href="amoore-theme.css?v=4.2.0">
+  <link rel="stylesheet" href="dev-fix.css?v=4.2.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -46,7 +47,7 @@
       <div class="topbar-brand">
         <div class="mark">a.</div>
         <div><strong>amoore Dev</strong><span>Mission Control</span></div>
-        <button type="button" class="version-chip" id="version-chip" title="Что нового" aria-label="Что нового в версии">v4.0.0</button>
+        <button type="button" class="version-chip" id="version-chip" title="Что нового" aria-label="Что нового в версии">v4.2.0</button>
       </div>
       <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="topbar-tabs">
         <span></span><span></span><span></span><i class="burger-dot" id="burger-dot" hidden></i>
@@ -191,6 +192,7 @@
           <div class="section-title">Версии и Changelog</div>
           <div class="team-form glass" style="margin-bottom:24px">
             <p class="widget-meta" style="margin:0 0 14px">Первая версия в списке — текущая: её показывают чипы версии на всех сайтах и бот. Один пункт — одна строка.</p>
+            <p class="cl-hint">Перетащите ⠿ или используйте стрелки, чтобы изменить порядок версий. Верхняя версия — текущая.</p>
             <div id="cl-editor"></div>
             <div class="modal-actions" style="margin-top:14px">
               <button type="button" class="btn btn-ghost" id="cl-add">+ Добавить версию</button>
@@ -381,7 +383,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="digest.js?v=4.0.0"></script>
-  <script src="app.js?v=4.0.0"></script>
+  <script src="digest.js?v=4.2.0"></script>
+  <script src="app.js?v=4.2.0"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@ const path = require('path'), fs = require('fs');
 const H = require('./harness'), S = require('./seed'), { suite, sleep, until } = require('./lib');
 const DEV = path.resolve(__dirname, '..'), RU = path.resolve(__dirname, '../../amoore-ru');
 const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { recursive: true });
-const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','4.0.0');` : '');
+const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','4.2.0');` : '');
 
 (async () => {
   const { chromium } = H.pwRequire();
@@ -21,7 +21,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     await until(async () => (await page.$$('.site-card')).length >= 2, 5000);
     const tabs = await visibleTabs(page);
     T.check('порядок вкладок: Дашборд → Новости → Медиа → Дайджест → Настройки, затем Команда / Логи / Заявки', tabs.join('>') === 'Дашборд>Новости>Медиа>Дайджест>Настройки>Команда>Логи>Заявки', tabs.join('>'));
-    T.check('чип версии показывает v4.0.0', (await page.textContent('#version-chip')) === 'v4.0.0');
+    T.check('чип версии показывает v4.2.0', (await page.textContent('#version-chip')) === 'v4.2.0', await page.textContent('#version-chip'));
     T.check('нет ошибок JS при входе', errors.length === 0, errors.join('; '));
     T.check('если версия уже просмотрена — окно «Что нового» не показывается', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.click('#version-chip'); await sleep(500);
@@ -30,18 +30,18 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
   { const { page } = await open({ seen: false });
     const shown = await until(async () => page.$eval('#whatsnew-modal', e => e.classList.contains('visible')), 3000);
     T.check('первый вход за версию: выскакивает окно «Что нового»', !!shown);
-    T.check('заголовок «Обновление v4.0»', /Обновление v4\.0/.test(await page.textContent('#whatsnew-title')), await page.textContent('#whatsnew-title'));
+    T.check('заголовок «Обновление v4.2»', /Обновление v4\.2/.test(await page.textContent('#whatsnew-title')), await page.textContent('#whatsnew-title'));
     const li = await page.$$eval('#whatsnew-list li li', e => e.map(x => x.textContent));
-    T.check('в списке изменения NEXUS: дизайн-система, тумблеры Safari, «Админы в сети», версии из БД', li.length >= 4 && li.some(t => /NEXUS/i.test(t)) && li.some(t => /Safari/i.test(t)) && li.some(t => /в сети/i.test(t)) && li.some(t => /Changelog/i.test(t)), li.length + ' пунктов');
+    T.check('в списке изменения v4.2: Deep Glass, тумблеры, перетаскивание версий, адаптивный мат', li.length >= 4 && li.some(t => /Deep Glass/i.test(t)) && li.some(t => /тумблер/i.test(t)) && li.some(t => /Drag|перетаскив/i.test(t)) && li.some(t => /мат/i.test(t)), li.length + ' пунктов');
     await page.click('#whatsnew-ok'); await sleep(300);
-    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '4.0.0');
+    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '4.2.0');
     await page.reload(); await sleep(1500);
     T.check('после перезагрузки окно больше не появляется', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.context().close(); }
   { const core = fs.readFileSync(path.join(DEV, 'shared/amoore-core.js'), 'utf8'), app = fs.readFileSync(path.join(DEV, 'app.js'), 'utf8');
     const cv = (core.match(/var AMOORE_VERSION = '([\d.]+)'/) || [])[1], av = (app.match(/const AMOORE_VERSION = '([\d.]+)'/) || [])[1];
     const cl = JSON.parse(fs.readFileSync(path.join(DEV, 'changelog.json'), 'utf8'));
-    T.check('синхронизация версий: core = app.js = changelog (4.0.0)', cv === '4.0.0' && av === '4.0.0' && cl.current === '4.0.0', `${cv}/${av}/${cl.current}`); }
+    T.check('синхронизация версий: core = app.js = changelog (4.2.0)', cv === '4.2.0' && av === '4.2.0' && cl.current === '4.2.0', `${cv}/${av}/${cl.current}`); }
 
   // ---------- красный счётчик заявок ----------
   console.log('Заявки и счётчик');
@@ -328,7 +328,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     const { page } = await open({ seed: s, seen: false });
     const ok = await until(async () => (await page.textContent('#version-chip')) === 'v5.0.0', 4000);
     const wn = await until(async () => /5\.0/.test(await page.textContent('#whatsnew-title')), 4000);
-    T.check('админка берёт версию из БД, код — только фоллбэк (v4.0.0)', !!ok && !!wn, await page.textContent('#whatsnew-title'));
+    T.check('админка берёт версию из БД, код — только фоллбэк (v4.2.0)', !!ok && !!wn, await page.textContent('#whatsnew-title'));
     T.check('названия ролей из БД применяются сразу после входа (список ролей в форме)', await until(async () => (await page.$$eval('#new-role option', o => o.map(x => x.textContent))).includes('Босс'), 3000));
     await page.context().close(); }
 

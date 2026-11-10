@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '4.0.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '4.2.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -987,12 +987,22 @@ document.addEventListener('click', async (e) => {
 
 // ======================================================================= «Что нового» (changelog.json)
 const WN_KEY = 'amoore_dev_seen_version';
-const WN_FALLBACK = [{ version: AMOORE_VERSION, title: 'NEXUS', items: [
-  'Единая дизайн-система NEXUS на всех сайтах экосистемы.',
-  'Тумблеры в мобильном Safari больше не растягиваются.',
-  'Вкладка «Новости», «Админы в сети», редактирование профилей, названия ролей и редактор changelog.'] }];
+const WN_FALLBACK = [{ version: AMOORE_VERSION, title: 'NEXUS Total Fix', items: [
+  'Тёмный Deep Glass без белых пятен, тумблеры 46×28.',
+  'История обновлений v1.0.0 → v4.2 с перетаскиванием версий.',
+  'Исправлены демо-чат и вкладки новостей на лендинге, адаптивный характер бота.'] }];
 const verKey = v => String(v || '').split('.').map(x => parseInt(x, 10) || 0);
-const sortVersions = list => (list || []).filter(v => v && v.version).sort((a, b) => { const x = verKey(a.version), y = verKey(b.version); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); return 0; });
+// Если у всех версий есть order — порядок задан в админке (Drag & Drop); иначе новые версии сверху
+const sortVersions = list => {
+  const arr = (list || []).filter(v => v && v.version);
+  const manual = arr.length > 0 && arr.every(v => typeof v.order === 'number');
+  return arr.slice().sort((a, b) => {
+    if (manual) return a.order - b.order;
+    const x = verKey(a.version), y = verKey(b.version);
+    for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0);
+    return 0;
+  });
+};
 function paintVersionChip() { const c = $('version-chip'); if (c) c.textContent = 'v' + curVersion(); }
 async function loadChangelog() {
   // 1) БД (global_settings.changelog) → 2) changelog.json → 3) жёсткий фоллбэк из кода
@@ -1277,8 +1287,10 @@ let clDraft = [];
 function paintClEditor() {
   $('cl-editor').innerHTML = clDraft.map((v, i) => `
     <div class="admin-card glass cl-card" data-i="${i}" style="display:block;margin-bottom:12px">
+      <div class="cl-head"><span class="cl-handle" title="Перетащить" aria-label="Перетащить версию">⠿</span><b>v${esc(v.version || '…')}</b>
+        <span class="cl-move"><button type="button" class="cl-up" aria-label="Выше">▲</button><button type="button" class="cl-down" aria-label="Ниже">▼</button></span></div>
       <div class="form-row">
-        <div class="form-group"><label>Версия</label><input class="cl-version" value="${esc(v.version)}" placeholder="4.0.0" inputmode="decimal"></div>
+        <div class="form-group"><label>Версия</label><input class="cl-version" value="${esc(v.version)}" placeholder="4.2.0" inputmode="decimal"></div>
         <div class="form-group"><label>Название</label><input class="cl-title" value="${esc(v.title || '')}" maxlength="60"></div>
         <div class="form-group"><label>Дата</label><input type="date" class="cl-date" value="${esc(v.date || '')}"></div>
       </div>
@@ -1311,12 +1323,44 @@ $('role-labels-save').addEventListener('click', async () => {
   logAction('labels_edit'); toast('Названия ролей сохранены (бот подхватит за минуту)'); applyRoleUI();
 });
 $('cl-add').addEventListener('click', () => { clDraft = readClEditor(); clDraft.unshift({ version: '', title: '', date: todayISO(), items: [] }); paintClEditor(); });
-$('cl-editor').addEventListener('click', e => { const d = e.target.closest('.cl-del'); if (!d) return; clDraft = readClEditor(); clDraft.splice(+d.closest('.cl-card').dataset.i, 1); paintClEditor(); });
+$('cl-editor').addEventListener('click', e => {
+  const mv = e.target.closest('.cl-up, .cl-down');
+  if (mv) { clDraft = readClEditor(); const i = +mv.closest('.cl-card').dataset.i, j = mv.classList.contains('cl-up') ? i - 1 : i + 1; if (j >= 0 && j < clDraft.length) { [clDraft[i], clDraft[j]] = [clDraft[j], clDraft[i]]; paintClEditor(); } return; }
+  const d = e.target.closest('.cl-del'); if (!d) return; clDraft = readClEditor(); clDraft.splice(+d.closest('.cl-card').dataset.i, 1); paintClEditor(); });
+
+// Drag & Drop порядка версий: pointer events — работает и мышью, и пальцем на iPhone
+(function clDnD() {
+  const box = $('cl-editor'); if (!box) return;
+  let drag = null;
+  function onMove(e) {
+    if (!drag) return;
+    const others = [...box.querySelectorAll('.cl-card')].filter(c => c !== drag);
+    const target = others.find(c => { const r = c.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; });
+    if (target) { if (drag.nextElementSibling !== target) box.insertBefore(drag, target); }
+    else if (box.lastElementChild !== drag) box.appendChild(drag);
+    if (e.clientY < 90) window.scrollBy(0, -14); else if (e.clientY > window.innerHeight - 90) window.scrollBy(0, 14);
+    e.preventDefault();
+  }
+  function onEnd() {
+    if (!drag) return;
+    document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onEnd); document.removeEventListener('pointercancel', onEnd);
+    drag.classList.remove('cl-dragging'); drag = null;
+    clDraft = readClEditor(); paintClEditor();
+    toast('Порядок изменён — нажмите «Сохранить и обновить везде»');
+  }
+  box.addEventListener('pointerdown', e => {
+    const h = e.target.closest('.cl-handle'); if (!h) return;
+    drag = h.closest('.cl-card'); drag.classList.add('cl-dragging');
+    document.addEventListener('pointermove', onMove, { passive: false }); document.addEventListener('pointerup', onEnd); document.addEventListener('pointercancel', onEnd);
+    e.preventDefault();
+  });
+})();
 $('cl-save').addEventListener('click', async () => {
   if (!isSuper()) return;
-  const list = sortVersions(readClEditor());
+  const list = readClEditor().filter(v => v.version).map((v, i) => ({ ...v, order: i }));   // порядок — как расставлен перетаскиванием
   if (!list.length) return toast('Добавьте хотя бы одну версию', 'error');
-  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 4.0.0', 'error');
+  if (new Set(list.map(v => v.version)).size !== list.length) return toast('Версии не должны повторяться', 'error');
+  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 4.2.0', 'error');
   const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: list[0].version, versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return toast(friendlyError(error), 'error');
   wnList = list; liveVersion = String(list[0].version); paintVersionChip();

@@ -95,14 +95,14 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   { const { page } = await open();
     await sleep(800);
     const info = await page.evaluate(() => ({ v: window.AMOORE_VERSION, api: window.amooreCore && window.amooreCore.version, st: window.AMOORE_STATE && window.AMOORE_STATE.version, ftr: document.querySelector('.version-btn [data-amoore-version]').textContent }));
-    T.check('AMOORE_VERSION = 4.0.0 (core, state, API)', info.v === '4.0.0' && info.api === '4.0.0' && info.st === '4.0.0', JSON.stringify(info));
-    T.check('в подвале показана «Версия 4.0.0»', info.ftr === '4.0.0');
+    T.check('AMOORE_VERSION = 4.2.0 (core, state, API)', info.v === '4.2.0' && info.api === '4.2.0' && info.st === '4.2.0', JSON.stringify(info));
+    T.check('в подвале показана «Версия 4.2.0»', info.ftr === '4.2.0');
     await page.click('#version-btn');
     await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     const n = (await page.$$('#nx-changelog .nx-cl-entry')).length;
     T.check('модалка истории обновлений (ядро) загружает changelog.json, если БД пуста', n >= 3, n + ' версий');
     const first = await page.$eval('#nx-changelog .nx-cl-entry h3', e => e.textContent);
-    T.check('первая запись — v4.0.0', /v4\.0\.0/.test(first), first);
+    T.check('первая запись — v4.2.0', /v4\.2\.0/.test(first), first);
     await page.keyboard.press('Escape'); await sleep(350);
     T.check('Esc закрывает модалку', !(await page.$eval('#nx-changelog', e => e.classList.contains('open'))));
     const cl = JSON.parse(fs.readFileSync(path.join(ROOT, 'changelog.json'), 'utf8'));
@@ -113,7 +113,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   console.log('NEXUS: чип версии, вход, дайджесты');
   { const { page } = await open();
     const chip = await until(async () => page.$('#nx-version-chip'), 4000);
-    T.check('чип версии v4.0.0 стоит рядом с логотипом', !!chip && (await page.textContent('#nx-version-chip')) === 'v4.0.0' && await page.$eval('#nx-version-chip', c => c.previousElementSibling && c.previousElementSibling.classList.contains('brand')));
+    T.check('чип версии v4.2.0 стоит рядом с логотипом', !!chip && (await page.textContent('#nx-version-chip')) === 'v4.2.0' && await page.$eval('#nx-version-chip', c => c.previousElementSibling && c.previousElementSibling.classList.contains('brand')));
     await page.click('#nx-version-chip');
     const opened = await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     T.check('клик по чипу открывает историю обновлений', !!opened);
@@ -162,6 +162,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await until(async () => (await items(page)).filter(i => i.t).length >= 4, 5000);
     const names = await page.$$eval('#news-tabs .tab', e => e.map(x => x.firstChild.textContent.trim()));
     T.check('вкладки новостей: Все | Дайджесты | Обновления | Патчи | Планы', names.join('|') === 'Все|Дайджесты|Обновления|Патчи|Планы', names.join('|'));
+    await page.evaluate(() => document.querySelectorAll('.news-item').forEach(e => { e.hidden = false; e.style.display = ''; }));   // v4.2: «Все» скрывает дайджесты — для замера показываем все карточки
     const wide = await page.$eval('.news-item-digest', e => { const o = document.querySelector('.news-item:not(.news-item-digest)'); return { w: e.getBoundingClientRect().width, other: o.getBoundingClientRect().width, label: e.querySelector('small').textContent }; });
     T.check('карточка дайджеста шире обычных и подписана «Дайджест»', wide.w > wide.other + 100 && /Дайджест/.test(wide.label), JSON.stringify(wide));
     await page.click('#news-tabs [data-filter="digest"]'); await sleep(450);
@@ -242,6 +243,12 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     T.check('на вкладках счётчики (Все 5 · Дайджесты 0 · Обновления 2 · Патчи 2 · Планы 1)', cnt.join() === '5,0,2,2,1', cnt.join());
     const all = await vis();
     T.check('«Все»: показано всё, самое свежее сверху (по дате новости)', all.length === 5 && all[0] === 'Голосовые, память и карма' && all[all.length - 1] === 'Обновление старое', all.join(' > '));
+    await page.evaluate(() => { window.__db.news.unshift({ id: 'dg1', title: 'Дайджест недели', body: 'сводка', type: 'digest', display_date: '2026-11-09', is_published: true, published_at: new Date().toISOString() }); window.__emit('news', {}); });
+    await until(async () => (await page.$$eval('#news-tabs .news-count', e => e[1].textContent)) === '1', 3000);
+    T.check('v4.2 «Все» скрывает дайджесты (счётчик «Все» без digest)', !(await vis()).includes('Дайджест недели'));
+    await page.click('#news-tabs [data-filter="digest"]'); await sleep(200);
+    T.check('v4.2 «Дайджесты»: только digest', (await vis()).join('|') === 'Дайджест недели', (await vis()).join('|'));
+    await page.click('#news-tabs [data-filter="all"]'); await sleep(200);
     await page.click('#news-tabs [data-filter="patch"]'); await sleep(450);
     const pt = await vis();
     T.check('«Патчи»: остаются только патчи, свежий патч выше старого', pt.join('|') === 'Патч новее|Обновление', pt.join('|'));
@@ -292,7 +299,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   { const css = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8'), html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
     T.check('viewport-fit=cover включён', /viewport-fit=cover/.test(html));
     T.check('safe-area-inset-* применён к шапке, меню, нижней панели, подвалу и модалке', ['.topbar', '.mobile-nav', '.mobile-cta', 'footer', '.modal-overlay'].every(sel => new RegExp(sel.replace('.', '\\.') + '[^{]*\\{[^}]*safe-area-inset', 's').test(css)));
-    T.check('кэш: CSS/JS подключены с версией ?v=4.0.0', /style\.css\?v=4\.0\.0/.test(html) && /amoore-core\.js\?v=4\.0\.0/.test(html) && /landing\.js\?v=4\.0\.0/.test(html));
+    T.check('кэш: CSS/JS подключены с версией ?v=4.2.0', /style\.css\?v=4\.2\.0/.test(html) && /amoore-core\.js\?v=4\.2\.0/.test(html) && /landing\.js\?v=4\.2\.0/.test(html));
     const hdr = fs.readFileSync(path.join(ROOT, '_headers'), 'utf8');
     T.check('_headers: CSS больше не «immutable на год»', !/\/\*\.css\s*\n\s*Cache-Control:[^\n]*immutable/.test(hdr)); }
 
