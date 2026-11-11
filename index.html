@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
-  <title>amoore Dev — Mission Control v4.2</title>
+  <title>amoore Dev — Mission Control</title>
   <meta name="theme-color" content="#070b16">
   <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4.2.0">
-  <link rel="stylesheet" href="amoore-theme.css?v=4.2.0">
-  <link rel="stylesheet" href="dev-fix.css?v=4.2.0">
+  <script src="amoore-ux.js?v=4.3.0"></script>
+  <link rel="stylesheet" href="style.css?v=4.3.0">
+  <link rel="stylesheet" href="amoore-theme.css?v=4.3.0">
+  <link rel="stylesheet" href="dev-theme.css?v=4.3.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -43,37 +44,45 @@
   </div>
 
   <div class="app" id="app">
-    <header class="topbar">
-      <div class="topbar-brand">
-        <div class="mark">a.</div>
-        <div><strong>amoore Dev</strong><span>Mission Control</span></div>
-        <button type="button" class="version-chip" id="version-chip" title="Что нового" aria-label="Что нового в версии">v4.2.0</button>
+    <header class="ux-topbar" id="ux-topbar">
+    <div class="ux-bar">
+      <div class="ux-left">
+        <a class="ux-logo" href="#" aria-label="amoore Dev">
+          <span class="ux-mark">a.</span>
+          <span class="ux-name"><strong>amoore Dev</strong><small>Mission Control</small></span>
+        </a>
+        <button type="button" class="ux-chip nx-version-chip" id="version-chip" data-ux-chip aria-haspopup="dialog" aria-label="История обновлений">v4.3</button>
       </div>
-      <button class="burger" id="burger" type="button" aria-label="Меню" aria-expanded="false" aria-controls="topbar-tabs">
-        <span></span><span></span><span></span><i class="burger-dot" id="burger-dot" hidden></i>
-      </button>
-      <nav class="topbar-tabs" id="topbar-tabs">
-        <button class="tab-btn active" data-view="dashboard" id="tab-dashboard">Дашборд</button>
-        <button class="tab-btn" data-view="news" id="tab-news">Новости</button>
-        <button class="tab-btn" data-view="media" id="tab-media">Медиа</button>
-        <button class="tab-btn" data-view="digest" id="tab-digest">Дайджест</button>
-        <button class="tab-btn" data-view="settings" id="tab-settings">Настройки</button>
-        <button class="tab-btn" data-view="team" id="tab-team">Команда</button>
-        <button class="tab-btn" data-view="logs" id="tab-logs">Логи</button>
-        <button class="tab-btn" data-view="leads" id="tab-leads">Заявки<span class="tab-badge" id="leads-badge" hidden aria-label="Новых заявок">0</span></button>
-      </nav>
-      <div class="topbar-right">
+      <div class="ux-panel" id="ux-panel">
+        <nav class="ux-nav" id="ux-nav" aria-label="Навигация">
+          <button type="button" class="ux-tab active" data-view="dashboard" id="tab-dashboard">Дашборд</button>
+          <button type="button" class="ux-tab" data-view="news" id="tab-news">Новости</button>
+          <button type="button" class="ux-tab" data-view="media" id="tab-media">Медиа</button>
+          <button type="button" class="ux-tab" data-view="digest" id="tab-digest">Дайджест</button>
+          <button type="button" class="ux-tab" data-view="team" id="tab-team">Команда</button>
+          <button type="button" class="ux-tab" data-view="logs" id="tab-logs">Логи</button>
+          <button type="button" class="ux-tab" data-view="leads" id="tab-leads">Заявки<span class="ux-badge" id="leads-badge" hidden aria-label="Новых заявок">0</span></button>
+        </nav>
+        <div class="ux-group">
+          <a class="ux-icon-btn ux-settings-link" data-ux-settings href="#settings" title="Настройки" aria-label="Настройки" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>
+          <div class="ux-user" data-ux-user hidden><span class="ux-avatar" data-ux-avatar aria-hidden="true"></span><span class="ux-user-name" data-ux-user-name></span></div>
+          <button type="button" class="ux-logout" data-ux-logout id="logout-btn" hidden>Выйти</button>
+        </div>
+      </div>
+      <div class="ux-tools">
+        <button type="button" class="ux-icon-btn" data-ux-theme id="theme-toggle" title="Сменить тему" aria-label="Переключить тему"><svg class="ux-ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="ux-ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+        <button type="button" class="ux-burger" data-ux-burger id="burger" aria-label="Открыть меню" aria-expanded="false" aria-controls="ux-panel"><span></span><span></span><span></span><i class="ux-dot" id="burger-dot" hidden></i></button>
+      </div>
+    </div>
+  </header>
+
+    <main class="main">
+      <div class="main-search">
         <div class="global-search-wrap">
           <input id="global-search" type="search" placeholder="Поиск по панели…" title="Поиск: новости, сайты, админы" aria-label="Глобальный поиск" autocomplete="off">
           <div id="global-search-results" class="global-search-results" role="listbox" hidden></div>
         </div>
-        <div class="admin-badge"><span class="dot"></span><span>Admin</span></div>
-        <span class="admin-name" id="admin-nickname">—</span>
-        <button class="btn btn-ghost btn-sm" id="logout-btn">Выйти</button>
       </div>
-    </header>
-
-    <main class="main">
       <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
         <section class="admin-card glass onboarding-card" id="onboarding-card" hidden aria-labelledby="onboarding-title">
@@ -118,6 +127,11 @@
             <button type="button" class="btn btn-ghost btn-sm" id="bot-test-btn">Тестовое сообщение</button>
             <button type="button" class="btn btn-ghost btn-sm" id="bot-logs-csv">Скачать логи CSV</button>
           </div>
+
+        <div class="admin-card glass" id="broadcast-card" style="margin-top:24px"><h3 style="margin:0 0 12px">Telegram · Рассылка</h3>
+          <div class="form-group"><label for="telegram-broadcast-text">Текст сообщения для Telegram</label><textarea id="telegram-broadcast-text" rows="4" maxlength="4000" placeholder="Сообщение всем активным пользователям бота…"></textarea><p class="widget-meta">Рассылка доступна только super_admin. Получатели — пользователи, которые ранее писали боту в личные сообщения.</p></div>
+          <button type="button" class="btn btn-primary" id="telegram-broadcast-btn">Отправить всем пользователям бота</button>
+        </div>
         </div>
 
       </div>
@@ -173,40 +187,50 @@
 
       <!-- SETTINGS -->
       <div class="view" id="view-settings">
-        <div class="section-title">Telegram · Рассылка</div>
-        <div class="team-form glass" style="margin-bottom:24px">
-          <div class="form-group"><label for="telegram-broadcast-text">Текст сообщения для Telegram</label><textarea id="telegram-broadcast-text" rows="4" maxlength="4000" placeholder="Сообщение всем активным пользователям бота…"></textarea><p class="widget-meta">Рассылка доступна только super_admin. Получатели — пользователи, которые ранее писали боту в личные сообщения.</p></div>
-          <button type="button" class="btn btn-primary" id="telegram-broadcast-btn">Отправить всем пользователям бота</button>
-        </div>
-        <div id="settings-super-blocks">
-          <div class="section-title">Названия ролей</div>
-          <div class="team-form glass" style="margin-bottom:24px">
-            <p class="widget-meta" style="margin:0 0 14px">Переименуйте роли под себя (например, «Шеф»). Названия видны в админке, на сайтах и в боте. Внутренние ключи ролей не меняются.</p>
-            <div class="form-row">
-              <div class="form-group"><label for="rl-super_admin">super_admin</label><input id="rl-super_admin" maxlength="32" placeholder="Основатель"></div>
-              <div class="form-group"><label for="rl-admin">admin</label><input id="rl-admin" maxlength="32" placeholder="Админ"></div>
-              <div class="form-group"><label for="rl-moderator">moderator</label><input id="rl-moderator" maxlength="32" placeholder="Модератор"></div>
+        <div class="settings-stack">
+
+          <section class="settings-card glass" id="set-appearance" aria-labelledby="set-appearance-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">◐</span><div><h3 id="set-appearance-h">Внешний вид</h3><p>Тема панели. Выбор запоминается в браузере и общий для всех сайтов экосистемы.</p></div></header>
+            <div class="theme-seg" role="radiogroup" aria-label="Тема оформления">
+              <button type="button" class="theme-seg-btn" role="radio" data-theme-choice="dark" aria-checked="false">Тёмная</button>
+              <button type="button" class="theme-seg-btn" role="radio" data-theme-choice="light" aria-checked="false">Светлая</button>
             </div>
-            <button type="button" class="btn btn-primary" id="role-labels-save" style="width:auto;padding:12px 28px">Сохранить названия</button>
-          </div>
-          <div class="section-title">Версии и Changelog</div>
-          <div class="team-form glass" style="margin-bottom:24px">
-            <p class="widget-meta" style="margin:0 0 14px">Первая версия в списке — текущая: её показывают чипы версии на всех сайтах и бот. Один пункт — одна строка.</p>
-            <p class="cl-hint">Перетащите ⠿ или используйте стрелки, чтобы изменить порядок версий. Верхняя версия — текущая.</p>
+          </section>
+
+          <section class="settings-card glass" id="set-profile" aria-labelledby="set-profile-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">☺</span><div><h3 id="set-profile-h">Профиль</h3><p>Имя и почта, которые видны в панели.</p></div></header>
+            <div class="form-row">
+              <div class="form-group"><label for="pf-nickname">Никнейм</label><input id="pf-nickname" maxlength="40" placeholder="Boss" autocomplete="nickname"></div>
+              <div class="form-group"><label for="pf-email">Email</label><input id="pf-email" type="email" maxlength="120" placeholder="founder@amoore.ru" autocomplete="email"></div>
+            </div>
+            <p class="settings-note">⚠ Здесь меняется email профиля. Email для входа хранится в Supabase Auth — после смены обновите его и там (Supabase → Authentication → Users), иначе вход по новому адресу не заработает.</p>
+            <button type="button" class="btn btn-primary" id="pf-save">Сохранить профиль</button>
+          </section>
+
+          <section class="settings-card glass" id="set-changelog" data-super aria-labelledby="set-changelog-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">≡</span><div><h3 id="set-changelog-h">Управление Changelog</h3><p>Первая версия в списке — текущая: её показывают чипы версии на всех сайтах и бот. Один пункт — одна строка. Порядок меняется перетаскиванием ⠿ или стрелками.</p></div></header>
             <div id="cl-editor"></div>
             <div class="modal-actions" style="margin-top:14px">
               <button type="button" class="btn btn-ghost" id="cl-add">+ Добавить версию</button>
               <button type="button" class="btn btn-primary" id="cl-save" style="width:auto;flex:1">Сохранить и обновить везде</button>
             </div>
-          </div>
-        </div>
-        <div class="section-title">Резервная копия</div>
-        <div class="team-form glass backup-card">
-          <div>
-            <h3>Скачать данные</h3>
-            <p class="widget-meta" style="margin:0">Сайты, новости и пользователи (без токенов доступа) одним JSON-файлом.</p>
-          </div>
-          <button type="button" class="btn btn-ghost" id="backup-btn"><span id="backup-btn-text">Скачать резервную копию (JSON)</span></button>
+          </section>
+
+          <section class="settings-card glass" id="set-roles" data-super aria-labelledby="set-roles-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">♛</span><div><h3 id="set-roles-h">Управление ролями</h3><p>Переименуйте роли под себя. Названия видны в админке, на сайтах и в боте; внутренние ключи ролей не меняются.</p></div></header>
+            <div class="form-row">
+              <div class="form-group"><label for="rl-super_admin">Основатель <small>super_admin</small></label><input id="rl-super_admin" maxlength="32" placeholder="Основатель"></div>
+              <div class="form-group"><label for="rl-admin">Админ <small>admin</small></label><input id="rl-admin" maxlength="32" placeholder="Админ"></div>
+              <div class="form-group"><label for="rl-moderator">Модератор <small>moderator</small></label><input id="rl-moderator" maxlength="32" placeholder="Модератор"></div>
+            </div>
+            <button type="button" class="btn btn-primary" id="role-labels-save">Сохранить названия</button>
+          </section>
+
+          <section class="settings-card glass" id="set-backup" aria-labelledby="set-backup-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">⇩</span><div><h3 id="set-backup-h">Бэкап</h3><p>Сайты, новости и пользователи (без токенов доступа) одним JSON-файлом.</p></div></header>
+            <button type="button" class="btn btn-primary" id="backup-btn"><span id="backup-btn-text">Скачать JSON-бэкап базы</span></button>
+          </section>
+
         </div>
       </div>
 
@@ -383,7 +407,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="digest.js?v=4.2.0"></script>
-  <script src="app.js?v=4.2.0"></script>
+  <script src="digest.js?v=4.3.0"></script>
+  <script src="app.js?v=4.3.0"></script>
 </body>
 </html>

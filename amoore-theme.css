@@ -214,3 +214,111 @@ html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
   top: 3px !important; left: 3px !important; position: absolute !important; border-radius: 50% !important;
   box-sizing: border-box !important;
 }
+
+/* =====================================================================
+   v4.3 POLISH — Unified Topbar (.ux-*). Одна и та же шапка на всех сайтах экосистемы.
+   Слева: логотип + чип версии · Центр: вкладки · Справа: тема, ⚙ (админам), пользователь, «Выйти».
+   До 1119px всё, кроме темы, прячется в бургер-меню.
+   ===================================================================== */
+.ux-topbar [hidden] { display: none !important; }
+.ux-topbar {
+  position: sticky; top: 0; z-index: 1000; width: 100%; box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  color: var(--nx-ink);
+  background-color: var(--nx-glass-bg);
+  -webkit-backdrop-filter: blur(var(--nx-glass-blur)) saturate(1.4); backdrop-filter: blur(var(--nx-glass-blur)) saturate(1.4);
+  border: 0; border-bottom: var(--nx-glass-border); box-shadow: var(--nx-glass-shadow);
+}
+.ux-bar {
+  display: flex; align-items: center; gap: 14px; box-sizing: border-box;
+  max-width: 1440px; min-height: 64px; margin: 0 auto;
+  padding: 0 max(clamp(14px, 3vw, 28px), env(safe-area-inset-left, 0px));
+}
+.ux-left { order: 0; display: flex; align-items: center; gap: 10px; flex: 0 0 auto; min-width: 0; }
+.ux-logo { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: inherit; text-decoration: none; }
+.ux-mark {
+  flex: 0 0 38px; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px;
+  font: 800 18px/1 var(--nx-font-head); color: #0a0e18; background: var(--nx-btn-gradient);
+  box-shadow: 0 0 0 1px rgba(var(--nx-gold-rgb), .4);
+}
+.ux-name { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.ux-name strong { font: 800 15px/1.15 var(--nx-font-head); white-space: nowrap; }
+.ux-name small { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--nx-muted); }
+.ux-chip {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 32px; padding: 0 12px;
+  font: 700 11px/1 var(--nx-btn-font); letter-spacing: .02em; white-space: nowrap; cursor: pointer;
+  color: var(--nx-gold); background: transparent; border: 1px solid rgba(var(--nx-gold-rgb), .35); border-radius: 999px;
+  -webkit-tap-highlight-color: transparent;
+}
+.ux-chip:hover { border-color: rgba(var(--nx-gold-rgb), .7); }
+
+/* на широких экранах панель «растворяется»: вкладки и группа действий — прямые элементы шапки */
+.ux-panel { display: contents; }
+.ux-nav { order: 1; flex: 1 1 auto; display: flex; justify-content: center; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.ux-nav::-webkit-scrollbar { display: none; }
+.ux-tab {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; box-sizing: border-box;
+  font: 600 13.5px/1 var(--nx-btn-font); white-space: nowrap; text-decoration: none; cursor: pointer;
+  color: var(--nx-muted); background: transparent; border: 0; border-radius: var(--nx-btn-radius);
+  transition: color .18s ease, background-color .18s ease, box-shadow .18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.ux-tab:hover { color: var(--nx-ink); background: rgba(var(--nx-gold-rgb), .08); }
+.ux-tab.active, .ux-tab[aria-current="page"] { color: var(--nx-gold); background: rgba(var(--nx-gold-rgb), .12); box-shadow: inset 0 0 0 1px rgba(var(--nx-gold-rgb), .38); }
+.ux-count, .ux-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  font: 700 11px/1 var(--nx-btn-font); border-radius: 999px; color: var(--nx-muted); background: rgba(var(--nx-gold-rgb), .14);
+}
+.ux-badge { color: #fff; background: #ef4444; box-shadow: 0 0 0 2px var(--nx-bg); }
+.ux-tools { order: 2; display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
+.ux-nav ~ .ux-tools { margin-left: 0; }
+.ux-group { order: 3; display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.ux-icon-btn, .ux-burger {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; height: 40px; padding: 0; box-sizing: border-box;
+  color: var(--nx-ink); background: transparent; text-decoration: none; cursor: pointer;
+  border: 1px solid rgba(var(--nx-gold-rgb), .3); border-radius: var(--nx-btn-radius);
+  -webkit-tap-highlight-color: transparent; transition: border-color .18s ease, color .18s ease, background-color .18s ease;
+}
+.ux-icon-btn:hover, .ux-burger:hover { color: var(--nx-gold); border-color: rgba(var(--nx-gold-rgb), .7); }
+.ux-icon-btn svg { width: 20px; height: 20px; display: block; }
+:root[data-theme="light"] .ux-ico-moon, :root:not([data-theme="light"]) .ux-ico-sun { display: none; }
+.ux-user { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 170px; padding: 0 4px; font: 700 13px/1 var(--nx-btn-font); }
+.ux-avatar {
+  flex: 0 0 32px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
+  font: 800 14px/1 var(--nx-font-head); color: #0a0e18; background: var(--nx-btn-gradient);
+}
+.ux-user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ux-logout {
+  min-height: 40px; padding: 0 16px; box-sizing: border-box; font: 700 13px/1 var(--nx-btn-font); cursor: pointer;
+  color: var(--nx-ink); background: transparent; border: 1px solid rgba(var(--nx-gold-rgb), .3); border-radius: var(--nx-btn-radius);
+}
+.ux-logout:hover { color: #0a0e18; background: var(--nx-btn-gradient); border-color: transparent; }
+.ux-burger { display: none; flex-direction: column; gap: 4px; }
+.ux-burger span { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; transition: transform .2s ease, opacity .2s ease; }
+.ux-topbar.open .ux-burger span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.ux-topbar.open .ux-burger span:nth-child(2) { opacity: 0; }
+.ux-topbar.open .ux-burger span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+.ux-burger .ux-dot { position: absolute; top: 5px; right: 5px; width: 9px; height: 9px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 2px var(--nx-bg); }
+.ux-burger { position: relative; }
+.ux-tab:focus-visible, .ux-icon-btn:focus-visible, .ux-burger:focus-visible, .ux-logout:focus-visible, .ux-chip:focus-visible { outline: 2px solid var(--nx-gold); outline-offset: 2px; }
+
+@media (max-width: 1119px) {
+  .ux-bar { gap: 10px; min-height: 58px; }
+  .ux-burger { display: inline-flex; }
+  .ux-name small { display: none; }
+  .ux-panel {
+    display: none; position: absolute; left: 0; right: 0; top: 100%; flex-direction: column; align-items: stretch; gap: 12px; box-sizing: border-box;
+    max-height: calc(100vh - 70px); max-height: calc(100dvh - 70px - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain;
+    padding: 14px max(clamp(14px, 3vw, 28px), env(safe-area-inset-left, 0px)) calc(18px + env(safe-area-inset-bottom, 0px));
+    background-color: var(--bg, #070b16); border-bottom: var(--nx-glass-border); box-shadow: 0 24px 48px rgba(0, 0, 0, .35);
+  }
+  .ux-topbar.open .ux-panel { display: flex; }
+  .ux-nav { flex-direction: column; align-items: stretch; gap: 4px; overflow: visible; }
+  .ux-tab { min-height: 46px; padding: 0 14px; font-size: 15px; justify-content: space-between; }
+  .ux-group { flex-wrap: wrap; padding-top: 12px; border-top: 1px solid rgba(var(--nx-gold-rgb), .16); }
+  .ux-user { flex: 1 1 auto; max-width: none; }
+  .ux-logout { flex: 1 1 100%; min-height: 46px; }
+  html.ux-menu-open, html.ux-menu-open body { overflow: hidden; }
+}
+@media (max-width: 420px) { .ux-name strong { font-size: 14px; } .ux-chip { padding: 0 9px; min-width: 40px; } }
+@media (prefers-reduced-motion: reduce) { .ux-tab, .ux-icon-btn, .ux-burger, .ux-burger span { transition: none !important; } }

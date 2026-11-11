@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v4.2.0 «NEXUS TOTAL FIX»
+ * amoore-core.js — v4.3.0 «POLISH»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -8,7 +8,7 @@
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
  *   <script src="amoore-core.js"></script>
  *
- * window.AMOORE_STATE — единый state (config, news, sites, god)
+ * window.AMOORE_STATE — единый state (config, news, god)
  * window.AMOORE_CONFIG — alias на state.config
  * window.amooreCore — API (refresh, isChatEnabled, ...)
  */
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '4.2.0';
+  var AMOORE_VERSION = '4.3.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -49,7 +49,6 @@
   var godToken = null;     // проверенный токен или null
   var godChecked = false;
   var newsCache = [];
-  var sitesCache = [];
   var botOnline = null; // null = unknown; only explicit false pauses the demo chat
 
   // Глобальный state экосистемы
@@ -57,14 +56,12 @@
     siteId: SITE_ID,
     config: null,
     news: [],
-    sites: [],
     god: false,
     version: AMOORE_VERSION
   };
   function publishState() {
     window.AMOORE_STATE.config = cfg ? Object.assign({}, cfg) : null;
     window.AMOORE_STATE.news = newsCache.slice();
-    window.AMOORE_STATE.sites = sitesCache.slice();
     window.AMOORE_STATE.god = !!godToken;
     window.AMOORE_CONFIG = cfg;
     try {
@@ -683,8 +680,9 @@
     window.AMOORE_STATE.version = AMOORE_VERSION;
     if (window.amooreCore) window.amooreCore.version = AMOORE_VERSION;
     Array.prototype.forEach.call(document.querySelectorAll('[data-amoore-version]'), function (n) { n.textContent = AMOORE_VERSION; });
+    if (window.amooreUX) window.amooreUX.setVersion(AMOORE_VERSION);
     var chip = document.getElementById('nx-version-chip');
-    if (chip) chip.textContent = 'v' + AMOORE_VERSION;
+    if (chip && !chip.hasAttribute('data-ux-chip')) chip.textContent = 'v' + AMOORE_VERSION;
   }
   async function loadChangelogList() {
     if (changelogList) return changelogList;
@@ -695,7 +693,7 @@
       var local = await fetchChangelog('changelog.json');
       if (local && local.length) list = sortVersions(local);
     }
-    changelogList = list && list.length ? list : [{ version: '4.2.0', title: 'NEXUS Total Fix', items: ['Единый дизайн экосистемы, умный бот, обновлённая админка.'] }];
+    changelogList = list && list.length ? list : [{ version: '4.3.0', title: 'POLISH', items: ['Единая шапка, обновлённые настройки, умный бот, быстрее загрузка.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }
@@ -737,13 +735,14 @@
     renderChangelog(ov.querySelector('.nx-cl-body'), await loadChangelogList());
   }
   function mountVersionChip() {
+    document.addEventListener('amoore:changelog', openChangelog);
     if (document.getElementById('nx-version-chip') || document.getElementById('version-chip')) return;
     var brand = document.querySelector('[data-amoore-brand], .brand, .topbar-brand');
     if (!brand || !brand.parentNode) return;
     var chip = el('button', 'nx-version-chip');
     chip.type = 'button'; chip.id = 'nx-version-chip';
     chip.setAttribute('aria-haspopup', 'dialog'); chip.setAttribute('aria-label', 'История обновлений');
-    chip.textContent = 'v' + AMOORE_VERSION;
+    chip.textContent = 'v' + (window.amooreUX ? window.amooreUX.shortVer(AMOORE_VERSION) : AMOORE_VERSION);
     chip.addEventListener('click', openChangelog);
     brand.parentNode.insertBefore(chip, brand.nextSibling);
   }
@@ -758,63 +757,13 @@
     try { client.from('site_visits').insert({ site_id: SITE_ID }).then(function () {}, function () {}); } catch (e) {}
   }
 
-  // ------------------------------------------------------------------ ecosystem cards + SEO
-  async function fetchSites() {
-    try {
-      if (client) {
-        var r = await withTimeout(client.from('ecosystem_sites').select('id,name,url,status').order('id'), 7000);
-        if (r && !r.error && r.data) return r.data;
-      }
-      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=id,name,url,status&order=id';
-      var res = await withTimeout(fetch(url, { headers: restHeaders() }), 7000);
-      if (!res.ok) return [];
-      return await res.json();
-    } catch (e) { return []; }
-  }
-
-  function renderEcosystem() {
-    var grid = document.querySelector('#ecosystem .eco-grid, [data-amoore-ecosystem]');
-    if (!grid || !sitesCache.length) return;
-    // Не трогаем, если уже есть data-amoore-dynamic
-    var existing = grid.querySelectorAll('[data-amoore-site]');
-    if (existing.length === sitesCache.length) {
-      // refresh links/names
-    }
-    var frag = document.createDocumentFragment();
-    sitesCache.forEach(function (s) {
-      if (!s || !s.id) return;
-      var art = document.createElement('article');
-      art.className = 'eco-card glass-card reveal';
-      art.setAttribute('data-amoore-site', s.id);
-      var icon = document.createElement('div');
-      icon.className = 'eco-card-icon';
-      icon.textContent = s.id === 'landing' ? '✦' : (s.id === 'studio' ? '◇' : '◆');
-      var h3 = document.createElement('h3');
-      h3.textContent = s.name || s.id;
-      var p = document.createElement('p');
-      p.textContent = s.status === 'open' ? 'Онлайн' : 'На обслуживании';
-      var a = document.createElement('a');
-      a.className = 'eco-link';
-      a.href = s.url || '#';
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.textContent = 'Открыть →';
-      art.appendChild(icon); art.appendChild(h3); art.appendChild(p); art.appendChild(a);
-      frag.appendChild(art);
-    });
-    if (frag.childNodes.length) {
-      grid.textContent = '';
-      grid.appendChild(frag);
-    }
-  }
-
+  // ------------------------------------------------------------------ SEO
   function applySeo() {
     if (!cfg) return;
     try {
       var name = cfg.name || 'amoore';
-      if (cfg.seo_title) document.title = cfg.seo_title;
-      else document.title = name + ' | AI companion';
-      var desc = cfg.seo_description || cfg.banner_text || '';
+      document.title = name + ' | AI companion';
+      var desc = cfg.banner_text || '';
       if (desc) {
         var m = document.querySelector('meta[name="description"]');
         if (!m) {
@@ -828,18 +777,32 @@
   }
 
   // ------------------------------------------------------------------ config + live
-  async function fetchConfig() {
+  // Конфиг сайта: только нужные поля, кэш в localStorage на 5 минут (CFG_TTL_MS).
+  // Кэш читается лишь при загрузке страницы; Realtime и опрос раз в 20 с всегда идут в БД и обновляют кэш,
+  // поэтому закрытие сайта из админки применяется сразу.
+  var CFG_COLS = 'id,name,url,status,overlay_type,banner_active,banner_text,demo_chat_active,news_active';
+  var CFG_KEY = 'amoore_cfg_' + SITE_ID;
+  var CFG_TTL_MS = 5 * 60 * 1000;
+  function readCfgCache() {
+    try {
+      var d = JSON.parse(localStorage.getItem(CFG_KEY) || 'null');
+      return d && d.cfg && Date.now() - d.t < CFG_TTL_MS ? d.cfg : null;
+    } catch (e) { return null; }
+  }
+  function writeCfgCache(c) { try { localStorage.setItem(CFG_KEY, JSON.stringify({ t: Date.now(), cfg: c })); } catch (e) {} }
+  async function fetchConfig(useCache) {
+    if (useCache) { var cached = readCfgCache(); if (cached) return cached; }
     try {
       if (client) {
-        var r = await withTimeout(client.from('ecosystem_sites').select('*').eq('id', SITE_ID).maybeSingle(), 7000);
-        if (r && !r.error && r.data) return r.data;
+        var r = await withTimeout(client.from('ecosystem_sites').select(CFG_COLS).eq('id', SITE_ID).maybeSingle(), 7000);
+        if (r && !r.error && r.data) { writeCfgCache(r.data); return r.data; }
       }
-      // REST fallback
-      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=*&id=eq.' + encodeURIComponent(SITE_ID);
+      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/ecosystem_sites?select=' + CFG_COLS + '&id=eq.' + encodeURIComponent(SITE_ID);
       var res = await withTimeout(fetch(url, { headers: restHeaders() }), 7000);
       if (!res.ok) return null;
       var arr = await res.json();
-      return arr && arr[0] ? arr[0] : null;
+      if (arr && arr[0]) { writeCfgCache(arr[0]); return arr[0]; }
+      return null;
     } catch (e) { return null; }
   }
   async function fetchBotStatus() {
@@ -871,8 +834,6 @@
       await fetchBotStatus();
       if (c) { cfg = c; publishState(); applyConfig(); applySeo(); renderNews(); }
       else applyVisibility();
-      var s = await fetchSites();
-      if (s && s.length) { sitesCache = s; publishState(); renderEcosystem(); }
     };
     try {
       if (client.channel) {
@@ -914,22 +875,18 @@
 
     // Конфиг сайта грузим параллельно с новостями; новости не блокируются ничем.
     cfgPromise = safe(async function () {
-      cfg = await fetchConfig();
+      cfg = await fetchConfig(true);
       await fetchBotStatus();
       publishState(); applyConfig(); applySeo();
     });
     var newsPromise = safe(renderNews);
-    var sitesPromise = safe(async function () {
-      sitesCache = await fetchSites(); publishState(); renderEcosystem();
-    });
-    await Promise.all([cfgPromise, newsPromise, sitesPromise]);
+    await Promise.all([cfgPromise, newsPromise]);
     if (client) startLive();
     else {
       setInterval(function () {
         if (document.visibilityState && document.visibilityState !== 'visible') return;
         renderNews();
         fetchBotStatus().then(applyVisibility);
-        fetchSites().then(function (s) { sitesCache = s; publishState(); renderEcosystem(); });
       }, POLL_MS);
     }
   }
@@ -955,9 +912,7 @@
       await fetchBotStatus();
       if (c) { cfg = c; publishState(); applyConfig(); applySeo(); }
       else applyVisibility();
-      sitesCache = await fetchSites();
       publishState();
-      renderEcosystem();
       return renderNews();
     }
   };

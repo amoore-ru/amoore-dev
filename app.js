@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '4.2.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '4.3.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -72,6 +72,11 @@ const $ = (id) => document.getElementById(id);
   document.addEventListener('DOMContentLoaded', show); show();
 })();
 let me = null;                 // текущий админ
+// Конкретные поля вместо select('*'): меньше трафика, схема явная.
+const SITE_COLS = 'id,name,url,status,overlay_type,banner_active,banner_text,demo_chat_active,news_active,sort_order,updated_at';
+const NEWS_COLS = 'id,title,body,type,display_date,is_published,published_at';
+const LOG_COLS = 'id,message,status,error_text,source,created_at';
+const LEAD_COLS = 'id,name,contact,message,status,created_at';
 let sitesCache = [];
 let pendingCloseSiteId = null;
 let tokenOnlyMode = false;
@@ -228,10 +233,10 @@ function showApp(session) {
   me = { ...session, perms: resolvePermissions(session.role, session.permissions) };
   $('login-screen').style.display = 'none';
   $('app').classList.add('visible');
-  $('admin-nickname').textContent = me.nickname || me.name || me.email;
+  paintUser();
   if ($('news-date') && !$('news-date').value) $('news-date').value = todayISO();
   applyRoleUI();
-  switchView('dashboard');
+  switchView(location.hash === '#settings' ? 'settings' : 'dashboard');
   loadRoleLabels();               // названия ролей из БД (фоллбэк — стандартные)
   touchSeen();                    // «в сети»: обновляем last_seen_at
   startLeadsWatcher();          // красный счётчик новых заявок
@@ -245,18 +250,26 @@ const VIEW_RULES = {
   media:     () => can('manage_media'),
   team:      () => isSuper() || can('manage_admins'),
   logs:      () => can('view_logs'),
-  settings:  () => can('download_backup')
+  settings:  () => isSuper() || me?.role === 'admin' || can('download_backup')
 };
+function paintUser() {
+  if (!window.amooreUX) return;
+  window.amooreUX.setUser({ nickname: me.nickname, name: me.name, email: me.email, role: me.role });
+  const gear = document.querySelector('[data-ux-settings]');
+  if (gear) gear.hidden = !VIEW_RULES.settings();      // шестерёнка — только тем, у кого есть доступ к настройкам
+}
 function applyRoleUI() {
   Object.keys(VIEW_RULES).forEach(k => { const b = $('tab-' + k); if (b) b.style.display = VIEW_RULES[k]() ? '' : 'none'; });
   $('news-form-wrap').style.display = can('manage_news') ? '' : 'none';
   $('news-role-note').textContent = isSuper() ? 'Полный доступ: добавление, правка, удаление и публикация дайджестов.' : can('manage_news') ? 'Вы можете добавлять новости.' : 'Режим чтения: просмотр опубликованных новостей.';
   const nt = $('news-type'); if (nt && isSuper() && !nt.querySelector('option[value="digest"]')) nt.insertAdjacentHTML('beforeend', '<option value="digest">Дайджест</option>');
-  if ($('settings-super-blocks')) $('settings-super-blocks').style.display = isSuper() ? '' : 'none';
+  if ($('set-backup')) $('set-backup').style.display = can('download_backup') ? '' : 'none';
+  document.querySelectorAll('[data-super]').forEach(n => { n.style.display = isSuper() ? '' : 'none'; });
+  paintUser();
   $('add-site-btn').style.display = can('manage_sites') ? '' : 'none';
   $('add-admin-wrap').style.display = can('manage_admins') ? '' : 'none';
   $('mini-audit-widget').style.display = can('view_logs') ? '' : 'none';
-  if ($('telegram-broadcast-btn')) $('telegram-broadcast-btn').style.display = isSuper() ? '' : 'none';
+  if ($('broadcast-card')) $('broadcast-card').style.display = isSuper() ? '' : 'none';
   const sel = $('new-role');
   sel.innerHTML = ['moderator', 'admin'].concat(isSuper() ? ['super_admin'] : []).map(r => `<option value="${r}">${esc(rl(r))}</option>`).join('');
 }
@@ -265,7 +278,8 @@ function applyRoleUI() {
 let viewTimer = 0;
 function switchView(name) {
   if (!VIEW_RULES[name] || !VIEW_RULES[name]()) name = 'dashboard';
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  document.querySelectorAll('.ux-tab').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  document.querySelector('[data-ux-settings]')?.classList.toggle('active', name === 'settings');
   const next = $('view-' + name), prev = document.querySelector('.view.active');
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   clearTimeout(viewTimer);
@@ -286,23 +300,9 @@ function switchView(name) {
   if (name === 'leads') loadLeads();
   if (name === 'digest') loadDigestView();
 }
-function closeMobileMenu() {
-  $('topbar-tabs').classList.remove('open');
-  $('burger').setAttribute('aria-expanded', 'false');
-  document.body.classList.remove('menu-open');
-}
-$('burger').addEventListener('click', () => {
-  const open = $('topbar-tabs').classList.toggle('open');
-  $('burger').setAttribute('aria-expanded', open ? 'true' : 'false');
-  document.body.classList.toggle('menu-open', open);       // блокирует прокрутку страницы под меню
-});
-// Меню как в нативных приложениях: закрывается по Esc, по тапу вне меню и при переходе на широкий экран
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('topbar-tabs').classList.contains('open')) { closeMobileMenu(); $('burger').focus(); } });
-document.addEventListener('click', e => {
-  if ($('topbar-tabs').classList.contains('open') && !e.target.closest('#topbar-tabs, #burger')) closeMobileMenu();
-});
-window.addEventListener('resize', () => { if (window.innerWidth > 1100) closeMobileMenu(); });
-document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+const closeMobileMenu = () => window.amooreUX?.closeMenu();
+document.querySelectorAll('.ux-tab').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+document.querySelector('[data-ux-settings]')?.addEventListener('click', e => { e.preventDefault(); switchView('settings'); });
 
 // ======================================================================= глобальный поиск по новостям, сайтам и администраторам
 (function installGlobalSearch() {
@@ -385,7 +385,7 @@ $('onboarding-god')?.addEventListener('click',()=>{const landing=sitesCache.find
 async function loadSites() {
   const grid = $('sites-grid');
   grid.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div>';
-  const { data, error } = await sb.from('ecosystem_sites').select('*').order('id');
+  const { data, error } = await sb.from('ecosystem_sites').select(SITE_COLS).order('id');
   if (error) { grid.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   sitesCache = data || [];
   renderSites();
@@ -796,7 +796,7 @@ async function sendBotTest() {
 async function downloadBotLogsCsv() {
   if (!isSuper() && !can('view_logs')) return toast('Недостаточно прав', 'error');
   try {
-    const { data, error } = await sb.from('bot_logs').select('*').order('created_at', { ascending: false }).limit(500);
+    const { data, error } = await sb.from('bot_logs').select(LOG_COLS).order('created_at', { ascending: false }).limit(500);
     if (error) return toast(friendlyError(error), 'error');
     const rows = data || [];
     const header = 'id,created_at,status,message,error_text,source';
@@ -815,7 +815,7 @@ async function loadLeads() {
   const list = $('leads-list');
   if (!list) return;
   list.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка заявок"><i></i><i></i><i></i></div>';
-  const { data, error } = await sb.from('leads').select('*').order('created_at', { ascending: false }).limit(50);
+  const { data, error } = await sb.from('leads').select(LEAD_COLS).order('created_at', { ascending: false }).limit(50);
   if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   if (!data?.length) { list.innerHTML = '<div class="loading-state">Здесь пока пусто. Новые заявки появятся после отправки формы.</div>'; return; }
   list.innerHTML = data.map(l => `
@@ -987,10 +987,10 @@ document.addEventListener('click', async (e) => {
 
 // ======================================================================= «Что нового» (changelog.json)
 const WN_KEY = 'amoore_dev_seen_version';
-const WN_FALLBACK = [{ version: AMOORE_VERSION, title: 'NEXUS Total Fix', items: [
-  'Тёмный Deep Glass без белых пятен, тумблеры 46×28.',
-  'История обновлений v1.0.0 → v4.2 с перетаскиванием версий.',
-  'Исправлены демо-чат и вкладки новостей на лендинге, адаптивный характер бота.'] }];
+const WN_FALLBACK = [{ version: AMOORE_VERSION, title: 'POLISH', items: [
+  'Единая шапка на всех сайтах, смена темы Тёмная / Светлая.',
+  'Настройки админки по карточкам: профиль, Changelog, роли, бэкап.',
+  'Блок «Экосистема» на лендинге, фикс вкладок новостей, бот стал живее.'] }];
 const verKey = v => String(v || '').split('.').map(x => parseInt(x, 10) || 0);
 // Если у всех версий есть order — порядок задан в админке (Drag & Drop); иначе новые версии сверху
 const sortVersions = list => {
@@ -1003,7 +1003,7 @@ const sortVersions = list => {
     return 0;
   });
 };
-function paintVersionChip() { const c = $('version-chip'); if (c) c.textContent = 'v' + curVersion(); }
+function paintVersionChip() { window.amooreUX?.setVersion(curVersion()); }
 async function loadChangelog() {
   // 1) БД (global_settings.changelog) → 2) changelog.json → 3) жёсткий фоллбэк из кода
   try {
@@ -1048,7 +1048,7 @@ $('whatsnew-ok')?.addEventListener('click', closeWhatsNew);
 $('whatsnew-history')?.addEventListener('click', () => renderWhatsNew(wnList || WN_FALLBACK, true));
 $('whatsnew-modal')?.addEventListener('click', e => { if (e.target === $('whatsnew-modal')) closeWhatsNew(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('whatsnew-modal').classList.contains('visible')) closeWhatsNew(); });
-$('version-chip')?.addEventListener('click', () => openWhatsNew(true));
+document.addEventListener('amoore:changelog', () => openWhatsNew(true));
 
 // ======================================================================= медиа
 const dz = $('dropzone');
@@ -1084,7 +1084,7 @@ async function loadMedia() {
   if (!files.length) { grid.innerHTML = '<div class="loading-state">Медиатека пока пуста. Загрузите первое изображение.</div>'; return; }
   grid.innerHTML = files.map(f => {
     const url = sb.storage.from('media').getPublicUrl(f.name).data.publicUrl;
-    return `<div class="media-item glass"><img src="${esc(url)}" alt="" loading="lazy">
+    return `<div class="media-item glass"><img src="${esc(url)}" alt="" loading="lazy" decoding="async">
       <button type="button" class="btn btn-ghost btn-sm copy-url" data-url="${esc(url)}">Скопировать ссылку</button></div>`;
   }).join('');
 }
@@ -1114,8 +1114,8 @@ $('backup-btn').addEventListener('click', async () => {
   btn.disabled = true; label.textContent = 'Собираю данные…';
   try {
     const [sites, news, admins] = await Promise.all([
-      sb.from('ecosystem_sites').select('*').order('id'),
-      sb.from('news').select('*').order('published_at', { ascending: false }),
+      sb.from('ecosystem_sites').select(SITE_COLS).order('id'),
+      sb.from('news').select(NEWS_COLS).order('published_at', { ascending: false }),
       sb.from('admins').select('id, email, name, nickname, role, permissions, created_at')
     ]);
     for (const r of [sites, news, admins]) if (r.error) throw r.error;
@@ -1132,7 +1132,7 @@ $('backup-btn').addEventListener('click', async () => {
     logAction('backup');
     toast(`Бэкап: ${sites.data.length} сайтов, ${news.data.length} новостей, ${admins.data.length} пользователей`);
   } catch (err) { toast(friendlyError(err), 'error'); }
-  finally { btn.disabled = false; label.textContent = 'Скачать резервную копию (JSON)'; }
+  finally { btn.disabled = false; label.textContent = 'Скачать JSON-бэкап базы'; }
 });
 
 // ======================================================================= команда и права
@@ -1207,7 +1207,7 @@ $('ea-save').addEventListener('click', async () => {
   if (editAdminId !== me.admin_id) patch.role = $('ea-role').value;
   const { error } = await sb.from('admins').update(patch).eq('id', editAdminId);
   if (error) return toast(friendlyError(error), 'error');
-  if (editAdminId === me.admin_id) { me.nickname = patch.nickname; me.name = patch.name; me.email = patch.email; $('admin-nickname').textContent = me.nickname || me.name || me.email; }
+  if (editAdminId === me.admin_id) { me.nickname = patch.nickname; me.name = patch.name; me.email = patch.email; paintUser(); }
   logAction('admin_edit', null, null, patch.nickname);
   toast('Профиль обновлён'); $('edit-admin-modal').classList.remove('visible'); loadTeam();
 });
@@ -1290,7 +1290,7 @@ function paintClEditor() {
       <div class="cl-head"><span class="cl-handle" title="Перетащить" aria-label="Перетащить версию">⠿</span><b>v${esc(v.version || '…')}</b>
         <span class="cl-move"><button type="button" class="cl-up" aria-label="Выше">▲</button><button type="button" class="cl-down" aria-label="Ниже">▼</button></span></div>
       <div class="form-row">
-        <div class="form-group"><label>Версия</label><input class="cl-version" value="${esc(v.version)}" placeholder="4.2.0" inputmode="decimal"></div>
+        <div class="form-group"><label>Версия</label><input class="cl-version" value="${esc(v.version)}" placeholder="4.3.0" inputmode="decimal"></div>
         <div class="form-group"><label>Название</label><input class="cl-title" value="${esc(v.title || '')}" maxlength="60"></div>
         <div class="form-group"><label>Дата</label><input type="date" class="cl-date" value="${esc(v.date || '')}"></div>
       </div>
@@ -1306,7 +1306,40 @@ function readClEditor() {
     items: c.querySelector('.cl-items').value.split('\n').map(x => x.trim()).filter(Boolean)
   }));
 }
+// Тема: переключатель «Тёмная / Светлая» (значение хранится в localStorage["theme"] модулем amoore-ux.js)
+function paintThemeChoice() {
+  const cur = window.amooreUX ? window.amooreUX.getTheme() : 'dark';
+  document.querySelectorAll('[data-theme-choice]').forEach(b => {
+    const on = b.dataset.themeChoice === cur;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+}
+document.querySelectorAll('[data-theme-choice]').forEach(b => b.addEventListener('click', () => window.amooreUX?.setTheme(b.dataset.themeChoice)));
+document.addEventListener('amoore:theme', paintThemeChoice);
+
+// Профиль: никнейм и email (в таблице admins; email для входа живёт в Supabase Auth — напоминание в карточке)
+$('pf-save').addEventListener('click', async () => {
+  if (!me) return;
+  const nickname = $('pf-nickname').value.trim().slice(0, 40), email = $('pf-email').value.trim().toLowerCase();
+  if (!nickname) return toast('Никнейм не может быть пустым', 'error');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast('Проверьте email', 'error');
+  const btn = $('pf-save'); btn.disabled = true;
+  try {
+    const { error } = await sb.from('admins').update({ nickname, email }).eq('id', me.admin_id);
+    if (error) return toast(friendlyError(error), 'error');
+    const emailChanged = email !== me.email;
+    me.nickname = nickname; me.email = email;
+    const s = loadSession(); if (s) saveSession({ ...s, nickname, email }, s.expires_at);
+    paintUser(); logAction('admin_edit', null, null, nickname);
+    toast(emailChanged ? 'Профиль сохранён. Не забудьте сменить email и в Supabase Auth' : 'Профиль сохранён');
+  } finally { btn.disabled = false; }
+});
+
 async function renderSettingsBlocks() {
+  paintThemeChoice();
+  $('pf-nickname').value = me.nickname || '';
+  $('pf-email').value = me.email || '';
   if (!isSuper()) return;
   ['super_admin', 'admin', 'moderator'].forEach(k => { const i = $('rl-' + k); if (i) i.value = roleLabels[k] || ''; });
   wnList = await loadChangelog();
@@ -1360,7 +1393,7 @@ $('cl-save').addEventListener('click', async () => {
   const list = readClEditor().filter(v => v.version).map((v, i) => ({ ...v, order: i }));   // порядок — как расставлен перетаскиванием
   if (!list.length) return toast('Добавьте хотя бы одну версию', 'error');
   if (new Set(list.map(v => v.version)).size !== list.length) return toast('Версии не должны повторяться', 'error');
-  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 4.2.0', 'error');
+  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 4.3.0', 'error');
   const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: list[0].version, versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return toast(friendlyError(error), 'error');
   wnList = list; liveVersion = String(list[0].version); paintVersionChip();
@@ -1425,10 +1458,12 @@ $('login-form').addEventListener('submit', async (e) => {
     $('login-btn-text').textContent = 'Войти';
   }
 });
-$('logout-btn').addEventListener('click', () => {
+document.addEventListener('amoore:logout', e => {
+  e.preventDefault();
   clearSession(true);
   sb.auth.signOut().catch(() => {});
   me = null;
+  window.amooreUX?.clearUser();
   showLogin(false);
 });
 

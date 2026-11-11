@@ -1,0 +1,106 @@
+/* =====================================================================
+   amoore-dev v4.3 «POLISH» — тема админки (Тёмная / Светлая) + блоки «Настройки».
+   Подключается ПОСЛЕ amoore-theme.css. Тема задаётся атрибутом data-theme на <html> (модуль amoore-ux.js).
+   ===================================================================== */
+
+/* ---------- Светлая тема: переопределяем переменные из style.css ---------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3f1f8; --bg-elevated: rgba(255, 255, 255, 0.92); --bg-card: rgba(255, 255, 255, 0.72);
+  --border: rgba(150, 118, 28, 0.28); --border-strong: rgba(150, 118, 28, 0.5);
+  --gold: #a47f1a; --gold-soft: #8a6a12; --gold-dim: rgba(164, 127, 26, 0.14);
+  --text: #17151d; --text-muted: #5f5970; --text-dim: #8b8598;
+  --success: #15935f; --danger: #d63b3b; --danger-dim: rgba(214, 59, 59, 0.12);
+  --shadow: 0 8px 28px rgba(27, 20, 38, 0.12); --edge-hi: rgba(255, 255, 255, 0.7);
+}
+:root[data-theme="light"], :root[data-theme="light"] body { background-color: #f3f1f8; color: #17151d; }
+:root[data-theme="light"] body { background-image: radial-gradient(ellipse 80% 50% at 20% -10%, rgba(212, 175, 55, 0.14), transparent), radial-gradient(ellipse 60% 40% at 80% 110%, rgba(139, 124, 247, 0.12), transparent); }
+:root[data-theme="light"] .glass,
+:root[data-theme="light"] .site-card,
+:root[data-theme="light"] .widget,
+:root[data-theme="light"] .stat-card,
+:root[data-theme="light"] .admin-card,
+:root[data-theme="light"] .team-form,
+:root[data-theme="light"] .settings-card,
+:root[data-theme="light"] .login-card,
+:root[data-theme="light"] .logs-wrap {
+  background: rgba(255, 255, 255, 0.78) !important; color: #17151d;
+  border: 1px solid rgba(150, 118, 28, 0.3) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 10px 30px rgba(27, 20, 38, 0.1) !important;
+}
+:root[data-theme="light"] .modal { background: #ffffff !important; color: #17151d; border: 1px solid rgba(150, 118, 28, 0.3) !important; }
+:root[data-theme="light"] input, :root[data-theme="light"] textarea, :root[data-theme="light"] select, :root[data-theme="light"] .ta {
+  background-color: #ffffff !important; color: #17151d !important; border: 1px solid rgba(150, 118, 28, 0.3) !important;
+}
+:root[data-theme="light"] input::placeholder, :root[data-theme="light"] textarea::placeholder { color: #8b8598; }
+:root[data-theme="light"] input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px #ffffff inset !important; -webkit-text-fill-color: #17151d !important; }
+:root[data-theme="light"] .btn-ghost { color: #17151d; border-color: rgba(150, 118, 28, 0.4); }
+
+/* ---------- Тёмная тема (по умолчанию): плотное тёмное стекло без белых пятен ---------- */
+:root:not([data-theme="light"]) { color-scheme: dark; }
+:root:not([data-theme="light"]), :root:not([data-theme="light"]) body { background-color: #070b16; color: #eef0f7; }
+:root:not([data-theme="light"]) .glass,
+:root:not([data-theme="light"]) .site-card,
+:root:not([data-theme="light"]) .widget,
+:root:not([data-theme="light"]) .stat-card,
+:root:not([data-theme="light"]) .admin-card,
+:root:not([data-theme="light"]) .team-form,
+:root:not([data-theme="light"]) .settings-card,
+:root:not([data-theme="light"]) .modal,
+:root:not([data-theme="light"]) .login-card,
+:root:not([data-theme="light"]) .logs-wrap {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.07) 0%, transparent 38%), rgba(13, 18, 32, 0.78) !important;
+  border: 1px solid rgba(212, 175, 55, 0.34) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 48px rgba(0, 0, 0, 0.42) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5);
+  color: #eef0f7;
+}
+:root:not([data-theme="light"]) .modal { background: rgba(13, 18, 32, 0.96) !important; }
+:root:not([data-theme="light"]) input, :root:not([data-theme="light"]) textarea, :root:not([data-theme="light"]) select, :root:not([data-theme="light"]) .ta {
+  background-color: rgba(255, 255, 255, 0.05) !important; color: #eef0f7 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important;
+}
+:root:not([data-theme="light"]) input::placeholder, :root:not([data-theme="light"]) textarea::placeholder { color: #8b90a5; }
+:root:not([data-theme="light"]) input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px #0d1220 inset !important; -webkit-text-fill-color: #eef0f7 !important; }
+table, th, td { background-color: transparent; }
+
+/* золотые кнопки (обе темы) */
+.btn-primary { background-image: linear-gradient(135deg, #e8c96a 0%, #d4af37 55%, #b8932a 100%); color: #0a0e18; border-color: transparent; }
+
+/* ---------- Поиск по панели: под шапкой, справа ---------- */
+.main-search { display: flex; justify-content: flex-end; margin: 0 0 18px; }
+.main-search .global-search-wrap { width: min(420px, 100%); }
+
+/* ---------- Настройки: аккуратные карточки ---------- */
+.settings-stack { display: grid; gap: 18px; max-width: 860px; margin: 0 auto; }
+.settings-card { padding: 22px 24px; border-radius: 22px; }
+.settings-card-head { display: flex; align-items: flex-start; gap: 14px; margin: 0 0 18px; }
+.settings-card-head h3 { margin: 0 0 4px; font-size: 18px; }
+.settings-card-head p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-muted); }
+.settings-ico {
+  flex: 0 0 42px; width: 42px; height: 42px; display: grid; place-items: center; font-size: 20px; color: var(--gold);
+  border-radius: 13px; border: 1px solid rgba(var(--gold-rgb), 0.4); background: rgba(var(--gold-rgb), 0.1);
+}
+.settings-note { margin: 0 0 16px; padding: 12px 14px; font-size: 13px; line-height: 1.5; color: var(--text-muted); border-radius: 12px; border: 1px dashed rgba(var(--gold-rgb), 0.4); background: rgba(var(--gold-rgb), 0.07); }
+.settings-card .form-group label small { margin-left: 6px; font-size: 11px; font-weight: 500; color: var(--text-dim); }
+.settings-card .btn-primary:not(#cl-save) { width: auto; padding: 12px 28px; }
+.theme-seg { display: inline-flex; padding: 4px; gap: 4px; border-radius: 14px; border: 1px solid rgba(var(--gold-rgb), 0.35); }
+.theme-seg-btn {
+  min-height: 44px; min-width: 120px; padding: 0 20px; font: 700 14px var(--font-head); cursor: pointer;
+  color: var(--text-muted); background: transparent; border: 0; border-radius: 10px; transition: color .2s ease, background-color .2s ease;
+}
+.theme-seg-btn.active { color: #0a0e18; background: linear-gradient(135deg, #e8c96a 0%, #d4af37 55%, #b8932a 100%); }
+.theme-seg-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (max-width: 560px) { .settings-card { padding: 18px 16px; } .theme-seg { display: flex; } .theme-seg-btn { flex: 1; min-width: 0; } }
+
+/* ---------- Редактор Changelog: перетаскивание версий ---------- */
+.cl-card { position: relative; transition: box-shadow .2s ease, transform .2s ease, opacity .2s ease; }
+.cl-card.cl-dragging { opacity: .9; transform: scale(1.01); box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.7), 0 24px 56px rgba(0, 0, 0, 0.4) !important; z-index: 5; }
+.cl-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.cl-handle {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: 0 0 40px;
+  border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.3); color: var(--gold); font-size: 20px;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.cl-handle:active { cursor: grabbing; }
+.cl-move { display: inline-flex; gap: 6px; margin-left: auto; }
+.cl-move button { width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.3); background: transparent; color: var(--gold); font-size: 16px; }

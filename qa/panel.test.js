@@ -4,7 +4,7 @@ const path = require('path'), fs = require('fs');
 const H = require('./harness'), S = require('./seed'), { suite, sleep, until } = require('./lib');
 const DEV = path.resolve(__dirname, '..'), RU = path.resolve(__dirname, '../../amoore-ru');
 const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { recursive: true });
-const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','4.2.0');` : '');
+const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','4.3.0');` : '');
 
 (async () => {
   const { chromium } = H.pwRequire();
@@ -13,15 +13,15 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
   const URL = 'http://localhost:8302/index.html';
   const b = await chromium.launch();
   const open = (o = {}) => H.openPage(b, URL, o.seed || S.seed(), Object.assign({ init: sessionInit('a1', 'super_admin', o.seen !== false) }, o));
-  const visibleTabs = (page) => page.$$eval('.tab-btn', els => els.filter(e => getComputedStyle(e).display !== 'none').map(e => e.textContent.replace(/\d+\+?$/, '').trim()));
+  const visibleTabs = (page) => page.$$eval('.ux-tab', els => els.filter(e => getComputedStyle(e).display !== 'none').map(e => e.textContent.replace(/\d+\+?$/, '').trim()));
 
   // ---------- вкладки, версия, «Что нового» ----------
   console.log('Навигация и версия');
   { const { page, errors } = await open({ seen: true });
     await until(async () => (await page.$$('.site-card')).length >= 2, 5000);
     const tabs = await visibleTabs(page);
-    T.check('порядок вкладок: Дашборд → Новости → Медиа → Дайджест → Настройки, затем Команда / Логи / Заявки', tabs.join('>') === 'Дашборд>Новости>Медиа>Дайджест>Настройки>Команда>Логи>Заявки', tabs.join('>'));
-    T.check('чип версии показывает v4.2.0', (await page.textContent('#version-chip')) === 'v4.2.0', await page.textContent('#version-chip'));
+    T.check('порядок вкладок: Дашборд → Новости → Медиа → Дайджест, затем Команда / Логи / Заявки (Настройки — шестерёнка)', tabs.join('>') === 'Дашборд>Новости>Медиа>Дайджест>Команда>Логи>Заявки', tabs.join('>'));
+    T.check('чип версии показывает v4.3', (await page.textContent('#version-chip')) === 'v4.3', await page.textContent('#version-chip'));
     T.check('нет ошибок JS при входе', errors.length === 0, errors.join('; '));
     T.check('если версия уже просмотрена — окно «Что нового» не показывается', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.click('#version-chip'); await sleep(500);
@@ -30,18 +30,18 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
   { const { page } = await open({ seen: false });
     const shown = await until(async () => page.$eval('#whatsnew-modal', e => e.classList.contains('visible')), 3000);
     T.check('первый вход за версию: выскакивает окно «Что нового»', !!shown);
-    T.check('заголовок «Обновление v4.2»', /Обновление v4\.2/.test(await page.textContent('#whatsnew-title')), await page.textContent('#whatsnew-title'));
+    T.check('заголовок «Обновление v4.3»', /Обновление v4\.3/.test(await page.textContent('#whatsnew-title')), await page.textContent('#whatsnew-title'));
     const li = await page.$$eval('#whatsnew-list li li', e => e.map(x => x.textContent));
-    T.check('в списке изменения v4.2: Deep Glass, тумблеры, перетаскивание версий, адаптивный мат', li.length >= 4 && li.some(t => /Deep Glass/i.test(t)) && li.some(t => /тумблер/i.test(t)) && li.some(t => /Drag|перетаскив/i.test(t)) && li.some(t => /мат/i.test(t)), li.length + ' пунктов');
+    T.check('в списке изменения v4.3: шапка, Экосистема, вкладки, Drag & Drop, адаптивный мат', li.length >= 4 && li.some(t => /шапк/i.test(t)) && li.some(t => /Экосистем/i.test(t)) && li.some(t => /вкладк/i.test(t)) && li.some(t => /Drag|перетаскив/i.test(t)) && li.some(t => /мат/i.test(t)), li.length + ' пунктов');
     await page.click('#whatsnew-ok'); await sleep(300);
-    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '4.2.0');
+    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '4.3.0');
     await page.reload(); await sleep(1500);
     T.check('после перезагрузки окно больше не появляется', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.context().close(); }
   { const core = fs.readFileSync(path.join(DEV, 'shared/amoore-core.js'), 'utf8'), app = fs.readFileSync(path.join(DEV, 'app.js'), 'utf8');
     const cv = (core.match(/var AMOORE_VERSION = '([\d.]+)'/) || [])[1], av = (app.match(/const AMOORE_VERSION = '([\d.]+)'/) || [])[1];
     const cl = JSON.parse(fs.readFileSync(path.join(DEV, 'changelog.json'), 'utf8'));
-    T.check('синхронизация версий: core = app.js = changelog (4.2.0)', cv === '4.2.0' && av === '4.2.0' && cl.current === '4.2.0', `${cv}/${av}/${cl.current}`); }
+    T.check('синхронизация версий: core = app.js = changelog (4.3.0)', cv === '4.3.0' && av === '4.3.0' && cl.current === '4.3.0', `${cv}/${av}/${cl.current}`); }
 
   // ---------- красный счётчик заявок ----------
   console.log('Заявки и счётчик');
@@ -223,9 +223,9 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
 
   // ---------- адаптив ----------
   console.log('Адаптив');
-  const widths = [320, 360, 375, 390, 414, 430, 540, 768, 820, 900, 1024, 1100, 1101, 1280, 1440, 1920], matrix = [];
+  const widths = process.env.WIDTHS ? process.env.WIDTHS.split(',').map(Number) : [320, 360, 375, 390, 414, 430, 540, 768, 820, 900, 1024, 1100, 1120, 1280, 1440, 1920], matrix = [];
   for (const w of widths) {
-    const mobile = w <= 1100;   // до 1100px включительно навигация сворачивается в бургер
+    const mobile = w <= 1119;   // до 1119px включительно навигация сворачивается в бургер
     const { page, errors } = await open({ viewport: { width: w, height: mobile ? 800 : 900 }, mobile: w < 820, seen: false });
     await until(async () => (await page.$$('.site-card')).length >= 2, 5000);
     await sleep(900);
@@ -235,7 +235,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     await page.click('#whatsnew-ok'); await sleep(250);
     for (const v of ['dashboard', 'news', 'media', 'team', 'logs', 'leads', 'digest', 'settings']) {
       if (mobile) { await page.click('#burger'); await sleep(350); }
-      await page.click('#tab-' + v); await sleep(900);
+      await page.click(v === 'settings' ? '[data-ux-settings]' : '#tab-' + v); await sleep(900);
       if (v === 'digest') { await page.click('#digest-build'); await sleep(900); }
       const m = await page.evaluate(() => {
         const d = document.documentElement, vw = innerWidth, wide = [];
@@ -248,7 +248,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     }
     if (mobile) {
       await page.click('#burger'); await sleep(350);
-      const tap = await page.$$eval('.topbar-tabs .tab-btn', els => els.filter(e => getComputedStyle(e).display !== 'none').map(e => Math.round(e.getBoundingClientRect().height)));
+      const tap = await page.$$eval('.ux-nav .ux-tab', els => els.filter(e => getComputedStyle(e).display !== 'none').map(e => Math.round(e.getBoundingClientRect().height)));
       T.check(`${w}px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)`, tap.every(h => h >= 44), tap.join(','));
     }
     T.check(`${w}px: нет ошибок JS`, errors.length === 0, errors.join('; '));
@@ -308,27 +308,27 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     T.check('редактирование профиля: name, nickname, email, role сохраняются', await page.evaluate(() => window.__db.admins.some(a => a.id === 'a2' && a.name === 'Модер Новый' && a.nickname === 'ModNew' && a.email === 'modnew@amoore.ru' && a.role === 'admin')));
     await page.click('.edit-admin[data-id="a2"]'); await sleep(200); await page.fill('#ea-email', 'не-почта'); await page.click('#ea-save'); await sleep(300);
     T.check('невалидный email отклоняется', await page.evaluate(() => window.__db.admins.find(a => a.id === 'a2').email === 'modnew@amoore.ru')); await page.click('#ea-cancel');
-    await page.click('#tab-settings'); await sleep(500);
+    await page.click('[data-ux-settings]'); await sleep(500);
     await page.fill('#rl-super_admin', 'Шеф'); await page.fill('#rl-moderator', 'Страж'); await page.click('#role-labels-save'); await sleep(700);
     const stored = await page.evaluate(() => (window.__db.global_settings || []).find(r => r.key === 'role_labels'));
     T.check('названия ролей сохраняются в global_settings.role_labels', !!stored && stored.value.super_admin === 'Шеф' && stored.value.moderator === 'Страж' && stored.value.admin === 'Админ', JSON.stringify(stored));
     await page.click('#tab-team'); await sleep(600);
     T.check('новые названия ролей («Шеф») применяются в команде', /Шеф/.test(await page.textContent('#team-list')));
-    await page.click('#tab-settings'); await sleep(500);
+    await page.click('[data-ux-settings]'); await sleep(500);
     await page.click('#cl-add'); const card = '.cl-card >> nth=0';
-    await page.fill('.cl-card:nth-child(1) .cl-version', '4.1.0'); await page.fill('.cl-card:nth-child(1) .cl-title', 'Тест'); await page.fill('.cl-card:nth-child(1) .cl-items', 'Первое\nВторое'); await page.click('#cl-save'); await sleep(800);
+    await page.fill('.cl-card:nth-child(1) .cl-version', '9.9.9'); await page.fill('.cl-card:nth-child(1) .cl-title', 'Тест'); await page.fill('.cl-card:nth-child(1) .cl-items', 'Первое\nВторое'); await page.click('#cl-save'); await sleep(800);
     const cl = await page.evaluate(() => (window.__db.global_settings || []).find(r => r.key === 'changelog'));
-    T.check('редактор Changelog пишет в БД; текущая версия = первая запись', !!cl && cl.value.current === '4.1.0' && cl.value.versions[0].items.length === 2 && cl.value.versions.length >= 2, JSON.stringify(cl && cl.value.current));
-    T.check('чип версии в админке обновился из БД', (await page.textContent('#version-chip')) === 'v4.1.0');
+    T.check('редактор Changelog пишет в БД; текущая версия = первая запись', !!cl && cl.value.current === '9.9.9' && cl.value.versions[0].items.length === 2 && cl.value.versions.length >= 2, JSON.stringify(cl && cl.value.current));
+    T.check('чип версии в админке обновился из БД', (await page.textContent('#version-chip')) === 'v9.9.9');
     await page.fill('.cl-card:nth-child(1) .cl-version', 'abc'); await page.click('#cl-save'); await sleep(300);
-    T.check('неверный формат версии не сохраняется', (await page.evaluate(() => window.__db.global_settings.find(r => r.key === 'changelog').value.current)) === '4.1.0');
+    T.check('неверный формат версии не сохраняется', (await page.evaluate(() => window.__db.global_settings.find(r => r.key === 'changelog').value.current)) === '9.9.9');
     await page.context().close(); }
   { // версия из БД на старте: «Что нового» + чип
     const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '5.0.0', versions: [{ version: '5.0.0', title: 'Из базы', items: ['Новое из БД'] }] } }, { key: 'role_labels', value: { super_admin: 'Босс', admin: 'Админ', moderator: 'Модератор' } }];
     const { page } = await open({ seed: s, seen: false });
-    const ok = await until(async () => (await page.textContent('#version-chip')) === 'v5.0.0', 4000);
+    const ok = await until(async () => (await page.textContent('#version-chip')) === 'v5.0', 4000);
     const wn = await until(async () => /5\.0/.test(await page.textContent('#whatsnew-title')), 4000);
-    T.check('админка берёт версию из БД, код — только фоллбэк (v4.2.0)', !!ok && !!wn, await page.textContent('#whatsnew-title'));
+    T.check('админка берёт версию из БД, код — только фоллбэк (v4.3.0)', !!ok && !!wn, await page.textContent('#whatsnew-title'));
     T.check('названия ролей из БД применяются сразу после входа (список ролей в форме)', await until(async () => (await page.$$eval('#new-role option', o => o.map(x => x.textContent))).includes('Босс'), 3000));
     await page.context().close(); }
 
