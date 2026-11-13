@@ -76,15 +76,20 @@
   function each(sel, fn) { var n = document.querySelectorAll(sel); for (var i = 0; i < n.length; i++) fn(n[i]); }
   function setUser(u) {
     var on = !!u;
-    var name = on ? String(u.nickname || u.name || u.email || 'Admin') : '';
-    var isAdmin = on && (u.role === 'super_admin' || u.role === 'admin');
+    var pc = window.amooreProfileCache;      // v5.2: ник и роль — из единого профиля amoore ID
+    var name = on ? String((pc && pc.display_name) || u.nickname || u.name || u.email || 'Пользователь') : '';
+    var isAdmin = on && (u.role === 'super_admin' || u.role === 'admin' || (pc && pc.role === 'super_admin'));
     each('[data-ux-user]', function (n) { n.hidden = !on; });
     each('[data-ux-logout]', function (n) { n.hidden = !on; });
     each('[data-ux-settings]', function (n) { n.hidden = !isAdmin; });
     each('[data-ux-user-name]', function (n) { n.textContent = name; });
-    each('[data-ux-avatar]', function (n) { n.textContent = name ? name.charAt(0).toUpperCase() : ''; });
+    each('[data-ux-avatar]', function (n) {
+      n.textContent = name ? name.charAt(0).toUpperCase() : '';
+      if (pc && pc.avatar_color) { n.style.background = pc.avatar_color; n.style.color = '#17151d'; }
+    });
   }
   function clearUser() { setUser(null); }
+  document.addEventListener('amoore:profile', function () { var s = session(); if (s) setUser(s); });
   function logout() {
     var ev;
     try { ev = new CustomEvent('amoore:logout', { cancelable: true }); } catch (e) { ev = null; }

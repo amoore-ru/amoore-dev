@@ -96,14 +96,14 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   { const { page } = await open();
     await sleep(800);
     const info = await page.evaluate(() => ({ v: window.AMOORE_VERSION, api: window.amooreCore && window.amooreCore.version, st: window.AMOORE_STATE && window.AMOORE_STATE.version, ftr: document.querySelector('.version-btn [data-amoore-version]').textContent }));
-    T.check('AMOORE_VERSION = 5.1.0 (core, state, API)', info.v === '5.1.0' && info.api === '5.1.0' && info.st === '5.1.0', JSON.stringify(info));
-    T.check('в подвале показана «Версия 5.1.0»', info.ftr === '5.1.0');
+    T.check('AMOORE_VERSION = 5.2.0 (core, state, API)', info.v === '5.2.0' && info.api === '5.2.0' && info.st === '5.2.0', JSON.stringify(info));
+    T.check('в подвале показана «Версия 5.2.0»', info.ftr === '5.2.0');
     await page.click('#version-btn');
     await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     const n = (await page.$$('#nx-changelog .nx-cl-entry')).length;
     T.check('модалка истории обновлений (ядро) загружает changelog.json, если БД пуста', n >= 3, n + ' версий');
     const first = await page.$eval('#nx-changelog .nx-cl-entry h3', e => e.textContent);
-    T.check('первая запись — v5.1.0', /v5.1.0/.test(first), first);
+    T.check('первая запись — v5.2.0', /v5.2.0/.test(first), first);
     await page.keyboard.press('Escape'); await sleep(350);
     T.check('Esc закрывает модалку', !(await page.$eval('#nx-changelog', e => e.classList.contains('open'))));
     const cl = JSON.parse(fs.readFileSync(path.join(ROOT, 'changelog.json'), 'utf8'));
@@ -299,7 +299,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     T.check('viewport-fit=cover включён', /viewport-fit=cover/.test(html));
     T.check('v4.4 плавающей кнопки #mobile-cta в разметке нет, а в CSS она display:none !important', !/id="mobile-cta"/.test(html) && /\.mobile-cta[^{]*\{\s*display:\s*none\s*!important/.test(css));
     T.check('safe-area-inset-* применён к шапке, меню, нижней панели, подвалу и модалке', ['.ux-topbar', '.ux-panel', 'footer'].every(sel => new RegExp(sel.replace('.', '\\.') + '[^{]*\\{[^}]*safe-area-inset', 's').test(css + fs.readFileSync(path.join(ROOT, 'amoore-theme.css'), 'utf8'))));
-    T.check('кэш: CSS/JS подключены с версией ?v=5.1.0', /style\.css\?v=5.1.0/.test(html) && /amoore-core\.js\?v=5.1.0/.test(html) && /landing\.js\?v=5.1.0/.test(html));
+    T.check('кэш: CSS/JS подключены с версией ?v=5.2.0', /style\.css\?v=5.2.0/.test(html) && /amoore-core\.js\?v=5.2.0/.test(html) && /landing\.js\?v=5.2.0/.test(html));
     const hdr = fs.readFileSync(path.join(ROOT, '_headers'), 'utf8');
     T.check('_headers: CSS больше не «immutable на год»', !/\/\*\.css\s*\n\s*Cache-Control:[^\n]*immutable/.test(hdr)); }
 

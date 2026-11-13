@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <script src="amoore-ux.js?v=5.1.0"></script>
-  <link rel="stylesheet" href="style.css?v=5.1.0">
-  <link rel="stylesheet" href="amoore-theme.css?v=5.1.0">
-  <link rel="stylesheet" href="dev-theme.css?v=5.1.0">
+  <script src="amoore-ux.js?v=5.2.0"></script>
+  <link rel="stylesheet" href="style.css?v=5.2.0">
+  <link rel="stylesheet" href="amoore-theme.css?v=5.2.0">
+  <link rel="stylesheet" href="dev-theme.css?v=5.2.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -21,12 +21,12 @@
       <div class="login-logo">
         <div class="mark">a.</div>
         <h1>amoore Dev</h1>
-        <p>Mission Control</p>
+        <p>Центр управления</p>
       </div>
       <form id="login-form" autocomplete="off">
         <div class="form-group" id="email-group">
           <label for="email">Email</label>
-          <input type="email" id="email" placeholder="founder@amoore.ru" required autocomplete="username">
+          <input type="email" id="email" placeholder="you@amoore.ru" required autocomplete="username">
         </div>
         <div class="form-group" id="otp-group">
           <label for="otp">Код из письма</label>
@@ -93,7 +93,7 @@
       <!-- DASHBOARD -->
       <div class="view active" id="view-dashboard">
         <section class="admin-card glass onboarding-card" id="onboarding-card" hidden aria-labelledby="onboarding-title">
-          <div class="admin-card-info"><h3 id="onboarding-title">Давай настроим экосистему!</h3><p class="muted">Проверим базу, Telegram-бота и выполним первые шаги.</p>
+          <div class="admin-card-info"><h3 id="onboarding-title">Давай настроим экосистему!</h3><p class="muted">Проверим базу, Телеграм-бота и выполним первые шаги.</p>
             <div id="onboarding-checks" class="onboarding-checks"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line"></div></div>
           </div>
           <div class="onboarding-actions"><button type="button" class="btn btn-primary btn-sm" id="onboarding-news">Создать первую новость</button><button type="button" class="btn btn-ghost btn-sm" id="onboarding-god">Настроить God Mode</button><button type="button" class="btn btn-ghost btn-sm" id="onboarding-refresh">Повторить проверку</button></div>
@@ -112,7 +112,7 @@
           </div>
           <div class="widget glass widget-feed" id="mini-audit-widget">
             <div class="widget-title">Последние действия</div>
-            <div id="mini-audit" class="mini-audit">Загрузка…</div>
+            <div id="mini-audit" class="mini-audit"><div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div></div>
           </div>
         </div>
 
@@ -120,12 +120,12 @@
           <div class="section-title">Сайты экосистемы</div>
           <button type="button" class="btn btn-primary btn-sm" id="add-site-btn" style="display:none">+ Добавить сайт</button>
         </div>
-        <div class="sites-grid" id="sites-grid"><div class="loading-state">Загрузка…</div></div>
+        <div class="sites-grid" id="sites-grid"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>
 
         
         <div class="admin-card glass" id="bot-status-card" style="margin-top:24px">
           <div class="admin-card-info">
-            <h3 style="margin:0 0 8px">Telegram-бот</h3>
+            <h3 style="margin:0 0 8px">Телеграм-бот</h3>
             <p class="muted" id="bot-status-line">Статус: загрузка…</p>
             <p class="muted" id="bot-hb-line" style="font-size:12px"></p>
           </div>
@@ -135,12 +135,16 @@
             <button type="button" class="btn btn-ghost btn-sm" id="bot-logs-csv">Скачать логи CSV</button>
           </div>
 
-        <div class="admin-card glass" id="broadcast-card" style="margin-top:24px"><h3 style="margin:0 0 12px">Telegram · Рассылка</h3>
-          <div class="form-group"><label for="telegram-broadcast-text">Текст сообщения для Telegram</label><textarea id="telegram-broadcast-text" rows="4" maxlength="4000" placeholder="Сообщение всем активным пользователям бота…"></textarea><p class="widget-meta">Рассылка доступна только super_admin. Получатели — пользователи, которые ранее писали боту в личные сообщения.</p></div>
-          <button type="button" class="btn btn-primary" id="telegram-broadcast-btn">Отправить всем пользователям бота</button>
-        </div>
+        
         </div>
 
+      
+        <div class="settings-stack" style="margin-top:24px">
+          <section class="settings-card glass" id="set-backup" aria-labelledby="set-backup-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">⇩</span><div><h3 id="set-backup-h">Бэкап</h3><p>Сайты, новости и пользователи (без токенов доступа) одним JSON-файлом.</p></div></header>
+            <button type="button" class="btn btn-primary" id="backup-btn"><span id="backup-btn-text">Скачать JSON-бэкап базы</span></button>
+          </section>
+        </div>
       </div>
 
       <!-- MEDIA -->
@@ -154,11 +158,16 @@
           <p>Перетащите файл сюда или <label class="linkish">выберите<input type="file" id="media-file" accept="image/*,.pdf,.json,application/pdf,application/json" hidden></label></p><p class="muted" style="margin-top:8px;font-size:12px;opacity:.7">Картинки, PDF и JSON</p>
           <p class="widget-meta">Bucket: media · публичный доступ</p>
         </div>
-        <div class="media-grid" id="media-grid"><div class="loading-state">Загрузка…</div></div>
+        <div class="media-grid" id="media-grid"><div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div></div>
       </div>
 
       <!-- NEWS -->
       <div class="view" id="view-news">
+        <div class="chip-tabs" id="news-subtabs" role="tablist" aria-label="Раздел новостей">
+          <button type="button" class="chip-tab active" role="tab" data-pane="news" aria-selected="true">Новости</button>
+          <button type="button" class="chip-tab" role="tab" data-pane="updates" data-super aria-selected="false">Обновления</button>
+        </div>
+        <div id="news-pane-news">
         <div class="section-title">Новости</div>
         <p class="widget-meta" id="news-role-note"></p>
         <div id="news-form-wrap">
@@ -189,7 +198,18 @@
           </form>
         </div>
         <div class="section-title" style="margin-top:20px">Последние новости</div>
-        <div id="news-admin-list" class="team-list"><div class="loading-state">Загрузка…</div></div>
+        <div id="news-admin-list" class="team-list"><div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div></div>
+      </div>
+        <div id="news-pane-updates" data-super hidden>
+          <section class="settings-card glass" id="set-changelog" aria-labelledby="set-changelog-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">≡</span><div><h3 id="set-changelog-h">Обновления (changelog)</h3><p>Первая версия в списке — текущая: её показывают чипы версии на всех сайтах и бот. Один пункт — одна строка. Порядок меняется перетаскиванием ⠿ или стрелками.</p></div></header>
+            <div id="cl-editor"></div>
+            <div class="modal-actions" style="margin-top:14px">
+              <button type="button" class="btn btn-ghost" id="cl-add">+ Добавить версию</button>
+              <button type="button" class="btn btn-primary" id="cl-save" style="width:auto;flex:1">Сохранить и обновить везде</button>
+            </div>
+          </section>
+        </div>
       </div>
 
       <!-- SETTINGS -->
@@ -205,38 +225,17 @@
           </section>
 
           <section class="settings-card glass" id="set-profile" aria-labelledby="set-profile-h">
-            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">☺</span><div><h3 id="set-profile-h">Профиль</h3><p>Имя и почта, которые видны в панели.</p></div></header>
-            <div class="form-row">
-              <div class="form-group"><label for="pf-nickname">Никнейм</label><input id="pf-nickname" maxlength="40" placeholder="Boss" autocomplete="nickname"></div>
-              <div class="form-group"><label for="pf-email">Email</label><input id="pf-email" type="email" maxlength="120" placeholder="founder@amoore.ru" autocomplete="email"></div>
-            </div>
-            <p class="settings-note">⚠ Здесь меняется email профиля. Email для входа хранится в Supabase Auth — после смены обновите его и там (Supabase → Authentication → Users), иначе вход по новому адресу не заработает.</p>
-            <button type="button" class="btn btn-primary" id="pf-save">Сохранить профиль</button>
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">☺</span><div><h3 id="set-profile-h">Профиль</h3><p>Единый профиль amoore ID — такой же, как на сайте: аватарка, никнейм, привязка Телеграма.</p></div></header>
+            <div id="set-profile-host" class="aid-host"><div class="skeleton-stack" aria-label="Профиль загружается"><i></i><i></i><i></i></div></div>
           </section>
 
-          <section class="settings-card glass" id="set-changelog" data-super aria-labelledby="set-changelog-h">
-            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">≡</span><div><h3 id="set-changelog-h">Управление Changelog</h3><p>Первая версия в списке — текущая: её показывают чипы версии на всех сайтах и бот. Один пункт — одна строка. Порядок меняется перетаскиванием ⠿ или стрелками.</p></div></header>
-            <div id="cl-editor"></div>
-            <div class="modal-actions" style="margin-top:14px">
-              <button type="button" class="btn btn-ghost" id="cl-add">+ Добавить версию</button>
-              <button type="button" class="btn btn-primary" id="cl-save" style="width:auto;flex:1">Сохранить и обновить везде</button>
-            </div>
-          </section>
+          
 
-          <section class="settings-card glass" id="set-roles" data-super aria-labelledby="set-roles-h">
-            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">♛</span><div><h3 id="set-roles-h">Управление ролями</h3><p>Переименуйте роли под себя. Названия видны в админке, на сайтах и в боте; внутренние ключи ролей не меняются.</p></div></header>
-            <div class="form-row">
-              <div class="form-group"><label for="rl-super_admin">Основатель <small>super_admin</small></label><input id="rl-super_admin" maxlength="32" placeholder="Основатель"></div>
-              <div class="form-group"><label for="rl-admin">Админ <small>admin</small></label><input id="rl-admin" maxlength="32" placeholder="Админ"></div>
-              <div class="form-group"><label for="rl-moderator">Модератор <small>moderator</small></label><input id="rl-moderator" maxlength="32" placeholder="Модератор"></div>
-            </div>
-            <button type="button" class="btn btn-primary" id="role-labels-save">Сохранить названия</button>
-          </section>
+          
 
-          <section class="settings-card glass" id="set-backup" aria-labelledby="set-backup-h">
-            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">⇩</span><div><h3 id="set-backup-h">Бэкап</h3><p>Сайты, новости и пользователи (без токенов доступа) одним JSON-файлом.</p></div></header>
-            <button type="button" class="btn btn-primary" id="backup-btn"><span id="backup-btn-text">Скачать JSON-бэкап базы</span></button>
-          </section>
+          
+
+          
 
         </div>
       </div>
@@ -254,9 +253,9 @@
               <div class="form-group"><label>Никнейм</label><input type="text" id="new-nickname" required></div>
               <div class="form-group"><label>Роль</label>
                 <select id="new-role">
-                  <option value="moderator">moderator</option>
-                  <option value="admin">admin</option>
-                  <option value="super_admin">super_admin</option>
+                  <option value="moderator">Модератор</option>
+                  <option value="admin">Администратор</option>
+                  <option value="super_admin">Основатель</option>
                 </select>
               </div>
             </div>
@@ -270,7 +269,18 @@
         </div>
         <div class="section-title">Команда</div>
         <p class="widget-meta" id="team-online-line" style="margin:-6px 0 12px"></p>
-        <div class="team-list" id="team-list"><div class="loading-state">Загрузка…</div></div>
+        <div class="team-list" id="team-list"><div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div>
+        <div class="settings-stack" style="margin-top:24px">
+          <section class="settings-card glass" id="set-roles" data-super aria-labelledby="set-roles-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">♛</span><div><h3 id="set-roles-h">Управление ролями</h3><p>Переименуйте роли под себя. Названия видны в админке, на сайтах и в боте; внутренние ключи ролей не меняются.</p></div></header>
+            <div class="form-row">
+              <div class="form-group"><label for="rl-super_admin">Основатель</label><input id="rl-super_admin" maxlength="32" placeholder="Основатель"></div>
+              <div class="form-group"><label for="rl-admin">Админ</label><input id="rl-admin" maxlength="32" placeholder="Админ"></div>
+              <div class="form-group"><label for="rl-moderator">Модератор</label><input id="rl-moderator" maxlength="32" placeholder="Модератор"></div>
+            </div>
+            <button type="button" class="btn btn-primary" id="role-labels-save">Сохранить названия</button>
+          </section>
+        </div></div>
       </div>
 
       <!-- LOGS -->
@@ -292,11 +302,11 @@
       <div class="view" id="view-leads">
         <h2>Заявки с лендинга</h2>
         <p class="muted">Форма «Оставить заявку» на amoore-ru</p>
-        <div id="leads-list" class="stack" style="margin-top:16px"><div class="loading-state">Загрузка…</div></div>
+        <div id="leads-list" class="stack" style="margin-top:16px"><div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div></div>
       </div>
 
       <div class="view" id="view-people">
-        <h2>Люди</h2><p class="muted">Все аккаунты Amoore ID. Доступно только Super Admin.</p>
+        <h2>Люди</h2><p class="muted">Все аккаунты amoore ID. Доступно только основателю.</p>
         <input type="search" id="people-search" placeholder="Поиск по email или username" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.05);color:inherit;font-size:16px;margin-top:12px">
         <div id="people-list" class="stack" style="margin-top:16px"></div>
       </div>
@@ -309,7 +319,7 @@
             <option value="">Все события</option>
             <option value="login">Вход и выход</option>
             <option value="password">Смена пароля</option>
-            <option value="profile">Профиль и Telegram</option>
+            <option value="profile">Профиль и Телеграм</option>
             <option value="security">Безопасность и роли</option>
             <option value="content">Контент</option>
             <option value="crm">Заявки (CRM)</option>
@@ -318,7 +328,7 @@
         <div class="logs-wrap glass" style="padding:0;overflow:hidden">
           <table class="logs-table">
             <thead><tr><th>Кто</th><th>Действие</th><th>Сайт</th><th>Заставка</th><th>Время</th></tr></thead>
-            <tbody id="logs-tbody"><tr><td colspan="5" class="loading-state">Загрузка…</td></tr></tbody>
+            <tbody id="logs-tbody"><tr><td colspan="5"><div class="skeleton-stack" aria-label="Загрузка"><i></i><i></i><i></i></div></td></tr></tbody>
           </table>
           <div class="logs-cards" id="logs-cards"></div>
         </div>
@@ -432,11 +442,11 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="amoore-id.js?v=5.1.0"></script>
-<script src="amoore-pwa.js?v=5.1.0" defer></script>
-<script src="amoore-cmdk.js?v=5.1.0" defer></script>
-  <script src="digest.js?v=5.1.0"></script>
-  <script src="app.js?v=5.1.0"></script>
-  <script src="amoore-admin-v5.js?v=5.1.0"></script>
+  <script src="amoore-id.js?v=5.2.0"></script>
+<script src="amoore-pwa.js?v=5.2.0" defer></script>
+<script src="amoore-cmdk.js?v=5.2.0" defer></script>
+  <script src="digest.js?v=5.2.0"></script>
+  <script src="app.js?v=5.2.0"></script>
+  <script src="amoore-admin-v5.js?v=5.2.0"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 /**
- * amoore-cmdk.js — v5.1.0 · Command Palette (Cmd/Ctrl+K). Побайтно одинаков во всех сайтах.
+ * amoore-cmdk.js — v5.2.0 · Command Palette (Cmd/Ctrl+K). Побайтно одинаков во всех сайтах.
  * Команды: переход между сайтами (с SSO, если вы вошли), смена темы, поиск новостей из AMOORE_STATE.news.
  * Расширение: amooreCmdk.register({ title, hint, run }).
  */
@@ -29,6 +29,13 @@
     var list = Object.keys(SITES).map(function (n) { return { title: 'Перейти: ' + n, hint: 'сайт', run: function () { go(n); } }; });
     list.push({ title: 'Сменить тему', hint: 'оформление', run: function () { if (window.amooreUX && amooreUX.toggleTheme) amooreUX.toggleTheme(); else { var r = document.documentElement, t = r.getAttribute('data-theme') === 'light' ? 'dark' : 'light'; r.setAttribute('data-theme', t); try { localStorage.setItem('theme', t); } catch (e) {} } } });
     if (window.amooreID && amooreID.sb) list.push({ title: 'Профиль и устройства', hint: 'аккаунт', run: function () { amooreID.openProfile(); } });
+    // v5.2: поиск по разделам текущего сайта — вкладки шапки (на всех сайтах это .ux-tab)
+    var tabs = document.querySelectorAll('.ux-tab'), seen = {};
+    Array.prototype.forEach.call(tabs, function (t) {
+      var name = (t.firstChild && t.firstChild.nodeType === 3 ? t.firstChild.textContent : t.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!name || seen[name] || t.hidden || t.offsetParent === null && !t.getClientRects().length && false) return; seen[name] = 1;
+      list.unshift({ title: 'Раздел: ' + name, hint: 'навигация', run: function () { t.click(); } });
+    });
     list = list.concat(extra);
     var news = (window.AMOORE_STATE && AMOORE_STATE.news) || [];
     if (q) news.forEach(function (n) { if (n && n.title) list.push({ title: n.title, hint: 'новость', run: function () { var el = document.querySelector('[data-news-id="' + n.id + '"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); else location.hash = '#news'; } }); });

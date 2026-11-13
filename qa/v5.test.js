@@ -41,9 +41,9 @@ check('токен SSO и ссылки стираются из адресной �
 check('нет innerHTML в amoore-id.js (XSS)', !/innerHTML/.test(idCode));
 
 // ---- версии
-const v = '5.1.0';
-check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.1.0'/.test(read('amoore-ru/amoore-core.js')));
-check('версия в bot.py', /AMOORE_VERSION = "5.1.0"/.test(read('amoore-ai/bot.py')));
+const v = '5.2.0';
+check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.2.0'/.test(read('amoore-ru/amoore-core.js')));
+check('версия в bot.py', /AMOORE_VERSION = "5.2.0"/.test(read('amoore-ai/bot.py')));
 for (const d of ['amoore-dev', 'amoore-ru', 'amoore-studio', 'amoore-ai']) check(`changelog ${d}`, JSON.parse(read(`${d}/changelog.json`)).current === v);
 
 // ---- PWA
@@ -79,7 +79,7 @@ check('SQL: RLS включён на новых таблицах', ['business_aut
 check('SQL: public_profile отдаёт только username/avatar/bio/публичные сайты', /function public\.public_profile/.test(sql) && !/'email'/.test(sql.slice(sql.indexOf('function public.public_profile'), sql.indexOf('function public.public_profile') + 900)));
 check('SQL: теги заявок ограничены VIP/Спам/В ожидании', /tags <@ array\['vip','spam','pending'\]/.test(sql));
 check('SQL: Realtime для leads/site_visits/audit_logs', /supabase_realtime/.test(sql) && /'site_visits'/.test(sql));
-check('SQL: changelog 5.1.0 (26.11.2026) в таблице и global_settings', (sql.match(/5\.1\.0/g) || []).length >= 4 && /2026-11-26/.test(sql));
+check('SQL: changelog 5.1.0 и 5.2.0 в таблице и global_settings', (sql.match(/5\.1\.0/g) || []).length >= 4 && (sql.match(/5\.2\.0/g) || []).length >= 4 && /2026-11-26/.test(sql));
 
 check('Edge push-news: защита от повторов и очистка мёртвых подписок', /push_sent_at/.test(read('supabase/functions/push-news/index.ts')) && /404 \|\| code === 410/.test(read('supabase/functions/push-news/index.ts')));
 check('Edge push-news: секрет вебхука сравнивается и нужен ≥16 символов', /secret\.length >= 16/.test(read('supabase/functions/push-news/index.ts')));
@@ -97,10 +97,10 @@ check('бот: заявки приходят с кнопками «Взять в
 check('бот: бизнес-ассистент читает business_automations и отвечает на «Вы» без смайликов', /fetch_business_automation/.test(bot) && /на «Вы»/.test(bot) && /sanitize_business_reply/.test(bot));
 const css = read('amoore-dev/style.css');
 check('CSS: .lead-card / .news-card — column, gap 12px, без space-between', /\.lead-card, \.news-card \{[^}]*flex-direction: column;[^}]*gap: 12px/.test(css) && !/\.lead-card[^{]*\{[^}]*space-between/.test(css));
-check('админка: ошибка рассылки «Ошибка: проверьте BOT_TOKEN»', /Ошибка: проверьте BOT_TOKEN/.test(read('amoore-dev/app.js')));
+check('админка: рассылка полностью удалена (v5.2)', !/telegram-broadcast-btn|broadcast-card/.test(read('amoore-dev/app.js') + read('amoore-dev/index.html')));
 check('админка: теги заявок, CSV, фильтр журнала, Realtime-графики', /Экспорт в CSV/.test(read('amoore-dev/amoore-admin-v5.js')) && /amoore-live-activity/.test(read('amoore-dev/amoore-admin-v5.js')) && /id="logs-filter"/.test(read('amoore-dev/index.html')));
 const cl = JSON.parse(read('amoore-ru/changelog.json')).versions[0];
-check('changelog: v5.1 MASTER от 2026-11-26', cl.version === '5.1.0' && cl.title === 'v5.1 MASTER' && cl.date === '2026-11-26' && cl.items.length >= 6);
+check('changelog: v5.2 POLISH & SYNC от 2026-11-26', cl.version === '5.2.0' && cl.title === 'v5.2 POLISH & SYNC' && cl.date === '2026-11-27' && cl.items.length >= 6);
 
 console.log(`v5: ${pass}/${pass + fail} проверок пройдено`);
 process.exit(fail ? 1 : 0);

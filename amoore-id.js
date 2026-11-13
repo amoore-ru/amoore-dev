@@ -1,9 +1,9 @@
 /**
- * amoore-id.js — v5.1.0 «MASTER» · Amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
+ * amoore-id.js — v5.2.0 «POLISH & SYNC» · amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
  * Подключение (после supabase-js):  <script src="amoore-id.js"></script>
  *   amooreID.init({ site: 'dev'|'studio'|'landing', sb: <существующий клиент, необязательно> })
  * API: signIn(email,pw) · sendCode/verifyCode · sendMagicLink · consumeUrl() (magic link + SSO) · ensureOnboarded()
- *      openProfile() / renderProfile(host) (вкладки: Профиль · Бизнес-ассистент · Rewards · Безопасность · Уведомления) · ssoOpen(target) · listSessions/revokeOthers · linkTelegram · people.* (только Boss)
+ *      openProfile() / renderProfile(host) (вкладки: Профиль · Бизнес-ассистент · Баллы · Безопасность · Уведомления) · ssoOpen(target) · listSessions/revokeOthers · linkTelegram · people.* (только Boss)
  */
 (function () {
   'use strict';
@@ -13,6 +13,29 @@
   var SITES = { dev: 'https://amoore-dev.pages.dev/', studio: 'https://amoore-studio.pages.dev/', landing: 'https://amoore.ru/' };
   var sb = null, site = 'landing', profile = null;
   var USERNAME_RE = /^[a-z0-9_]{3,24}$/;
+  // v5.2: подписи ролей — только по-русски (названия можно переопределить в «Команда → Управление ролями»)
+  var ROLE_RU = { user: 'Пользователь', moderator: 'Модератор', admin: 'Администратор', super_admin: 'Основатель' };
+  var roleOverrides = null;
+  function roleRu(role) { return (roleOverrides && roleOverrides[role]) || ROLE_RU[role] || role; }
+  function loadRoleLabels() {
+    if (roleOverrides || !sb) return Promise.resolve();
+    return Promise.resolve(sb.from('global_settings').select('value').eq('key', 'role_labels').maybeSingle())
+      .then(function (r) { roleOverrides = (r && r.data && r.data.value && typeof r.data.value === 'object') ? r.data.value : {}; }, function () { roleOverrides = {}; });
+  }
+  var AVATAR_COLORS = ['#d4af37', '#8b7cf7', '#3ddc84', '#ff7b7b', '#4cc9f0', '#f78fb3', '#ff9f43', '#6c8cff'];
+  function initial(p) { var n = String((p && (p.display_name || p.username)) || '?').trim(); return (n.charAt(0) || '?').toUpperCase(); }
+  function avatarEl(p, cls) {
+    cls = cls || 'aid-av';
+    if (p && p.avatar_url) return el('img', { class: cls, alt: '', src: p.avatar_url });
+    return el('div', { class: cls + ' aid-av-ph', 'aria-hidden': 'true', text: initial(p), style: 'background:' + ((p && p.avatar_color) || AVATAR_COLORS[0]) });
+  }
+  // v5.2: Студия сообщает о публикации — проект появляется в «Мои сайты» профиля amoore ID (уникально по адресу)
+  async function registerSite(title, url) {
+    var u = await user(); if (!u || !/^https:\/\/[^\s]{3,300}$/i.test(String(url || ''))) return false;
+    var r = await sb.from('user_sites').upsert({ user_id: u.id, title: String(title || 'Сайт').slice(0, 80), url: url, is_public: true }, { onConflict: 'user_id,url' });
+    return !r.error;
+  }
+  function announce(p) { try { document.dispatchEvent(new CustomEvent('amoore:profile', { detail: p })); } catch (e) {} }
 
   function el(tag, attrs, kids) {
     var n = document.createElement(tag);
@@ -132,8 +155,8 @@
   async function getProfile(force) {
     if (profile && !force) return profile;
     var u = await user(); if (!u) return null;
-    var r = await sb.from('profiles').select('id,username,avatar_url,role,telegram_id,is_banned,ban_reason,onboarded,rewards_balance,bio,is_public,referred_by').eq('id', u.id).maybeSingle();
-    profile = r.data || null; return profile;
+    var r = await sb.from('profiles').select('id,username,avatar_url,role,telegram_id,is_banned,ban_reason,onboarded,rewards_balance,bio,is_public,referred_by,display_name,avatar_color').eq('id', u.id).maybeSingle();
+    profile = r.data || null; window.amooreProfileCache = profile; if (profile) announce(profile); return profile;
   }
   function toWebp(file, size) {
     return new Promise(function (ok, bad) {
@@ -148,23 +171,27 @@
       img.src = url;
     });
   }
-  async function saveProfile(username, file) {
+  async function saveProfile(username, file, color) {
     var u = await user(); if (!u) throw new Error('Нужно войти');
     username = (username || '').trim().toLowerCase();
-    if (!USERNAME_RE.test(username)) throw new Error('Username: 3–24 символа, a–z, 0–9 и _');
+    if (!USERNAME_RE.test(username)) throw new Error('Никнейм (username): 3–24 символа, a–z, 0–9 и _');
     var p = await getProfile(), url = p && p.avatar_url;
-    if (file) {
-      if (file.size > 8 * 1024 * 1024) throw new Error('Файл больше 8 МБ');
-      var blob = await toWebp(file, 256), path = u.id + '/avatar.webp';
-      var up = await sb.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/webp', cacheControl: '3600' });
-      if (up.error) throw new Error(err(up.error));
-      url = sb.storage.from('avatars').getPublicUrl(path).data.publicUrl + '?v=' + Date.now();
-    }
-    if (!url) throw new Error('Загрузите аватарку');
-    var r = await sb.from('profiles').update({ username: username, avatar_url: url }).eq('id', u.id);
+    if (file) url = await uploadAvatar(file, u);
+    color = color || (p && p.avatar_color) || '';
+    if (!url && !color) throw new Error('Загрузите фото или выберите цвет аватарки');
+    var patch = { username: username, avatar_url: url || '' };
+    if (color) patch.avatar_color = color;
+    var r = await sb.from('profiles').update(patch).eq('id', u.id);
     if (r.error) throw new Error(err(r.error));
     await sb.rpc('log_event', { p_action: 'profile_update' });
-    return getProfile(true);
+    var np = await getProfile(true); announce(np); return np;
+  }
+  async function uploadAvatar(file, u) {
+    if (file.size > 8 * 1024 * 1024) throw new Error('Файл больше 8 МБ');
+    var blob = await toWebp(file, 256), path = u.id + '/avatar.webp';
+    var up = await sb.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/webp', cacheControl: '3600' });
+    if (up.error) throw new Error(err(up.error));
+    return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl + '?v=' + Date.now();
   }
 
   var CSS = '.aid-ov{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));background:rgba(7,11,22,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-family:var(--nx-font-body,system-ui,sans-serif)}' +
@@ -178,7 +205,9 @@
     '.aid-f{display:block;margin:0 0 12px}.aid-f>span{display:block;font-size:12px;color:var(--nx-muted,#8b90a5);margin-bottom:4px}.aid-inl{display:flex;align-items:center;gap:10px}.aid-card textarea,.aid-card input[type=password],.aid-card input[readonly]{width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.05);color:inherit;font:16px var(--nx-font-body,system-ui);margin-bottom:12px;resize:vertical}' +
     '.aid-hint{font-size:12px;color:var(--nx-muted,#8b90a5);margin:6px 0 12px;overflow-wrap:anywhere}.aid-hint a{color:inherit}.aid-big{font:800 32px var(--nx-font-head,system-ui);margin:4px 0 8px}.aid-x{border:0;background:none;color:inherit;font-size:22px;line-height:1;cursor:pointer;padding:0 6px}' +
     '.aid-sw{appearance:none;-webkit-appearance:none;width:46px;height:28px;border-radius:999px;background:rgba(255,255,255,.16);position:relative;cursor:pointer;flex:0 0 46px;margin:0;transition:background .2s}.aid-sw:before{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s}.aid-sw:checked{background:#d4af37}.aid-sw:checked:before{transform:translateX(18px)}' +
-    '.aid-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid rgba(212,175,55,.12);font-size:13px}.aid-row small{color:var(--nx-muted,#8b90a5)}';
+    '.aid-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid rgba(212,175,55,.12);font-size:13px}.aid-row small{color:var(--nx-muted,#8b90a5)}' +
+    '.aid-av-ph{display:flex;align-items:center;justify-content:center;font:800 34px var(--nx-font-head,system-ui);color:#17151d;border-color:rgba(255,255,255,.25)}.aid-pal{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}.aid-sw-c{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;box-shadow:0 0 0 1px rgba(255,255,255,.2)}.aid-sw-c.on{border-color:#fff;box-shadow:0 0 0 2px rgba(212,175,55,.9)}' +
+    '.aid-inline{max-width:100%;max-height:none;overflow:visible;box-shadow:none;border:0;background:transparent;padding:0}.aid-role{display:inline-block;padding:3px 12px;border-radius:999px;font:700 12px var(--nx-font-body,system-ui);background:rgba(212,175,55,.16);color:var(--nx-gold,#d4af37);border:1px solid rgba(212,175,55,.35)}.aid-center{text-align:center}.aid-card input,.aid-card textarea,.aid-card select{box-sizing:border-box;max-width:100%}.aid-card{overflow-x:hidden}';
   function ensureCss() { if (!document.getElementById('aid-css')) { var s = el('style', { id: 'aid-css' }); s.textContent = CSS; document.head.appendChild(s); } }
   function overlay(card) { ensureCss(); var ov = el('div', { class: 'aid-ov', role: 'dialog', 'aria-modal': 'true' }, [card]); document.body.appendChild(ov); return ov; }
 
@@ -189,23 +218,28 @@
       if (p.is_banned) { alert('Аккаунт заблокирован' + (p.ban_reason ? ': ' + p.ban_reason : '')); return signOut().then(function () { return null; }); }
       if (p.onboarded) return p;
       return new Promise(function (done) {
-        var av = el('img', { class: 'aid-av', alt: '', src: p.avatar_url || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' });
-        var file = el('input', { type: 'file', accept: 'image/*', hidden: '' }), name = el('input', { type: 'text', placeholder: 'username', maxlength: '24', autocomplete: 'off', autocapitalize: 'none' });
-        name.value = p.username || ''; var msg = el('div', { class: 'aid-err', role: 'alert' }), picked = null;
-        file.addEventListener('change', function () { picked = file.files[0]; if (picked) av.src = URL.createObjectURL(picked); });
+        var picked = null, color = p.avatar_color || AVATAR_COLORS[0], avWrap = el('div', { class: 'aid-center' });
+        function paintAv() { avWrap.textContent = ''; avWrap.appendChild(avatarEl({ username: name.value || p.username, avatar_url: picked ? URL.createObjectURL(picked) : p.avatar_url, avatar_color: color })); }
+        var file = el('input', { type: 'file', accept: 'image/*', hidden: '' }), name = el('input', { type: 'text', placeholder: 'никнейм (латиницей)', maxlength: '24', autocomplete: 'off', autocapitalize: 'none' });
+        name.value = p.username || ''; var msg = el('div', { class: 'aid-err', role: 'alert' });
+        file.addEventListener('change', function () { picked = file.files[0] || null; paintAv(); });
+        name.addEventListener('input', function () { if (!picked && !p.avatar_url) paintAv(); });
+        var pal = el('div', { class: 'aid-pal', role: 'radiogroup', 'aria-label': 'Цвет аватарки' });
+        AVATAR_COLORS.forEach(function (c) { pal.appendChild(el('button', { type: 'button', class: 'aid-sw-c' + (c === color ? ' on' : ''), style: 'background:' + c, 'aria-label': 'Цвет ' + c, onclick: function () { color = c; Array.prototype.forEach.call(pal.children, function (b) { b.classList.toggle('on', b.style.background === c || b.getAttribute('aria-label') === 'Цвет ' + c); }); paintAv(); } })); });
+        paintAv();
         var go = el('button', { class: 'aid-btn', type: 'button', text: 'Продолжить' });
         go.addEventListener('click', function () {
           go.disabled = true; msg.textContent = '';
-          saveProfile(name.value, picked).then(function (np) { ov.remove(); done(np); }).catch(function (e) { msg.textContent = err(e); go.disabled = false; });
+          saveProfile(name.value, picked, picked || p.avatar_url ? '' : color).then(function (np) { ov.remove(); done(np); }).catch(function (e) { msg.textContent = err(e); go.disabled = false; });
         });
         var out = el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Выйти', onclick: function () { signOut().then(function () { ov.remove(); done(null); }); } });
-        var ov = overlay(el('div', { class: 'aid-card' }, [el('h2', { text: 'Добро пожаловать в amoore' }), el('p', { text: 'Выберите username и аватарку — без них внутренние функции недоступны.' }),
-          av, el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Выбрать фото', onclick: function () { file.click(); } }), file, el('div', { style: 'height:12px' }), name, msg, go, out]));
+        var ov = overlay(el('div', { class: 'aid-card' }, [el('h2', { text: 'Добро пожаловать в amoore' }), el('p', { text: 'Выберите никнейм и аватарку: загрузите фото или просто выберите цвет — без этого внутренние функции недоступны.' }),
+          avWrap, el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Загрузить фото', onclick: function () { file.click(); } }), file, el('div', { style: 'height:12px' }), pal, name, msg, go, out]));
       });
     });
   }
 
-  // ---------------------------------------------------------------- устройства, Telegram
+  // ---------------------------------------------------------------- устройства, Телеграм
   async function listSessions() { var r = await sb.from('user_sessions').select('id,user_agent,ip,created_at,last_seen_at').order('last_seen_at', { ascending: false }); if (r.error) throw new Error(err(r.error)); return r.data; }
   async function revokeOthers() { var r = await sb.rpc('revoke_other_sessions'); if (r.error) throw new Error(err(r.error)); return r.data; }
   async function linkTelegram(code) { var r = await sb.rpc('link_telegram', { p_code: String(code).trim() }); if (r.error) throw new Error(err(r.error)); return r.data; }
@@ -215,7 +249,7 @@
     return b + (o ? ' · ' + o : '');
   }
   // ---------------------------------------------------------------- профиль с вкладками (модалка или inline-панель на лендинге)
-  var TABS = [['profile', 'Профиль'], ['business', 'Бизнес-ассистент'], ['rewards', 'Rewards'], ['security', 'Безопасность'], ['notify', 'Уведомления']];
+  var TABS = [['profile', 'Профиль'], ['business', 'Бизнес-ассистент'], ['rewards', 'Баллы'], ['security', 'Безопасность'], ['notify', 'Уведомления']];
   function fmtDt(d) { return new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
   function field(label, node) { return el('label', { class: 'aid-f' }, [el('span', { text: label }), node]); }
   function toggle(on, onchange) {
@@ -227,18 +261,39 @@
   function say(msg, text, good) { msg.style.color = good ? '#3ddc84' : ''; msg.textContent = text || ''; }
 
   async function tabProfile(p, box, reload) {
+    await loadRoleLabels();
     var msg = el('div', { class: 'aid-err', role: 'status' });
+    var color = p.avatar_color || AVATAR_COLORS[0], avWrap = el('div', { class: 'aid-center' });
+    function paintAv() { avWrap.textContent = ''; avWrap.appendChild(avatarEl({ username: p.username, display_name: nick.value || p.display_name, avatar_url: p.avatar_url, avatar_color: color })); }
+    var nick = el('input', { type: 'text', maxlength: '40', placeholder: 'Как вас называть', autocomplete: 'nickname', id: 'aid-nick' }); nick.value = p.display_name || '';
     var bio = el('textarea', { maxlength: '300', rows: '3', placeholder: 'Коротко о себе (до 300 символов)' }); bio.value = p.bio || '';
     var pub = toggle(p.is_public, null);
-    box.appendChild(el('img', { class: 'aid-av', alt: '', src: p.avatar_url || '' }));
-    box.appendChild(el('h2', { text: '@' + (p.username || '—'), style: 'text-align:center' }));
-    box.appendChild(el('p', { text: 'Роль: ' + p.role, style: 'text-align:center' }));
+    var file = el('input', { type: 'file', accept: 'image/*', hidden: '' });
+    var pal = el('div', { class: 'aid-pal', role: 'radiogroup', 'aria-label': 'Цвет аватарки' });
+    AVATAR_COLORS.forEach(function (c) { pal.appendChild(el('button', { type: 'button', class: 'aid-sw-c' + (c === color ? ' on' : ''), 'data-c': c, style: 'background:' + c, 'aria-label': 'Цвет ' + c, onclick: function () {
+      color = c; Array.prototype.forEach.call(pal.children, function (b2) { b2.classList.toggle('on', b2.getAttribute('data-c') === c); }); paintAv(); } })); });
+    nick.addEventListener('input', paintAv);
+    file.addEventListener('change', function () {
+      var f = file.files && file.files[0]; if (!f) return; say(msg, 'Загружаю фото…');
+      user().then(function (u) { return uploadAvatar(f, u); }).then(function (url) { return sb.from('profiles').update({ avatar_url: url }).eq('id', p.id).then(function (r) { if (r.error) throw r.error; p.avatar_url = url; paintAv(); say(msg, 'Фото обновлено', true); return getProfile(true).then(announce); }); })
+        .catch(function (e) { say(msg, err(e)); });
+    });
+    paintAv();
+    box.appendChild(avWrap);
+    box.appendChild(el('div', { class: 'aid-center', style: 'margin:0 0 12px' }, [el('h2', { text: p.display_name || ('@' + (p.username || '—')), style: 'margin:0 0 6px' }), el('span', { class: 'aid-role', id: 'aid-role', text: roleRu(p.role) })]));
+    box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Загрузить фото', onclick: function () { file.click(); } })); box.appendChild(file);
+    if (p.avatar_url) box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Убрать фото (будет цвет)', onclick: function () {
+      sb.from('profiles').update({ avatar_url: '', avatar_color: color }).eq('id', p.id).then(function (r) { if (r.error) return say(msg, err(r.error)); p.avatar_url = ''; paintAv(); getProfile(true).then(announce); reload && reload(); }); } }));
+    box.appendChild(el('p', { class: 'aid-hint', text: 'Цвет аватарки (если нет фото):', style: 'margin-top:14px' })); box.appendChild(pal);
+    box.appendChild(field('Никнейм', nick));
     box.appendChild(field('О себе', bio));
     box.appendChild(el('label', { class: 'aid-f aid-inl' }, [pub, el('span', { text: 'Публичная страница профиля' })]));
     box.appendChild(el('p', { class: 'aid-hint' }, [el('a', { href: publicUrl(p), text: publicUrl(p) })]));
-    box.appendChild(el('button', { class: 'aid-btn', type: 'button', text: 'Сохранить', onclick: function () {
-      sb.from('profiles').update({ bio: bio.value.trim().slice(0, 300), is_public: pub.checked }).eq('id', p.id).then(function (r) {
-        if (r.error) return say(msg, err(r.error)); profile = null; sb.rpc('log_event', { p_action: 'profile_update' }).then(function () {}); say(msg, 'Сохранено', true); }); } }));
+    box.appendChild(el('button', { class: 'aid-btn', type: 'button', id: 'aid-save', text: 'Сохранить', onclick: function () {
+      var dn = nick.value.trim().slice(0, 40);
+      sb.from('profiles').update({ display_name: dn || null, avatar_color: color, bio: bio.value.trim().slice(0, 300), is_public: pub.checked }).eq('id', p.id).then(function (r) {
+        if (r.error) return say(msg, err(r.error)); sb.rpc('log_event', { p_action: 'profile_update' }).then(function () {});
+        say(msg, 'Сохранено', true); return getProfile(true).then(announce); }); } }));
     // мои сайты
     box.appendChild(el('h2', { text: 'Мои сайты', style: 'font-size:16px;margin-top:18px' }));
     box.appendChild(el('p', { text: 'Публичные сайты показываются на вашей странице профиля. Только https://', class: 'aid-hint' }));
@@ -260,15 +315,15 @@
       if (!/^https:\/\/[^\s]{3,300}$/i.test(su.value.trim()) || !st.value.trim()) return say(msg, 'Укажите название и адрес, начинающийся с https://');
       sb.from('user_sites').insert({ title: st.value.trim(), url: su.value.trim(), is_public: true }).then(function (r) { if (r.error) return say(msg, err(r.error)); st.value = ''; su.value = ''; say(msg, ''); paintSites(); }); } }));
     paintSites();
-    // Telegram
-    box.appendChild(el('h2', { text: 'Telegram', style: 'font-size:16px;margin-top:18px' }));
-    var code = el('input', { type: 'text', inputmode: 'numeric', maxlength: '6', placeholder: '6-значный код из бота (/link)' });
-    if (p.telegram_id) box.appendChild(el('p', { text: 'Telegram привязан ✓ (ID ' + p.telegram_id + ')' }));
-    else { box.appendChild(code); box.appendChild(el('button', { class: 'aid-btn', type: 'button', text: 'Привязать Telegram', onclick: function () { linkTelegram(code.value).then(reload).catch(function (e) { say(msg, err(e)); }); } })); }
+    // Телеграм
+    box.appendChild(el('h2', { text: 'Телеграм', style: 'font-size:16px;margin-top:18px' }));
+    var code = el('input', { type: 'text', inputmode: 'numeric', maxlength: '6', placeholder: '6-значный код из бота (/link)', autocomplete: 'one-time-code' });
+    if (p.telegram_id) box.appendChild(el('p', { text: 'Телеграм привязан ✓ (ID ' + p.telegram_id + ')' }));
+    else { box.appendChild(el('p', { class: 'aid-hint', text: 'Откройте бота, отправьте ему /link в личных сообщениях и введите полученный код.' })); box.appendChild(code); box.appendChild(el('button', { class: 'aid-btn', type: 'button', text: 'Привязать Телеграм', onclick: function () { linkTelegram(code.value).then(reload).catch(function (e) { say(msg, err(e)); }); } })); }
     box.appendChild(msg);
   }
 
-  // Бизнес-ассистент (Telegram Business): настройки читает бот (amoore-ai) из business_automations
+  // Бизнес-ассистент (Телеграм Business): настройки читает бот (amoore-ai) из business_automations
   async function tabBusiness(p, box) {
     var msg = el('div', { class: 'aid-err', role: 'status' });
     var r = await sb.from('business_automations').select('is_enabled,company_name,working_hours,custom_instructions').eq('user_id', p.id).maybeSingle();
@@ -278,10 +333,10 @@
     var hours = el('input', { type: 'text', maxlength: '200', placeholder: 'Пн–Пт 10:00–19:00 (МСК)', id: 'biz-hours' }); hours.value = d.working_hours || '';
     var ins = el('textarea', { maxlength: '2000', rows: '6', placeholder: 'Услуги, цены, условия, что отвечать на частые вопросы, чего не обещать…', id: 'biz-instructions' }); ins.value = d.custom_instructions || '';
     box.appendChild(el('h2', { text: 'AI Бизнес-ассистент', style: 'font-size:18px' }));
-    box.appendChild(el('p', { text: 'Отвечает клиентам в ваших личных чатах Telegram от вашего имени: официально, на «Вы», без смайликов. Нужен Telegram Premium: Настройки → Telegram для бизнеса → Чат-боты → @asoave_bot. Telegram должен быть привязан к профилю.' }));
+    box.appendChild(el('p', { text: 'Отвечает клиентам в ваших личных чатах Телеграм от вашего имени: официально, на «Вы», без смайликов. Нужен Телеграм Premium: Настройки → Телеграм для бизнеса → Чат-боты → @asoave_bot. Телеграм должен быть привязан к профилю.' }));
     box.appendChild(el('label', { class: 'aid-f aid-inl' }, [on, el('span', { text: 'Ассистент включён' })]));
     box.appendChild(field('Название компании', company)); box.appendChild(field('Рабочие часы', hours)); box.appendChild(field('Инструкции для ассистента', ins));
-    if (!p.telegram_id) box.appendChild(el('p', { class: 'aid-hint', text: 'Telegram ещё не привязан: отправьте боту /link и введите код во вкладке «Профиль».' }));
+    if (!p.telegram_id) box.appendChild(el('p', { class: 'aid-hint', text: 'Телеграм ещё не привязан: отправьте боту /link и введите код во вкладке «Профиль».' }));
     box.appendChild(el('button', { class: 'aid-btn', type: 'button', text: 'Сохранить', onclick: function () {
       sb.from('business_automations').upsert({ user_id: p.id, is_enabled: on.checked, company_name: company.value.trim(), working_hours: hours.value.trim(), custom_instructions: ins.value.trim() }, { onConflict: 'user_id' })
         .then(function (x) { say(msg, x.error ? err(x.error) : 'Сохранено', !x.error); }); } }));
@@ -290,7 +345,7 @@
 
   async function tabRewards(p, box) {
     var msg = el('div', { class: 'aid-err', role: 'status' });
-    box.appendChild(el('h2', { text: 'Amoore Rewards', style: 'font-size:18px' }));
+    box.appendChild(el('h2', { text: 'Баллы', style: 'font-size:18px' }));
     box.appendChild(el('div', { class: 'aid-big', id: 'rw-balance', text: String(p.rewards_balance || 0) + ' баллов' }));
     box.appendChild(el('p', { text: 'Приглашайте друзей: +10 баллов за каждого, кто зарегистрируется по вашей ссылке.' }));
     var link = shareUrl(p), inp = el('input', { type: 'text', readonly: '', value: link, id: 'rw-link' });
@@ -329,6 +384,7 @@
     box.appendChild(el('h2', { text: 'Push-уведомления', style: 'font-size:18px' }));
     box.appendChild(el('p', { text: 'Получайте уведомление, когда в amoore выходит новость. Для iPhone сначала добавьте сайт на экран «Домой».' }));
     var btn = el('button', { class: 'aid-btn', type: 'button', id: 'push-enable', text: 'Разрешить уведомления' });
+    if (P && P.configured && !P.configured()) { box.appendChild(el('p', { class: 'aid-hint', text: 'Push-уведомления пока недоступны. Новости появятся в колокольчике на сайте.' })); return; }
     async function refresh() {
       if (!P || !P.supported()) { btn.disabled = true; btn.textContent = 'Не поддерживается в этом браузере'; return; }
       var sub = await P.isSubscribed(); btn.disabled = false; btn.textContent = sub ? 'Отключить уведомления' : 'Разрешить уведомления'; btn.dataset.on = sub ? '1' : '';
@@ -343,15 +399,16 @@
   var BUILD = { profile: tabProfile, business: tabBusiness, rewards: tabRewards, security: tabSecurity, notify: tabNotify };
   // host — контейнер (inline на лендинге) или null → модальное окно. tab — какую вкладку открыть.
   async function renderProfile(host, tab, onClose) {
-    var p = await getProfile(true); if (!p) return null; ensureCss();
+    var p = await getProfile(true); if (!p) return null; ensureCss(); await loadRoleLabels();
     var cur = BUILD[tab] ? tab : 'profile', body = el('div', { class: 'aid-body' }), nav = el('div', { class: 'aid-tabs', role: 'tablist' });
-    var card = el('div', { class: 'aid-card aid-wide' }, [nav, body]);
+    var card = el('div', { class: 'aid-card aid-wide' + (host ? ' aid-inline' : '') }, [nav, body]);
     async function show(t) {
       cur = t; body.textContent = '';
       Array.prototype.forEach.call(nav.children, function (b) { var on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
       try { await BUILD[t](await getProfile(true), body, function () { renderProfile(host, t, onClose); if (ov) ov.remove(); }); } catch (e) { body.appendChild(el('div', { class: 'aid-err', text: err(e) })); }
     }
-    TABS.forEach(function (t) { nav.appendChild(el('button', { type: 'button', role: 'tab', 'data-tab': t[0], text: t[1], onclick: function () { show(t[0]); } })); });
+    var P0 = window.amoorePush, pushOk = !!(P0 && P0.supported && P0.supported() && P0.configured && P0.configured());
+    TABS.filter(function (t) { return t[0] !== 'notify' || pushOk; }).forEach(function (t) { nav.appendChild(el('button', { type: 'button', role: 'tab', 'data-tab': t[0], text: t[1], onclick: function () { show(t[0]); } })); });
     var ov = null;
     if (host) { host.textContent = ''; host.appendChild(card); }
     else { card.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Закрыть', onclick: function () { ov.remove(); onClose && onClose(); } })); ov = overlay(card); }
@@ -373,7 +430,7 @@
     var p = await getProfile(true); var old = document.getElementById('aid-chip'); if (old) old.remove();
     if (!p || !p.onboarded) return; ensureCss();
     var st = document.getElementById('aid-chip-css') || el('style', { id: 'aid-chip-css' });
-    st.textContent = '#aid-chip{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:9990}#aid-chip>img{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid rgba(212,175,55,.5);cursor:pointer;display:block;transition:transform .35s cubic-bezier(.34,1.56,.64,1)}#aid-chip>img:active{transform:scale(.9)}#aid-menu{position:absolute;bottom:52px;left:0;min-width:210px;padding:6px;border-radius:14px;background:var(--nx-modal-bg,rgba(13,18,32,.95));border:var(--nx-glass-border,1px solid rgba(212,175,55,.2));display:none}#aid-menu.open{display:block}#aid-menu button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:none;color:var(--nx-ink,#eef0f7);font:14px var(--nx-font-body,system-ui);border-radius:10px;cursor:pointer}#aid-menu button:hover{background:rgba(212,175,55,.12)}';
+    st.textContent = '#aid-chip>.aid-chip-ph{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 18px system-ui;color:#17151d;background:' + (p.avatar_color || '#d4af37') + ';border:2px solid rgba(212,175,55,.5);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}#aid-chip{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:9990}#aid-chip>img{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid rgba(212,175,55,.5);cursor:pointer;display:block;transition:transform .35s cubic-bezier(.34,1.56,.64,1)}#aid-chip>img:active{transform:scale(.9)}#aid-menu{position:absolute;bottom:52px;left:0;min-width:210px;padding:6px;border-radius:14px;background:var(--nx-modal-bg,rgba(13,18,32,.95));border:var(--nx-glass-border,1px solid rgba(212,175,55,.2));display:none}#aid-menu.open{display:block}#aid-menu button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:none;color:var(--nx-ink,#eef0f7);font:14px var(--nx-font-body,system-ui);border-radius:10px;cursor:pointer}#aid-menu button:hover{background:rgba(212,175,55,.12)}';
     if (!st.parentNode) document.head.appendChild(st);
     var menu = el('div', { id: 'aid-menu' }), items = [['Профиль и устройства', openProfile]];
     if (site !== 'dev' && /admin|moderator|super_admin/.test(p.role)) items.push(['Открыть Админку', function () { return ssoOpen('dev'); }]);
@@ -381,7 +438,8 @@
     if (site !== 'landing') items.push(['Открыть сайт', function () { return ssoOpen('landing'); }]);
     items.push(['Выйти', function () { return signOut().then(function () { location.reload(); }); }]);
     items.forEach(function (it) { menu.appendChild(el('button', { type: 'button', text: it[0], onclick: function () { menu.classList.remove('open'); Promise.resolve(it[1]()).catch(function (e) { alert(err(e)); }); } })); });
-    var img = el('img', { src: p.avatar_url, alt: '@' + p.username, onclick: function () { menu.classList.toggle('open'); } });
+    var img = p.avatar_url ? el('img', { src: p.avatar_url, alt: '@' + p.username, onclick: function () { menu.classList.toggle('open'); } })
+      : el('div', { class: 'aid-chip-ph', text: initial(p), 'aria-label': '@' + p.username, onclick: function () { menu.classList.toggle('open'); } });
     document.body.appendChild(el('div', { id: 'aid-chip' }, [menu, img]));
   }
   // одна строка для сайта: обработать ссылку/SSO → онбординг → чип
@@ -400,18 +458,17 @@
     go.addEventListener('click', function () { go.disabled = true; msg.textContent = '';
       sendMagicLink(inp.value).then(function () { msg.style.color = '#3ddc84'; msg.textContent = 'Письмо отправлено — откройте ссылку на этом устройстве'; })
         .catch(function (e) { msg.style.color = ''; msg.textContent = err(e); go.disabled = false; }); });
-    var kids = [el('h2', { text: 'Вход в Amoore ID' }), el('p', { text: reason || 'Мы пришлём одноразовую ссылку на почту — пароль не нужен.' }), inp, msg, go];
-    if (pendingRef()) {   // пришли по приглашению (?ref=…): можно создать аккаунт
-      kids.push(el('button', { class: 'aid-btn aid-ghost', type: 'button', id: 'aid-register', text: 'Создать аккаунт по приглашению', onclick: function () {
-        msg.textContent = ''; sendMagicLink(inp.value, true).then(function () { msg.style.color = '#3ddc84'; msg.textContent = 'Письмо отправлено — откройте ссылку на этом устройстве'; })
-          .catch(function (e) { msg.style.color = ''; msg.textContent = err(e); }); } }));
-    }
+    var kids = [el('h2', { text: 'Вход в amoore ID' }), el('p', { text: reason || 'Мы пришлём одноразовую ссылку на почту — пароль не нужен.' }), inp, msg, go];
+    var hasRef = !!pendingRef();   // бонус начисляется только если пришли по ?ref=…; создать аккаунт может любой
+    kids.push(el('button', { class: 'aid-btn aid-ghost', type: 'button', id: 'aid-register', text: hasRef ? 'Создать аккаунт по приглашению' : 'Создать аккаунт', onclick: function () {
+      msg.textContent = ''; sendMagicLink(inp.value, true).then(function () { msg.style.color = '#3ddc84'; msg.textContent = 'Письмо отправлено — откройте ссылку на этом устройстве'; })
+        .catch(function (e) { msg.style.color = ''; msg.textContent = err(e); }); } }));
     var ov = overlay(el('div', { class: 'aid-card' }, kids.concat([
       el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Закрыть', onclick: function () { ov.remove(); } })])));
   }
 
   var api = { openLogin: openLogin, renderProfile: renderProfile, pendingRef: pendingRef, claimRef: claimRef, shareUrl: shareUrl, boot: boot, mountChip: mountChip,  init: init, signIn: signIn, sendCode: sendCode, verifyCode: verifyCode, sendMagicLink: sendMagicLink, signOut: signOut, consumeUrl: consumeUrl, ssoOpen: ssoOpen,
     getProfile: getProfile, saveProfile: saveProfile, ensureOnboarded: ensureOnboarded, openProfile: openProfile, listSessions: listSessions, revokeOthers: revokeOthers,
-    linkTelegram: linkTelegram, lockLeft: lockLeft, people: people, friendlyError: err, USERNAME_RE: USERNAME_RE, sb: null };
+    linkTelegram: linkTelegram, roleRu: roleRu, registerSite: registerSite, avatarEl: avatarEl, AVATAR_COLORS: AVATAR_COLORS, lockLeft: lockLeft, people: people, friendlyError: err, USERNAME_RE: USERNAME_RE, sb: null };
   window.amooreID = api;
 })();

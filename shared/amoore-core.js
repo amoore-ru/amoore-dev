@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v5.1.0 «BUGFIX»
+ * amoore-core.js — v5.2.0 «BUGFIX»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '5.1.0';
+  var AMOORE_VERSION = '5.2.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -312,7 +312,7 @@
   }
 
   // ------------------------------------------------------------------ Quick Admin (плавающее меню)
-  var ROLE_FALLBACK = { super_admin: 'Основатель', admin: 'Админ', moderator: 'Модератор' };
+  var ROLE_FALLBACK = { super_admin: 'Основатель', admin: 'Администратор', moderator: 'Модератор' };
   var roleLabelsCache = null;
   async function fetchGlobalSetting(key) {
     try {
@@ -693,7 +693,7 @@
       var local = await fetchChangelog('changelog.json');
       if (local && local.length) list = sortVersions(local);
     }
-    changelogList = list && list.length ? list : [{ version: '5.1.0', title: 'BUGFIX', items: ['Исправлены мобильная вёрстка и бургер-меню, настроены права RLS.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.2.0', title: 'BUGFIX', items: ['Исправлены мобильная вёрстка и бургер-меню, настроены права RLS.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }
@@ -756,7 +756,7 @@
     } catch (e) {}
     var row = { site_id: SITE_ID, visitor_id: visitorId(), path: String(location.pathname || '/').slice(0, 200) };
     geoLookup().then(function (g) {
-      if (g) { row.country_code = g.country_code || null; row.country = g.country || null; row.city = g.city || null; }
+      if (g) { row.country_code = g.country_code || null; row.country = g.country || null; row.city = g.city || null; if (typeof g.lat === 'number' && typeof g.lon === 'number') { row.lat = Math.round(g.lat * 100) / 100; row.lon = Math.round(g.lon * 100) / 100; } }
       try { client.from('site_visits').insert(row).then(function () {}, function () {}); } catch (e) {}
     });
   }

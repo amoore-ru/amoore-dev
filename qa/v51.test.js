@@ -125,7 +125,7 @@ const withProfile = () => { const s = S.seed(); s.profiles = profiles(); s.busin
       { id: 'l1', name: 'Иван', contact: '@ivan', message: 'Нужен сайт', status: 'new', tags: [], created_at: new Date().toISOString() },
       { id: 'l2', name: '=HYPERLINK("evil")', contact: 'a@b.c', message: 'спам "кавычки"', status: 'new', tags: ['spam'], created_at: new Date().toISOString() }];
     seed.audit_logs = [{ id: 'g1', admin_id: 'a1', action: 'login', created_at: new Date().toISOString() }, { id: 'g2', admin_id: 'a1', action: 'password_change', created_at: new Date().toISOString() }, { id: 'g3', admin_id: 'a1', action: 'news_add', created_at: new Date().toISOString() }];
-    const { page, errors } = await H.openPage(b, 'http://localhost:8352/index.html', seed, { init: "localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'a1',email:'boss@amoore.ru',name:'Boss',nickname:'Boss',role:'super_admin',access_token:'tok',expires_at:Date.now()+3e6}));localStorage.setItem('amoore_dev_seen_version','5.1.0');" });
+    const { page, errors } = await H.openPage(b, 'http://localhost:8352/index.html', seed, { init: "localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'a1',email:'boss@amoore.ru',name:'Boss',nickname:'Boss',role:'super_admin',access_token:'tok',expires_at:Date.now()+3e6}));localStorage.setItem('amoore_dev_seen_version','5.2.0');" });
     await until(async () => page.$('#tab-leads'), 6000).catch(() => {});
     const tabVisible = await until(async () => page.$eval('#tab-leads', e => e.offsetParent !== null).catch(() => false), 8000);
     if (!tabVisible) { T.check('админка открылась (сессия подставлена)', false, 'вкладка Заявки не найдена'); }

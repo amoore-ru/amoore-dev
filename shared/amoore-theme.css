@@ -353,3 +353,46 @@ html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
   .ux-extra-dev { display: block; text-align: center; padding: 10px; font: 700 14px/1.2 var(--nx-btn-font); color: var(--nx-gold); text-decoration: none; }
 }
 @media (min-width: 1120px) { .ux-mobile-extra { display: none !important; } }
+
+/* =====================================================================================
+   v5.2 «POLISH & SYNC» — единый UI-кит (одинаков на всех сайтах)
+   ===================================================================================== */
+:root { --ui-radius-btn: 12px; --ui-radius-chip: 999px; --ui-ease: cubic-bezier(.4, 0, .2, 1); }
+
+/* Блок 5: поля ввода не вылезают за экран, нет горизонтального скролла */
+input, textarea, select { box-sizing: border-box; max-width: 100%; }
+input:focus, textarea:focus, select:focus { outline-offset: -2px; }
+html, body { overflow-x: hidden; max-width: 100%; }
+.view, .section, .container, .settings-stack, .settings-card, .admin-card, .modal, .aid-card, .aid-host { max-width: 100%; overflow-x: hidden; }
+.aid-card input, .aid-card textarea { width: 100%; }
+
+/* Блок 6.1: вкладки-«чипсы» — как в новостях на лендинге; без эффекта «проваливания» */
+.chip-tabs, .aid-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.chip-tab, .aid-nav button, .aid-nav a {
+  appearance: none; font: 600 13px/1 var(--nx-font-body, system-ui); color: var(--nx-ink-soft, var(--text-secondary, inherit));
+  padding: 9px 16px; min-height: 36px; border-radius: var(--ui-radius-chip); cursor: pointer;
+  background: rgba(var(--nx-gold-rgb, 212, 175, 55), .06); border: 1px solid rgba(var(--nx-gold-rgb, 212, 175, 55), .22);
+  transition: background .2s var(--ui-ease), border-color .2s var(--ui-ease), color .2s var(--ui-ease);
+}
+.chip-tab:hover, .aid-nav button:hover { background: rgba(var(--nx-gold-rgb, 212, 175, 55), .14); }
+.chip-tab:active, .aid-nav button:active { transform: none; }
+.chip-tab.active, .aid-nav button.on, .aid-nav button.active, .aid-nav button[aria-selected="true"] {
+  color: var(--nx-gold, #d4af37); background: rgba(var(--nx-gold-rgb, 212, 175, 55), .16); border-color: rgba(var(--nx-gold-rgb, 212, 175, 55), .6);
+}
+
+/* Блок 6.2: тумблеры — один размер и одна анимация везде */
+.toggle, .nx-switch { width: 46px; min-width: 46px; height: 26px; max-height: 26px; border-radius: 999px; transition: background .25s var(--ui-ease), border-color .25s var(--ui-ease); }
+.toggle-knob { top: 2px; left: 2px; width: 20px; height: 20px; transition: transform .25s var(--ui-ease), background .25s var(--ui-ease); }
+.toggle.open .toggle-knob { transform: translateX(20px); }
+
+/* Блок 6.3: кнопки — единый радиус и hover */
+.btn, .aid-btn, .nx-btn, .btn-ghost, .btn-primary, .btn-sm, button.primary { border-radius: var(--ui-radius-btn); transition: transform .18s var(--ui-ease), box-shadow .18s var(--ui-ease), background .18s var(--ui-ease), border-color .18s var(--ui-ease); }
+@media (hover: hover) { .btn:hover, .aid-btn:hover, .nx-btn:hover, .btn-ghost:hover, .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(var(--nx-gold-rgb, 212, 175, 55), .18); } }
+
+/* Блок 14/24: скелетоны вместо «Загрузка…» */
+@keyframes ui-skel { 0% { opacity: .45 } 50% { opacity: .9 } 100% { opacity: .45 } }
+.skel, .skeleton-stack > i { display: block; border-radius: 10px; background: linear-gradient(90deg, rgba(var(--nx-gold-rgb, 212, 175, 55), .08), rgba(var(--nx-gold-rgb, 212, 175, 55), .18), rgba(var(--nx-gold-rgb, 212, 175, 55), .08)); animation: ui-skel 1.3s ease-in-out infinite; }
+.skeleton-stack { display: grid; gap: 10px; padding: 8px 0; }
+.skeleton-stack > i { height: 18px; } .skeleton-stack > i:first-child { width: 55%; } .skeleton-stack > i:last-child { width: 80%; }
+.skel-card { min-height: 150px; border-radius: 18px; }
+@media (prefers-reduced-motion: reduce) { .skel, .skeleton-stack > i { animation: none; } }

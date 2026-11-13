@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Amoore Supabase preflight. No dependencies; Node 18+. */
+/* amoore Supabase preflight. No dependencies; Node 18+. */
 const base = (process.env.SUPABASE_URL || process.env.AMOORE_SUPABASE_URL || '').replace(/\/$/, '');
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
 const required = ['admins','ecosystem_sites','news'];
@@ -8,7 +8,7 @@ const headers = () => ({ apikey:key, Authorization:`Bearer ${key}`, 'Content-Typ
 async function request(path, opts={}) { const r=await fetch(base+path,{...opts,headers:{...headers(),...(opts.headers||{})},signal:AbortSignal.timeout(10000)}); const body=await r.text(); return {ok:r.ok,status:r.status,body}; }
 async function main(){
  if(!base||!key){console.error('CONFIG ERROR: задайте SUPABASE_URL и SUPABASE_SERVICE_ROLE_KEY (локально, не публикуйте ключ).');process.exitCode=2;return;}
- console.log('Amoore DB preflight:',base);
+ console.log('amoore DB preflight:',base);
  let failed=false;
  for(const t of required){try{const r=await request(`/rest/v1/${t}?select=*&limit=0`);const ok=r.ok;console.log(`${ok?'OK':'FAIL'} table ${t}: HTTP ${r.status}`);if(!ok){failed=true;console.log(`  → Проверьте миграцию amoore-dev/shared/sql/001_amoore_schema.sql и grants/RLS для service_role.`);}}catch(e){failed=true;console.log(`FAIL table ${t}: ${e.message}`)}}
  for(const t of optional){try{const r=await request(`/rest/v1/${t}?select=*&limit=0`);console.log(`${r.ok?'OK':'INFO'} optional table ${t}: HTTP ${r.status}`);if(!r.ok)console.log(`  → Для функций v0.4 выполните миграцию 003_v04_onboarding_broadcast.sql (bot_subscribers); bot_status создаётся миграцией 002_v202_bot_leads.sql.`);}catch(e){console.log(`INFO optional table ${t}: ${e.message}`)}}

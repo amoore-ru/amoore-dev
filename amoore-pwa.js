@@ -1,5 +1,5 @@
 /**
- * amoore-pwa.js — v5.1.0 · PWA: manifest, iOS meta, Service Worker, Telegram Mini App, Web Push.
+ * amoore-pwa.js — v5.2.0 · PWA: manifest, iOS meta, Service Worker, Телеграм Mini App, Web Push.
  * Побайтно одинаков во всех трёх сайтах. Подключение: <script src="amoore-pwa.js" defer></script>
  */
 (function () {
@@ -22,7 +22,7 @@
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
   }
-  // Telegram Mini App: раскрываем на весь экран и красим шапку
+  // Телеграм Mini App: раскрываем на весь экран и красим шапку
   var tg = window.Telegram && window.Telegram.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#070b16'); tg.setBackgroundColor('#070b16'); document.documentElement.classList.add('in-telegram'); } catch (e) {} }
 

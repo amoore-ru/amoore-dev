@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '5.1.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '5.2.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -35,7 +35,7 @@ const ADMIN_DEFAULT = ['toggle_status', 'toggle_banner', 'toggle_chat', 'toggle_
 const roleDefault = (role, key) => role === 'super_admin' ? true : role === 'admin' ? ADMIN_DEFAULT.includes(key) : role === 'moderator' ? MODERATOR_DEFAULT.includes(key) : false;
 
 // ---- названия ролей (global_settings.role_labels): ключи ролей неизменны, меняется только подпись ----
-const ROLE_DEFAULT_LABELS = { super_admin: 'Основатель', admin: 'Админ', moderator: 'Модератор' };
+const ROLE_DEFAULT_LABELS = { super_admin: 'Основатель', admin: 'Администратор', moderator: 'Модератор' };
 let roleLabels = { ...ROLE_DEFAULT_LABELS };
 const rl = (role) => roleLabels[role] || role;
 
@@ -49,7 +49,7 @@ const ACTION_LABELS = {
   admin_add: 'Добавил пользователя', admin_delete: 'Удалил пользователя',
   role_change: 'Сменил роль', perms_change: 'Изменил права', media_upload: 'Загрузил медиа', backup: 'Скачал бэкап',
   admin_edit: 'Изменил профиль', news_edit: 'Изменил новость', digest_publish: 'Опубликовал дайджест', labels_edit: 'Изменил названия ролей', changelog_edit: 'Изменил changelog',
-  lead_done: 'Обработал заявку', lead_status: 'Сменил статус заявки', lead_tag: 'Поставил тег заявке', lead_export: 'Экспортировал заявки', login: 'Вход', logout: 'Выход', password_change: 'Смена пароля', profile_update: 'Обновил профиль', telegram_linked: 'Привязал Telegram', ban: 'Забанил', unban: 'Снял бан', set_role: 'Назначил роль', sessions_revoked: 'Завершил сессии', sso_issue: 'SSO-переход', digest_request: 'Запросил дайджест', bot_toggle: 'Переключил бота', broadcast: 'Сделал рассылку'
+  lead_done: 'Обработал заявку', lead_status: 'Сменил статус заявки', lead_tag: 'Поставил тег заявке', lead_export: 'Экспортировал заявки', login: 'Вход', logout: 'Выход', password_change: 'Смена пароля', profile_update: 'Обновил профиль', telegram_linked: 'Привязал Телеграм', ban: 'Забанил', unban: 'Снял бан', set_role: 'Назначил роль', sessions_revoked: 'Завершил сессии', sso_issue: 'SSO-переход', digest_request: 'Запросил дайджест', bot_toggle: 'Переключил бота', broadcast: 'Сделал рассылку'
 };
 const OVERLAY_LABELS = { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' };
 const NEWS_TYPES = { news: 'Новость', patch: 'Патч', soon: 'Скоро', digest: 'Дайджест' };
@@ -235,8 +235,14 @@ function showLogin(preferTokenOnly) {
   setLoginMode(!!(preferTokenOnly && rememberedEmail()));
 }
 function showApp(session) {
-  amooreID.ensureOnboarded().then(() => amooreID.mountChip()).catch(() => {});      // username + аватарка обязательны
   me = { ...session, perms: resolvePermissions(session.role, session.permissions) };
+  // v5.2: единый профиль — ник и роль берутся из profiles (как на сайте), чтобы везде были одинаковыми
+  amooreID.ensureOnboarded().then(() => { amooreID.mountChip(); return amooreID.getProfile(true); }).then(p => {
+    if (!p || !me) return;
+    if (p.display_name) me.nickname = p.display_name;
+    if (p.role === 'super_admin' && me.role !== 'super_admin') { me.role = 'super_admin'; me.perms = resolvePermissions('super_admin', session.permissions); applyRoleUI && applyRoleUI(); }
+    paintUser();
+  }).catch(() => {});      // username + аватарка (или цвет) обязательны
   $('login-screen').style.display = 'none';
   $('app').classList.add('visible');
   paintUser();
@@ -276,10 +282,20 @@ function applyRoleUI() {
   $('add-site-btn').style.display = can('manage_sites') ? '' : 'none';
   $('add-admin-wrap').style.display = can('manage_admins') ? '' : 'none';
   $('mini-audit-widget').style.display = can('view_logs') ? '' : 'none';
-  if ($('broadcast-card')) $('broadcast-card').style.display = isSuper() ? '' : 'none';
   const sel = $('new-role');
   sel.innerHTML = ['moderator', 'admin'].concat(isSuper() ? ['super_admin'] : []).map(r => `<option value="${r}">${esc(rl(r))}</option>`).join('');
 }
+// v5.2: «Новости» → под-вкладки «Новости | Обновления» (редактор changelog переехал из «Настроек»)
+let newsPane = 'news';
+function setNewsPane(pane) {
+  if (pane === 'updates' && !isSuper()) pane = 'news';
+  newsPane = pane;
+  document.querySelectorAll('#news-subtabs .chip-tab').forEach(b => { const on = b.dataset.pane === pane; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+  $('news-pane-news').hidden = pane !== 'news';
+  $('news-pane-updates').hidden = pane !== 'updates';
+  if (pane === 'updates') renderUpdatesPane();
+}
+document.addEventListener('click', e => { const b = e.target.closest('#news-subtabs .chip-tab'); if (b) setNewsPane(b.dataset.pane); });
 // Переход между вкладками: старый экран гаснет с размытием (~140 мс), новый выезжает снизу из blur.
 // Анимации — в style.css (.view.leaving / .view.active); при prefers-reduced-motion переключение мгновенное.
 let viewTimer = 0;
@@ -299,7 +315,7 @@ function switchView(name) {
   closeMobileMenu();
   window.scrollTo(0, 0);
   if (name === 'dashboard') loadDashboard();
-  if (name === 'news') loadNewsAdmin();
+  if (name === 'news') { loadNewsAdmin(); if (newsPane === 'updates') renderUpdatesPane(); }
   if (name === 'media') loadMedia();
   if (name === 'settings') renderSettingsBlocks();
   if (name === 'team') loadTeam();
@@ -376,8 +392,8 @@ async function loadOnboarding() {
     try { const { error } = await sb.from(table).select('id', { count: 'exact', head: true }); checks.push({label:`Таблица ${table}`,ok:!error,detail:error?friendlyError(error):'доступна'}); }
     catch (e) { checks.push({label:`Таблица ${table}`,ok:false,detail:friendlyError(e)}); }
   }
-  try { const {data,error}=await withTimeout(sb.from('bot_status').select('is_online').eq('id','main').maybeSingle()); checks.push({label:'Telegram-бот',ok:!error,detail:error?'нет связи с ботом':(data?.is_online===false?'Офлайн · техобслуживание':'Онлайн')}); }
-  catch(e){checks.push({label:'Telegram-бот',ok:false,detail:'Офлайн · нет ответа'});}
+  try { const {data,error}=await withTimeout(sb.from('bot_status').select('is_online').eq('id','main').maybeSingle()); checks.push({label:'Телеграм-бот',ok:!error,detail:error?'нет связи с ботом':(data?.is_online===false?'Офлайн · техобслуживание':'Онлайн')}); }
+  catch(e){checks.push({label:'Телеграм-бот',ok:false,detail:'Офлайн · нет ответа'});}
   const [admins,news] = await Promise.all([
     sb.from('admins').select('id',{count:'exact',head:true}),
     sb.from('news').select('id',{count:'exact',head:true})
@@ -801,7 +817,7 @@ async function toggleBotOnline() {
 }
 
 async function sendBotTest() {
-  if (!isSuper()) return toast('Только super_admin', 'error');
+  if (!isSuper()) return toast('Только основатель', 'error');
   try {
     const { error } = await sb.functions.invoke('send-telegram', { body: { message: '✅ Тест из amoore Dev — бот на связи.' } });
     if (error) return toast(friendlyError(error), 'error');
@@ -924,11 +940,11 @@ function renderDigest(r) {
     <div class="digest-actions">
       <button type="button" class="btn btn-ghost" id="digest-copy">Скопировать текст</button>
       <button type="button" class="btn btn-ghost" id="digest-download">Скачать .txt</button>
-      <button type="button" class="btn btn-primary" id="digest-send" style="width:auto">Отправить боту → админам в Telegram</button>
+      <button type="button" class="btn btn-primary" id="digest-send" style="width:auto">Отправить боту → админам в Телеграм</button>
       ${isSuper() ? '<button type="button" class="btn btn-ghost" id="digest-publish">Опубликовать на сайте как «Дайджест»</button>' : ''}
     </div>
     <p class="widget-meta" id="digest-send-status" role="status" aria-live="polite"></p>
-    <details class="digest-preview"><summary>Как сообщение выглядит в Telegram</summary><pre>${esc(r.text)}</pre></details>`;
+    <details class="digest-preview"><summary>Как сообщение выглядит в Телеграм</summary><pre>${esc(r.text)}</pre></details>`;
 }
 async function generateDigest() {
   if (!me || !VIEW_RULES.digest()) return toast('Недостаточно прав', 'error');
@@ -988,7 +1004,7 @@ async function sendDigestToBot() {
   digestPoll = setInterval(async () => {
     tries++;
     const { data: row } = id ? await sb.from('digest_queue').select('status,error_text').eq('id', id).maybeSingle() : { data: null };
-    if (row && row.status === 'sent') { clearInterval(digestPoll); st.textContent = '✓ Бот отправил дайджест админам в Telegram.'; btn.disabled = false; toast('Дайджест отправлен'); }
+    if (row && row.status === 'sent') { clearInterval(digestPoll); st.textContent = '✓ Бот отправил дайджест админам в Телеграм.'; btn.disabled = false; toast('Дайджест отправлен'); }
     else if (row && row.status === 'error') { clearInterval(digestPoll); st.textContent = 'Бот не смог отправить: ' + (row.error_text || 'ошибка'); btn.disabled = false; }
     else if (tries >= 24) { clearInterval(digestPoll); st.textContent = 'Бот пока не ответил (запрос в очереди). Проверьте, что бот запущен и в нём есть ключ service role.'; btn.disabled = false; }
   }, 5000);
@@ -1114,19 +1130,7 @@ $('media-grid').addEventListener('click', async (e) => {
   else { toast('Не удалось скопировать', 'error'); window.prompt('Ссылка на картинку:', b.dataset.url); }
 });
 
-// ======================================================================= настройки: бэкап
-if ($('telegram-broadcast-btn')) $('telegram-broadcast-btn').addEventListener('click', async () => {
-  if (!isSuper()) return toast('Только super_admin может отправлять рассылки', 'error');
-  const btn=$('telegram-broadcast-btn'), message=$('telegram-broadcast-text').value.trim();
-  if (!message) return toast('Введите текст сообщения', 'error');
-  if (btn.disabled) return;
-  if (!confirm('Отправить это сообщение всем активным пользователям amoore-ai?')) return;
-  btn.disabled=true; btn.setAttribute('aria-busy','true'); const old=btn.textContent; btn.textContent='Отправка…';
-  try { const {data,error}=await sb.functions.invoke('send-telegram',{body:{action:'broadcast',message}}); if(error||!data||data.error) throw (error||new Error(data?.error||'broadcast')); toast(`Рассылка завершена: ${data.sent} отправлено, ${data.failed} ошибок`,data.failed?'error':'success'); }
-  catch(e){toast('Ошибка: проверьте BOT_TOKEN','error');}
-  finally{btn.disabled=false;btn.removeAttribute('aria-busy');btn.textContent=old;}
-});
-
+// ======================================================================= бэкап (Дашборд)
 $('backup-btn').addEventListener('click', async () => {
   if (!can('download_backup')) return toast('Недостаточно прав', 'error');
   const btn = $('backup-btn'), label = $('backup-btn-text');
@@ -1175,6 +1179,7 @@ async function touchSeen() { try { await sb.rpc('touch_admin_seen'); } catch (_)
 setInterval(() => { if (me && document.visibilityState !== 'hidden') touchSeen(); }, 60000);
 let teamCache = [];
 async function loadTeam() {
+  fillRolesBlock();
   const list = $('team-list');
   list.innerHTML = '<div class="skeleton-stack" aria-label="Загрузка команды"><i></i><i></i><i></i></div>';
   let { data, error } = await sb.from('admins').select('id, email, name, nickname, role, permissions, last_seen_at').order('created_at');
@@ -1337,32 +1342,32 @@ function paintThemeChoice() {
 document.querySelectorAll('[data-theme-choice]').forEach(b => b.addEventListener('click', () => window.amooreUX?.setTheme(b.dataset.themeChoice)));
 document.addEventListener('amoore:theme', paintThemeChoice);
 
-// Профиль: никнейм и email (в таблице admins; email для входа живёт в Supabase Auth — напоминание в карточке)
-$('pf-save').addEventListener('click', async () => {
-  if (!me) return;
-  const nickname = $('pf-nickname').value.trim().slice(0, 40), email = $('pf-email').value.trim().toLowerCase();
-  if (!nickname) return toast('Никнейм не может быть пустым', 'error');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast('Проверьте email', 'error');
-  const btn = $('pf-save'); btn.disabled = true;
+// v5.2: профиль в настройках — тот самый amoore ID, что и на сайте (одни и те же поля, одна таблица profiles)
+async function mountProfileHost() {
+  const host = $('set-profile-host'); if (!host) return;
   try {
-    // v4.4: email уходит в БД только если реально изменён (иначе UPDATE упирался в права колонки email → «Недостаточно прав (RLS)»)
-    const emailChanged = email !== String(me.email || '').toLowerCase();
-    const patch = emailChanged ? { nickname, email } : { nickname };
-    const { error } = await sb.from('admins').update(patch).eq('id', me.admin_id);
-    if (error) return toast(friendlyError(error), 'error');
-    me.nickname = nickname; me.email = email;
-    const s = loadSession(); if (s) saveSession({ ...s, nickname, email }, s.expires_at);
-    paintUser(); logAction('admin_edit', null, null, nickname);
-    toast(emailChanged ? 'Профиль сохранён. Не забудьте сменить email и в Supabase Auth' : 'Профиль сохранён');
-  } finally { btn.disabled = false; }
+    amooreID.init({ site: 'dev', sb });
+    const card = await amooreID.renderProfile(host, 'profile');
+    if (!card) host.innerHTML = '<div class="loading-state">Войдите через amoore ID, чтобы редактировать профиль.</div>';
+  } catch (e) { host.innerHTML = `<div class="loading-state">${esc(friendlyError(e))}</div>`; }
+}
+document.addEventListener('amoore:profile', async (e) => {          // ник/аватар/роль изменились в профиле → шапка админки обновляется сразу
+  if (!me) return; const p = e.detail || {};
+  if (p.display_name) { me.nickname = p.display_name; const s = loadSession(); if (s) saveSession({ ...s, nickname: p.display_name }, s.expires_at); }
+  if (p.role === 'super_admin') me.role = 'super_admin';
+  paintUser();
 });
-
 async function renderSettingsBlocks() {
   paintThemeChoice();
-  $('pf-nickname').value = me.nickname || '';
-  $('pf-email').value = me.email || '';
+  mountProfileHost();
+}
+// роли и changelog вынесены из «Настроек»: роли — во вкладку «Команда», changelog — «Новости → Обновления»
+function fillRolesBlock() {
   if (!isSuper()) return;
   ['super_admin', 'admin', 'moderator'].forEach(k => { const i = $('rl-' + k); if (i) i.value = roleLabels[k] || ''; });
+}
+async function renderUpdatesPane() {
+  if (!isSuper()) return;
   wnList = await loadChangelog();
   clDraft = wnList === WN_FALLBACK ? [] : wnList.map(v => ({ ...v }));
   paintClEditor();
@@ -1414,7 +1419,7 @@ $('cl-save').addEventListener('click', async () => {
   const list = readClEditor().filter(v => v.version).map((v, i) => ({ ...v, order: i }));   // порядок — как расставлен перетаскиванием
   if (!list.length) return toast('Добавьте хотя бы одну версию', 'error');
   if (new Set(list.map(v => v.version)).size !== list.length) return toast('Версии не должны повторяться', 'error');
-  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 5.1.0', 'error');
+  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 5.2.0', 'error');
   const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: list[0].version, versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return toast(friendlyError(error), 'error');
   wnList = list; liveVersion = String(list[0].version); paintVersionChip();

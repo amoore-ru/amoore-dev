@@ -1,10 +1,10 @@
-/* amoore-admin-v5.js — v5.1.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
+/* amoore-admin-v5.js — v5.2.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
    Классический скрипт после app.js: использует его глобальные sb, $, esc, toast, friendlyError, me, isSuper, fmtDate. */
 (function () {
   'use strict';
   const STATUS = { new: 'Новая', in_progress: 'В работе', rejected: 'Отказ', done: 'Обработана' };
   const TAGS = { vip: 'VIP', spam: 'Спам', pending: 'В ожидании' };
-  const ROLE_LABEL = { user: 'Пользователь', moderator: 'Модератор', admin: 'Админ', super_admin: 'Super Admin' };
+  const ROLE_LABEL = { user: 'Пользователь', moderator: 'Модератор', admin: 'Администратор', super_admin: 'Основатель' };
   const CC = { RU:[61,100],UA:[49,32],BY:[53.7,28],KZ:[48,68],UZ:[41,64],GE:[42,43.5],AM:[40,45],AZ:[40.4,47.7],MD:[47,28.4],LV:[57,25],LT:[55.3,23.9],EE:[58.6,25],PL:[52,19],DE:[51,10],FR:[46.6,2.5],GB:[54,-2],IE:[53,-8],ES:[40,-4],PT:[39.5,-8],IT:[42.8,12.5],NL:[52.2,5.3],BE:[50.6,4.6],CH:[46.8,8.2],AT:[47.6,14.1],CZ:[49.8,15.5],SK:[48.7,19.7],HU:[47.2,19.5],RO:[45.9,25],BG:[42.7,25.5],GR:[39,22],RS:[44,21],HR:[45.1,15.2],FI:[64,26],SE:[62,15],NO:[61,9],DK:[56,10],TR:[39,35],IL:[31,35],AE:[24,54],SA:[24,45],EG:[26.8,30.8],IN:[21,78],CN:[35,103],JP:[36,138],KR:[36.5,127.8],TH:[15,101],VN:[16,106],ID:[-2,118],MY:[4,102],SG:[1.35,103.8],PH:[12.9,122],US:[39.8,-98.6],CA:[56,-106],MX:[23.6,-102.5],BR:[-10,-52],AR:[-34,-64],CL:[-30,-71],CO:[4,-72],AU:[-25,134],NZ:[-41,174],ZA:[-29,24],NG:[9,8],KE:[0,38],MA:[31.8,-7] };
   const D = (n) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n); return d; };
   const loadScript = (src) => new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
@@ -148,7 +148,7 @@
   async function loadAnalytics() {
     mount(); pollOnline(); clearInterval(liveTimer); liveTimer = setInterval(pollOnline, 20000);
     const since = D(6).toISOString();
-    const { data, error } = await sb.from('site_visits').select('created_at,path,country_code,country,visitor_id').gte('created_at', since).order('created_at', { ascending: false }).limit(5000);
+    const { data, error } = await sb.from('site_visits').select('created_at,path,country_code,country,visitor_id,city,lat,lon').gte('created_at', since).order('created_at', { ascending: false }).limit(5000);
     if (error) { $('v5-geo-note').textContent = friendlyError(error); return; }
     try { await libs(); } catch (_) { $('v5-geo-note').textContent = 'Не удалось загрузить Chart.js / Leaflet (проверьте сеть)'; return; }
     charts.forEach(c => c.destroy()); charts = [];
@@ -160,14 +160,24 @@
     charts.push(new Chart($('v5-visits'), { type: 'line', data: { labels: days.map(d => d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })), datasets: [{ data: days.map(d => by[key(d)] || 0), borderColor: '#d4af37', backgroundColor: 'rgba(212,175,55,.15)', fill: true, tension: .35 }] }, options: opts }));
     const pages = {}; data.forEach(v => { const p = v.path || '/'; pages[p] = (pages[p] || 0) + 1; });
     const top = Object.entries(pages).sort((a, b) => b[1] - a[1]).slice(0, 6);
-    charts.push(new Chart($('v5-pages'), { type: 'bar', data: { labels: top.map(t => t[0]), datasets: [{ data: top.map(t => t[1]), backgroundColor: '#8b7cf7' }] }, options: { ...opts, indexAxis: 'y' } }));
-    // карта: пузыри по странам (координаты — центроиды стран)
-    const geo = {}; data.forEach(v => { if (v.country_code) { const g = geo[v.country_code] || (geo[v.country_code] = { n: v.country || v.country_code, c: 0 }); g.c++; } });
-    if (!map) { map = L.map('v5-map', { worldCopyJump: true, attributionControl: true }).setView([30, 20], 1); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 6, attribution: '© OpenStreetMap' }).addTo(map); }
+    const pagesCard = $('v5-pages').closest('.v5-card'); if (pagesCard) pagesCard.style.display = top.length ? '' : 'none';      // пустой «Топ страниц» не показываем
+    if (top.length) charts.push(new Chart($('v5-pages'), { type: 'bar', data: { labels: top.map(t => t[0]), datasets: [{ data: top.map(t => t[1]), backgroundColor: '#8b7cf7' }] }, options: { ...opts, indexAxis: 'y' } }));
+    // карта: пузыри по городам (lat/lon визита; если их нет — центр страны)
+    const geo = {};
+    data.forEach(v => {
+      let pos = (typeof v.lat === 'number' && typeof v.lon === 'number') ? [v.lat, v.lon] : (v.country_code ? CC[v.country_code] : null);
+      if (!pos) return;
+      const name = v.city ? `${v.city}${v.country ? ', ' + v.country : ''}` : (v.country || v.country_code);
+      const k = name + '|' + pos[0].toFixed(1) + pos[1].toFixed(1);
+      (geo[k] || (geo[k] = { n: name, p: pos, c: 0 })).c++;
+    });
+    if (!map) { map = L.map('v5-map', { worldCopyJump: true, attributionControl: true, scrollWheelZoom: false }).setView([45, 40], 2); L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 12, attribution: '© OpenStreetMap' }).addTo(map); }
     map.eachLayer(l => { if (l instanceof L.CircleMarker) map.removeLayer(l); });
-    const max = Math.max(1, ...Object.values(geo).map(g => g.c));
-    Object.entries(geo).forEach(([cc, g]) => { const p = CC[cc]; if (!p) return; L.circleMarker(p, { radius: 6 + 18 * g.c / max, color: '#d4af37', fillColor: '#d4af37', fillOpacity: .45, weight: 1 }).addTo(map).bindTooltip(`${g.n}: ${g.c}`); });
-    $('v5-geo-note').textContent = Object.keys(geo).length ? `Стран: ${Object.keys(geo).length}. Гео ставится по IP при визите; точка — центр страны.` : 'Гео-данных пока нет: они появятся после деплоя Edge Function geo и новых визитов.';
+    const max = Math.max(1, ...Object.values(geo).map(g => g.c)), pts = [];
+    Object.values(geo).forEach(g => { pts.push(g.p); L.circleMarker(g.p, { radius: 6 + 16 * g.c / max, color: '#d4af37', fillColor: '#d4af37', fillOpacity: .5, weight: 1 }).addTo(map).bindTooltip(`${g.n}: ${g.c}`); });
+    if (pts.length) { try { map.fitBounds(pts, { padding: [30, 30], maxZoom: 6 }); } catch (_) {} }
+    const nCity = new Set(data.filter(v => v.city).map(v => v.city)).size;
+    $('v5-geo-note').textContent = Object.keys(geo).length ? `Городов: ${nCity}, мест на карте: ${Object.keys(geo).length}. Гео ставится по IP при визите (сам IP не хранится).` : 'Гео-данных пока нет: они появятся после деплоя Edge Function geo и новых визитов.';
     setTimeout(() => map.invalidateSize(), 200);
     startLive();
   }

@@ -647,7 +647,7 @@ create policy gs_delete on public.global_settings for delete to authenticated us
 
 -- названия ролей: super_admin = Основатель, admin = Админ, moderator = Модератор
 insert into public.global_settings (key, value) values
-  ('role_labels', '{"super_admin":"Основатель","admin":"Админ","moderator":"Модератор"}'::jsonb)
+  ('role_labels', '{"super_admin":"Основатель","admin":"Администратор","moderator":"Модератор"}'::jsonb)
 on conflict (key) do nothing;
 
 -- история версий (первая запись = текущая версия на всех сайтах)
@@ -914,6 +914,22 @@ begin
   return left(h->>'user-agent', 300);
 end $$;
 
+-- 0.1) Основатель (v5.2): единственный email, который может быть super_admin. Хранится в закрытой таблице
+--      (доступ только у service_role/SQL Editor). При первом запуске записывается email самого раннего super_admin.
+--      Сменить вручную:  insert into public.founder (id, email) values (true, 'you@example.com')
+--                        on conflict (id) do update set email = excluded.email;
+create table if not exists public.founder (
+  id    boolean primary key default true check (id),
+  email text not null check (email = lower(email))
+);
+alter table public.founder enable row level security;
+revoke all on public.founder from anon, authenticated;
+grant all on public.founder to service_role;
+create or replace function public.founder_email()
+returns text language sql stable security definer set search_path = public as $$
+  select (select email from public.founder where id) $$;
+revoke all on function public.founder_email() from anon, authenticated;
+
 -- 1) profiles -----------------------------------------------------------------------------------
 create table if not exists public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
@@ -928,6 +944,8 @@ create table if not exists public.profiles (
   created_at  timestamptz not null default now(),
   constraint profiles_username_fmt check (username is null or username ~ '^[a-z0-9_]{3,24}$')
 );
+alter table public.profiles add column if not exists display_name text;      -- v5.2: никнейм (отображаемое имя), общий для всех сайтов
+alter table public.profiles add column if not exists avatar_color text;      -- v5.2: цвет заглушки аватарки
 create unique index if not exists profiles_username_uq on public.profiles (lower(username));
 
 -- «Boss»: super_admin по profiles ИЛИ по старой таблице admins
@@ -950,6 +968,7 @@ declare r text;
 begin
   select case a.role when 'super_admin' then 'super_admin' when 'moderator' then 'moderator' else 'admin' end
     into r from public.admins a where lower(a.email) = lower(new.email);
+  if public.founder_email() is not null and lower(new.email) = public.founder_email() then r := 'super_admin'; end if;
   insert into public.profiles (id, role) values (new.id, coalesce(r, 'user')) on conflict (id) do nothing;
   return new;
 end $$;
@@ -968,7 +987,7 @@ on conflict (id) do nothing;
 create or replace function public.trg_profiles_guard()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  new.onboarded := coalesce(new.username, '') <> '' and coalesce(new.avatar_url, '') <> '';
+  new.onboarded := coalesce(new.username, '') <> '' and (coalesce(new.avatar_url, '') <> '' or coalesce(new.avatar_color, '') <> '');
   if tg_op = 'UPDATE'
      and current_setting('amoore.bypass', true) is distinct from '1'
      and auth.uid() is not null
@@ -1213,6 +1232,10 @@ create table if not exists public.tg_link_codes (
 alter table public.tg_link_codes enable row level security;   -- политик нет: пишет бот (service_role)
 revoke all on public.tg_link_codes from anon, authenticated;
 grant all on public.tg_link_codes to service_role;
+-- v5.2: бот (service_role) обязан иметь доступ к схеме и таблице profiles (поиск админов, привязка Telegram)
+grant usage on schema public to service_role;
+grant select, update on public.profiles to service_role;
+grant select, update on public.leads to service_role;
 
 create or replace function public.link_telegram(p_code text)
 returns bigint language plpgsql security definer set search_path = public as $$
@@ -1421,7 +1444,7 @@ create trigger profiles_guard before insert or update on public.profiles
   for each row execute function public.trg_profiles_guard();
 
 -- клиент может менять только username, avatar_url, bio, is_public
-grant update (username, avatar_url, bio, is_public) on public.profiles to authenticated;
+grant update (username, avatar_url, bio, is_public, display_name, avatar_color) on public.profiles to authenticated;
 
 -- 10.2 Rewards: журнал и начисление за приглашение ----------------------------------------------------
 create table if not exists public.rewards_log (
@@ -1525,11 +1548,12 @@ create policy us2_insert on public.user_sites for insert to authenticated with c
 create policy us2_update on public.user_sites for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy us2_delete on public.user_sites for delete to authenticated using (user_id = auth.uid());
 
--- Публичная страница amoore.ru/#u/username: только username, аватарка, био, публичные сайты. Без email и ролей.
+-- Публичная страница amoore.ru/#u/username: аватарка (фото или цвет), никнейм, био, статус (роль) и публичные сайты. Без email.
 create or replace function public.public_profile(p_username text)
 returns jsonb language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
-    'username', p.username, 'avatar_url', p.avatar_url, 'bio', p.bio,
+    'username', p.username, 'display_name', p.display_name, 'avatar_url', nullif(p.avatar_url, ''), 'avatar_color', p.avatar_color,
+    'bio', p.bio, 'role', p.role, 'created_at', p.created_at,
     'sites', coalesce((select jsonb_agg(jsonb_build_object('title', s.title, 'url', s.url) order by s.created_at desc)
                          from public.user_sites s where s.user_id = p.id and s.is_public), '[]'::jsonb))
   from public.profiles p
@@ -1603,7 +1627,7 @@ begin
     'current', '5.1.0',
     'versions', jsonb_build_array(jsonb_build_object(
       'version', '5.1.0', 'date', '2026-11-26', 'title', 'v5.1 MASTER', 'order', 0,
-      'items', $i$["Великая чистка БД: единый файл 001_init_database.sql", "Web App Лендинг: вкладки без перезагрузки и хэш-навигация", "AI Бизнес-ассистент для Telegram Business", "Amoore Rewards: реферальные ссылки и баллы", "CRM с тегами, экспорт заявок в CSV", "Push-уведомления (PWA) о новостях", "Публичные профили amoore.ru/u/username"]$i$::jsonb)
+      'items', $i$["Великая чистка БД: единый файл 001_init_database.sql", "Web App Лендинг: вкладки без перезагрузки и хэш-навигация", "AI Бизнес-ассистент для Телеграм Business", "Баллы amoore: реферальные ссылки и баллы", "CRM с тегами, экспорт заявок в CSV", "Push-уведомления (PWA) о новостях", "Публичные профили amoore.ru/u/username"]$i$::jsonb)
     ) || coalesce((select jsonb_agg(jsonb_set(x, '{order}', to_jsonb(coalesce((x->>'order')::int, 0) + 1)))
                      from jsonb_array_elements(v->'versions') x), '[]'::jsonb))
   where key = 'changelog';
@@ -1612,9 +1636,151 @@ update public.changelog_versions set sort_order = sort_order + 1
  where not exists (select 1 from public.changelog_versions where version = '5.1.0');
 insert into public.changelog_versions (version, title, released, items, sort_order)
 values ('5.1.0', 'v5.1 MASTER', '2026-11-26',
-  $i$["Великая чистка БД: единый файл 001_init_database.sql", "Web App Лендинг: вкладки без перезагрузки и хэш-навигация", "AI Бизнес-ассистент для Telegram Business", "Amoore Rewards: реферальные ссылки и баллы", "CRM с тегами, экспорт заявок в CSV", "Push-уведомления (PWA) о новостях", "Публичные профили amoore.ru/u/username"]$i$::jsonb, 0)
+  $i$["Великая чистка БД: единый файл 001_init_database.sql", "Web App Лендинг: вкладки без перезагрузки и хэш-навигация", "AI Бизнес-ассистент для Телеграм Business", "Баллы amoore: реферальные ссылки и баллы", "CRM с тегами, экспорт заявок в CSV", "Push-уведомления (PWA) о новостях", "Публичные профили amoore.ru/u/username"]$i$::jsonb, 0)
 on conflict (version) do nothing;
 
+
+-- =====================================================================================================
+-- РАЗДЕЛ 11 — v5.2 «POLISH & SYNC»
+-- =====================================================================================================
+
+-- 11.1 Основатель: единственный email с правом на super_admin -----------------------------------------------
+-- При первом запуске в таблицу founder записывается email самого раннего super_admin (из admins или profiles).
+-- Если super_admin ещё нет — founder пуст, защита включится сразу после первого вашего вызова:
+--   insert into public.founder (id, email) values (true, 'you@example.com') on conflict (id) do update set email = excluded.email;
+insert into public.founder (id, email)
+select true, lower(e) from (
+  select u.email as e from public.profiles p join auth.users u on u.id = p.id
+   where p.role = 'super_admin' order by p.created_at asc limit 1
+) x where e is not null
+on conflict (id) do nothing;
+insert into public.founder (id, email)
+select true, lower(a.email) from public.admins a where a.role = 'super_admin' order by a.created_at asc limit 1
+on conflict (id) do nothing;
+
+-- Только email основателя может стать super_admin (и только он не может быть понижен). Работает для всех, включая консоль.
+create or replace function public.trg_founder_guard()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+declare fe text := public.founder_email(); em text;
+begin
+  if fe is null then return new; end if;
+  if tg_table_name = 'admins' then em := lower(new.email); else select lower(email) into em from auth.users where id = new.id; end if;
+  if new.role = 'super_admin' and em is distinct from fe then
+    raise exception 'forbidden: only the founder email may be super_admin';
+  end if;
+  if tg_op = 'UPDATE' and old.role = 'super_admin' and new.role <> 'super_admin' and em = fe then
+    raise exception 'forbidden: the founder cannot be demoted';
+  end if;
+  return new;
+end $$;
+drop trigger if exists admins_founder_guard on public.admins;
+create trigger admins_founder_guard before insert or update of role on public.admins
+  for each row execute function public.trg_founder_guard();
+drop trigger if exists profiles_founder_guard on public.profiles;
+create trigger profiles_founder_guard before insert or update of role on public.profiles
+  for each row execute function public.trg_founder_guard();
+
+-- Основатель на всех сайтах: если email основателя уже зарегистрирован — роль super_admin в profiles и admins.
+create or replace function public.sync_founder()
+returns void language plpgsql security definer set search_path = public, auth as $$
+declare fe text := public.founder_email(); uid uuid;
+begin
+  if fe is null then return; end if;
+  select id into uid from auth.users where lower(email) = fe;
+  if uid is null then return; end if;
+  perform set_config('amoore.bypass', '1', true);
+  update public.profiles set role = 'super_admin' where id = uid and role <> 'super_admin';
+  update public.admins   set role = 'super_admin' where lower(email) = fe and role <> 'super_admin';
+end $$;
+revoke all on function public.sync_founder() from anon, authenticated;
+select public.sync_founder();
+
+-- 11.2 Единый профиль: никнейм (display_name) синхронизируется между profiles (сайты) и admins (админка) ----
+create or replace function public.trg_sync_nick_from_profile()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+begin
+  if new.display_name is distinct from old.display_name and coalesce(new.display_name, '') <> '' then
+    update public.admins a set nickname = new.display_name
+     where lower(a.email) = (select lower(email) from auth.users where id = new.id) and a.nickname is distinct from new.display_name;
+  end if;
+  return new;
+end $$;
+drop trigger if exists profiles_sync_nick on public.profiles;
+create trigger profiles_sync_nick after update of display_name on public.profiles
+  for each row execute function public.trg_sync_nick_from_profile();
+
+create or replace function public.trg_sync_nick_from_admin()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+begin
+  if new.nickname is distinct from old.nickname and coalesce(new.nickname, '') <> '' then
+    update public.profiles p set display_name = left(new.nickname, 40)
+     where p.id = (select id from auth.users where lower(email) = lower(new.email)) and p.display_name is distinct from left(new.nickname, 40);
+  end if;
+  return new;
+end $$;
+drop trigger if exists admins_sync_nick on public.admins;
+create trigger admins_sync_nick after update of nickname on public.admins
+  for each row execute function public.trg_sync_nick_from_admin();
+
+-- бэкфилл: ник админки → профиль (если в профиле ещё пусто)
+update public.profiles p set display_name = left(a.nickname, 40)
+  from auth.users u join public.admins a on lower(a.email) = lower(u.email)
+ where u.id = p.id and coalesce(p.display_name, '') = '' and coalesce(a.nickname, '') <> '';
+
+alter table public.profiles drop constraint if exists profiles_display_name_len;
+alter table public.profiles add constraint profiles_display_name_len check (display_name is null or char_length(display_name) between 1 and 40);
+alter table public.profiles drop constraint if exists profiles_avatar_color_fmt;
+alter table public.profiles add constraint profiles_avatar_color_fmt check (avatar_color is null or avatar_color ~ '^#[0-9a-fA-F]{6}$');
+
+
+-- 11.3 Гео-карта: координаты визита --------------------------------------------------------------------------
+alter table public.site_visits add column if not exists lat double precision;
+alter table public.site_visits add column if not exists lon double precision;
+
+-- 11.4 Колокольчик на лендинге: новость → уведомление всем активным пользователям ------------------------------
+create or replace function public.trg_news_notify()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(new.is_published, false) and (tg_op = 'INSERT' or not coalesce(old.is_published, false)) then
+    insert into public.notifications (user_id, kind, title, body, link)
+    select p.id, 'news', left(coalesce(new.title, 'Новость'), 120), left(coalesce(new.body, ''), 200), '#news'
+      from public.profiles p where not p.is_banned limit 5000;
+  end if;
+  return new;
+end $$;
+drop trigger if exists news_notify on public.news;
+create trigger news_notify after insert or update of is_published on public.news
+  for each row execute function public.trg_news_notify();
+grant update (read_at) on public.notifications to authenticated;
+
+-- 11.5 Студия → профиль: опубликованный проект попадает в «Мои сайты» (уникально по пользователю и адресу) ----------
+create unique index if not exists user_sites_user_url_uq on public.user_sites (user_id, url);
+
+-- 11.6 Changelog v5.2 «POLISH & SYNC» ------------------------------------------------------------------------------
+do $$
+declare v jsonb;
+begin
+  select value into v from public.global_settings where key = 'changelog';
+  if v is null or (v->'versions') @> '[{"version": "5.2.0"}]'::jsonb then return; end if;
+  update public.global_settings set updated_at = now(), value = jsonb_build_object(
+    'current', '5.2.0',
+    'versions', jsonb_build_array(jsonb_build_object(
+      'version', '5.2.0', 'date', '2026-11-27', 'title', 'v5.2 POLISH & SYNC', 'order', 0,
+      'items', $i$["Единый профиль amoore ID: ник, аватарка (фото или цвет) и роль одинаковы в админке, студии и на сайте", "Полная русификация интерфейса; amoore пишется строчными", "Админка: вход в стиле Liquid Glass, настройки только «Внешний вид» и «Профиль», Changelog переехал в «Новости → Обновления»", "Удалена Телеграм-рассылка из админки", "Починена привязка Телеграма: код /link создаётся, причина сбоя видна основателю", "Единый UI-кит: вкладки-чипсы, тумблеры и кнопки; поля ввода больше не вылезают за экран на телефоне", "Скелетоны вместо «Загрузка…»; карта посетителей по городам на дашборде", "Защита основателя на уровне базы данных", "Студия: профиль в настройках, проекты в профиле amoore ID, сжатие картинок в WebP", "Колокольчик уведомлений на лендинге"]$i$::jsonb)
+    ) || coalesce((select jsonb_agg(jsonb_set(x, '{order}', to_jsonb(coalesce((x->>'order')::int, 0) + 1)))
+                     from jsonb_array_elements(v->'versions') x), '[]'::jsonb))
+  where key = 'changelog';
+end $$;
+update public.changelog_versions set sort_order = sort_order + 1
+ where not exists (select 1 from public.changelog_versions where version = '5.2.0');
+insert into public.changelog_versions (version, title, released, items, sort_order)
+values ('5.2.0', 'v5.2 POLISH & SYNC', '2026-11-27',
+  $i$["Единый профиль amoore ID: ник, аватарка (фото или цвет) и роль одинаковы в админке, студии и на сайте", "Полная русификация интерфейса; amoore пишется строчными", "Админка: вход в стиле Liquid Glass, настройки только «Внешний вид» и «Профиль», Changelog переехал в «Новости → Обновления»", "Удалена Телеграм-рассылка из админки", "Починена привязка Телеграма: код /link создаётся, причина сбоя видна основателю", "Единый UI-кит: вкладки-чипсы, тумблеры и кнопки; поля ввода больше не вылезают за экран на телефоне", "Скелетоны вместо «Загрузка…»; карта посетителей по городам на дашборде", "Защита основателя на уровне базы данных", "Студия: профиль в настройках, проекты в профиле amoore ID, сжатие картинок в WebP", "Колокольчик уведомлений на лендинге"]$i$::jsonb, 0)
+on conflict (version) do nothing;
+
+-- Прежние подписи ролей «Админ» → «Администратор»
+update public.global_settings set value = jsonb_set(value, '{admin}', '"Администратор"') where key = 'role_labels' and value->>'admin' = 'Админ';
+
 -- Проверка:
--- select version from public.changelog_versions order by sort_order limit 2;     -- 5.1.0, 5.0.0
+-- select version from public.changelog_versions order by sort_order limit 2;     -- 5.2.0, 5.1.0
 -- select public.public_profile('username');
