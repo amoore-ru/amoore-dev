@@ -322,3 +322,34 @@ html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
 }
 @media (max-width: 420px) { .ux-name strong { font-size: 14px; } .ux-chip { padding: 0 9px; min-width: 40px; } }
 @media (prefers-reduced-motion: reduce) { .ux-tab, .ux-icon-btn, .ux-burger, .ux-burger span { transition: none !important; } }
+
+/* =====================================================================
+   v4.4 BUGFIX — бургер-меню: сплошной фон, без просвечивания (iPhone Safari / Telegram WebView)
+   Раньше шапка (.ux-topbar) оставалась полупрозрачной (rgba .58) и панель была ровно по высоте контента —
+   сквозь них виден контент страницы. Теперь при открытии: шапка и панель непрозрачные, панель занимает весь экран под шапкой.
+   ===================================================================== */
+@media (max-width: 1119px) {
+  .ux-topbar.open {
+    background-color: var(--bg, var(--nx-bg, #070b16)) !important; opacity: 1 !important;
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  }
+  .ux-topbar.open .ux-panel {
+    background-color: var(--bg, var(--nx-bg, #070b16)) !important; opacity: 1 !important;
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    height: calc(100vh - 58px); height: calc(100dvh - 58px - env(safe-area-inset-top, 0px));
+    max-height: none; z-index: 1001;
+  }
+  .ux-panel .ux-nav { flex: 0 0 auto; justify-content: flex-start; }
+  /* блок «Telegram + QR + Dev» внутри меню */
+  .ux-mobile-extra { order: 2; display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding-top: 14px; border-top: 1px solid rgba(var(--nx-gold-rgb), .16); }
+  .ux-extra-tg {
+    display: flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; padding: 0 20px; box-sizing: border-box;
+    font: 800 15px/1 var(--nx-btn-font); text-decoration: none; color: #0a0e18; background: var(--nx-btn-gradient);
+    border: 0; border-radius: var(--nx-btn-radius); -webkit-tap-highlight-color: transparent;
+  }
+  .ux-extra-qr { display: flex; align-items: center; gap: 14px; padding: 12px; border: 1px solid rgba(var(--nx-gold-rgb), .2); border-radius: 16px; }
+  .ux-extra-qr img { flex: 0 0 96px; width: 96px; height: 96px; border-radius: 10px; background: #fff; padding: 4px; box-sizing: border-box; object-fit: contain; }
+  .ux-extra-qr span { font: 700 14px/1.35 var(--nx-btn-font); color: var(--nx-ink); }
+  .ux-extra-dev { display: block; text-align: center; padding: 10px; font: 700 14px/1.2 var(--nx-btn-font); color: var(--nx-gold); text-decoration: none; }
+}
+@media (min-width: 1120px) { .ux-mobile-extra { display: none !important; } }

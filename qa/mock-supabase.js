@@ -100,13 +100,20 @@
           window.__mock.calls.push({ rpc: fn, args: args });
           if (fn === 'verify_admin') return Promise.resolve({ data: admin, error: null });
           if (fn === 'verify_god') return Promise.resolve({ data: true, error: null });
+          if (fn === 'public_profile') {   // v5.1: публичная страница #u/username
+            var p = table('profiles').filter(function (x) { return String(x.username).toLowerCase() === String(args.p_username).toLowerCase() && x.is_public !== false && !x.is_banned; })[0];
+            return Promise.resolve({ data: p ? { username: p.username, avatar_url: p.avatar_url, bio: p.bio || '', sites: table('user_sites').filter(function (z) { return z.user_id === p.id && z.is_public; }).map(function (z) { return { title: z.title, url: z.url }; }) } : null, error: null });
+          }
+          if (fn === 'claim_referral') { window.__referral = args.p_ref; return Promise.resolve({ data: 10, error: null }); }
           if (fn === 'quick_admins') return Promise.resolve({ data: [{ nickname: 'Boss', online: true }, { nickname: 'Tester', online: false }], error: null });
           return Promise.resolve({ data: true, error: null });
         },
         auth: {
-          getSession: function () { return Promise.resolve({ data: { session: window.__mock.session ? { user: { email: admin.email } } : null } }); },
+          getSession: function () { return Promise.resolve({ data: { session: window.__mock.session ? { user: { id: window.__mock.uid || admin.id, email: admin.email } } : null } }); },
           signInWithPassword: function () { return Promise.resolve({ data: { session: {} }, error: null }); },
-          signOut: function () { return Promise.resolve({}); }
+          signOut: function () { return Promise.resolve({}); },
+          updateUser: function (p) { window.__pwChanged = !!(p && p.password); return Promise.resolve({ data: {}, error: null }); },
+          signInWithOtp: function (o) { window.__otp = o; return Promise.resolve({ data: {}, error: null }); }
         },
         storage: { from: function () { return {
           list: function () { return Promise.resolve({ data: [{ name: 'a.png' }, { name: 'b.webp' }], error: null }); },

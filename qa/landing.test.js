@@ -9,11 +9,12 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   const T = suite('landing');
   const srv = await H.serve(ROOT, 8301), URL = 'http://localhost:8301/index.html';
   const b = await chromium.launch();
-  const open = (seed, o = {}) => H.openPage(b, URL + (o.query || ''), seed || S.seed(), o);
+  let TAB = 'home';   // v5.1: лендинг — SPA; тест открывает нужную вкладку (o.tab) до проверки её элементов
+  const open = async (seed, o = {}) => { const r = await H.openPage(b, URL + (o.query || ''), seed || S.seed(), o); const t = o.tab || TAB; if (t !== 'home') { await r.page.evaluate(x => window.amooreSPA && amooreSPA.go('#' + x), t); await sleep(150); } return r; };
   const items = (page) => page.$$eval('#news-list .news-item', els => els.map(e => ({ t: e.querySelector('b') && e.querySelector('b').textContent, s: e.querySelector('small') && e.querySelector('small').textContent, ph: e.hasAttribute('data-amoore-news-placeholder'), er: e.hasAttribute('data-amoore-news-error') })));
 
   // ---------- новости ----------
-  console.log('Новости');
+  TAB = 'news'; console.log('Новости');
   { const { page, errors } = await open();
     await until(async () => (await items(page)).filter(i => i.t).length >= 3, 5000);
     const it = await items(page);
@@ -69,7 +70,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await page.context().close(); }
 
   // ---------- баннер / чат / статус ----------
-  console.log('Баннер, чат, статус сайта');
+  TAB = 'chat'; console.log('Баннер, чат, статус сайта');
   { const s = S.seed(); Object.assign(s.ecosystem_sites[0], { banner_active: true, banner_text: 'Сайт на <b>профилактике</b>', demo_chat_active: false });
     const { page } = await open(s);
     const ban = await until(async () => page.$('#amoore-banner'), 4000);
@@ -91,18 +92,18 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await page.context().close(); }
 
   // ---------- версия ----------
-  console.log('Версия и история обновлений');
+  TAB = 'home'; console.log('Версия и история обновлений');
   { const { page } = await open();
     await sleep(800);
     const info = await page.evaluate(() => ({ v: window.AMOORE_VERSION, api: window.amooreCore && window.amooreCore.version, st: window.AMOORE_STATE && window.AMOORE_STATE.version, ftr: document.querySelector('.version-btn [data-amoore-version]').textContent }));
-    T.check('AMOORE_VERSION = 4.3.0 (core, state, API)', info.v === '4.3.0' && info.api === '4.3.0' && info.st === '4.3.0', JSON.stringify(info));
-    T.check('в подвале показана «Версия 4.3.0»', info.ftr === '4.3.0');
+    T.check('AMOORE_VERSION = 5.1.0 (core, state, API)', info.v === '5.1.0' && info.api === '5.1.0' && info.st === '5.1.0', JSON.stringify(info));
+    T.check('в подвале показана «Версия 5.1.0»', info.ftr === '5.1.0');
     await page.click('#version-btn');
     await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     const n = (await page.$$('#nx-changelog .nx-cl-entry')).length;
     T.check('модалка истории обновлений (ядро) загружает changelog.json, если БД пуста', n >= 3, n + ' версий');
     const first = await page.$eval('#nx-changelog .nx-cl-entry h3', e => e.textContent);
-    T.check('первая запись — v4.3.0', /v4\.3\.0/.test(first), first);
+    T.check('первая запись — v5.1.0', /v5.1.0/.test(first), first);
     await page.keyboard.press('Escape'); await sleep(350);
     T.check('Esc закрывает модалку', !(await page.$eval('#nx-changelog', e => e.classList.contains('open'))));
     const cl = JSON.parse(fs.readFileSync(path.join(ROOT, 'changelog.json'), 'utf8'));
@@ -110,10 +111,10 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await page.context().close(); }
 
   // ---------- NEXUS v4.0: чип версии, версия из БД, 🔒-вход, Quick Admin, дайджесты ----------
-  console.log('NEXUS: чип версии, вход, дайджесты');
+  TAB = 'news'; console.log('NEXUS: чип версии, вход, дайджесты');
   { const { page } = await open();
     const chip = await until(async () => page.$('#nx-version-chip'), 4000);
-    T.check('чип версии v4.3 стоит рядом с логотипом', !!chip && (await page.textContent('#nx-version-chip')) === 'v4.3' && await page.$eval('#nx-version-chip', c => c.previousElementSibling && c.previousElementSibling.classList.contains('ux-logo')));
+    T.check('чип версии v5.1 стоит рядом с логотипом', !!chip && (await page.textContent('#nx-version-chip')) === 'v5.1' && await page.$eval('#nx-version-chip', c => c.previousElementSibling && c.previousElementSibling.classList.contains('ux-logo')));
     await page.click('#nx-version-chip');
     const opened = await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     T.check('клик по чипу открывает историю обновлений', !!opened);
@@ -161,7 +162,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     const { page } = await open(s);
     await until(async () => (await items(page)).filter(i => i.t).length >= 4, 5000);
     const names = await page.$$eval('#news-tabs .tab', e => e.map(x => x.firstChild.textContent.trim()));
-    T.check('вкладки новостей: Все | Дайджесты | Обновления | Патчи | Планы', names.join('|') === 'Все|Дайджесты|Обновления|Патчи|Планы', names.join('|'));
+    T.check('вкладки новостей: Все | Дайджесты | Обновления | Планы', names.join('|') === 'Все|Дайджесты|Обновления|Планы', names.join('|'));
     await page.evaluate(() => document.querySelectorAll('.news-item').forEach(e => { e.hidden = false; e.style.display = ''; }));   // v4.2: «Все» скрывает дайджесты — для замера показываем все карточки
     const wide = await page.$eval('.news-item-digest', e => { const o = document.querySelector('.news-item:not(.news-item-digest)'); return { w: e.getBoundingClientRect().width, other: o.getBoundingClientRect().width, label: e.querySelector('small').textContent }; });
     T.check('карточка дайджеста шире обычных и подписана «Дайджест»', wide.w > wide.other + 100 && /Дайджест/.test(wide.label), JSON.stringify(wide));
@@ -170,7 +171,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await page.context().close(); }
 
   // ---------- заявка ----------
-  console.log('Форма «Оставить заявку»');
+  TAB = 'home'; console.log('Форма «Оставить заявку»');
   { const { page } = await open();
     const inStart = await page.$eval('#start #lead-form', e => !!e).catch(() => false);
     T.check('форма находится в блоке #start', inStart);
@@ -209,7 +210,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await page.context().close(); }
 
   // ---------- курсор убран ----------
-  console.log('Курсор и меню');
+  TAB = 'home'; console.log('Курсор и меню');
   { const { page } = await open();
     await page.mouse.move(300, 300); await page.mouse.move(420, 360); await sleep(300);
     T.check('кастомного курсора нет (ни элемента, ни класса на <html>)', !(await page.$('#amoore-cursor')) && !(await page.evaluate(() => document.documentElement.className.includes('amoore-cursor'))));
@@ -221,16 +222,16 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await sleep(600);
     await page.click('#burger'); await sleep(450);
     const st = await page.evaluate(() => ({ open: document.getElementById('ux-topbar').classList.contains('open'), lock: document.documentElement.classList.contains('ux-menu-open'), ar: document.getElementById('burger').getAttribute('aria-expanded'), links: document.querySelectorAll('.ux-nav a').length, theme: !!document.querySelector('.ux-tools [data-ux-theme]') }));
-    T.check('бургер открывает меню, scroll-lock включён, aria-expanded=true, тема остаётся в шапке', st.open && st.lock && st.ar === 'true' && st.links >= 7 && st.theme, JSON.stringify(st));
+    T.check('бургер открывает меню, scroll-lock включён, aria-expanded=true, тема остаётся в шапке', st.open && st.lock && st.ar === 'true' && st.links >= 5 && st.theme, JSON.stringify(st));
     await page.keyboard.press('Escape'); await sleep(300);
     T.check('Esc закрывает меню и снимает scroll-lock', !(await page.$eval('#ux-topbar', e => e.classList.contains('open'))) && !(await page.evaluate(() => document.documentElement.classList.contains('ux-menu-open'))));
     await page.click('#burger'); await sleep(400); await page.click('.ux-nav a[href="#news"]'); await sleep(900);
-    T.check('тап по пункту меню закрывает его и прокручивает к разделу', !(await page.$eval('#ux-topbar', e => e.classList.contains('open'))) && (await page.evaluate(() => scrollY)) > 500);
+    T.check('тап по пункту меню закрывает его и переключает вкладку «Новости»', !(await page.$eval('#ux-topbar', e => e.classList.contains('open'))) && await page.evaluate(() => amooreSPA.current() === 'news' && document.getElementById('view-news').classList.contains('is-active') && location.hash === '#news'));
     await page.context().close(); }
 
 
   // ---------- вкладки новостей (хотфикс 4.0.0) ----------
-  console.log('Вкладки новостей и золото');
+  TAB = 'news'; console.log('Вкладки новостей и золото');
   { const s = S.seed();
     s.news.push({ id: 'p2', title: 'Патч новее', body: 'свежий патч', type: 'patch', display_date: '2026-11-04', is_published: true, published_at: new Date(Date.now() - 6 * 86400000).toISOString() });
     s.news.push({ id: 'u2', title: 'Обновление старое', body: 'старое', type: 'news', display_date: '2026-10-01', is_published: true, published_at: new Date(Date.now() - 30 * 86400000).toISOString() });
@@ -238,9 +239,9 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await until(async () => (await items(page)).filter(i => i.t).length >= 5, 5000);
     const vis = async () => page.$$eval('#news-list .news-item[data-type]', els => els.filter(e => !e.hidden && getComputedStyle(e).display !== 'none').map(e => e.querySelector('b').textContent));
     const names = await page.$$eval('#news-tabs .tab', e => e.map(x => x.firstChild.textContent.trim()));
-    T.check('над списком 5 вкладок: Все / Дайджесты / Обновления / Патчи / Планы', names.join('|') === 'Все|Дайджесты|Обновления|Патчи|Планы', names.join('|'));
+    T.check('над списком 4 вкладки: Все / Дайджесты / Обновления / Планы (v4.4: «Патчи» убраны)', names.join('|') === 'Все|Дайджесты|Обновления|Планы', names.join('|'));
     const cnt = await page.$$eval('#news-tabs .news-count', e => e.map(x => x.textContent));
-    T.check('на вкладках счётчики (Все 5 · Дайджесты 0 · Обновления 2 · Патчи 2 · Планы 1)', cnt.join() === '5,0,2,2,1', cnt.join());
+    T.check('на вкладках счётчики (Все 5 · Дайджесты 0 · Обновления 4 = новости 2 + патчи 2 · Планы 1)', cnt.join() === '5,0,4,1', cnt.join());
     const all = await vis();
     T.check('«Все»: показано всё, самое свежее сверху (по дате новости)', all.length === 5 && all[0] === 'Голосовые, память и карма' && all[all.length - 1] === 'Обновление старое', all.join(' > '));
     await page.evaluate(() => { window.__db.news.unshift({ id: 'dg1', title: 'Дайджест недели', body: 'сводка', type: 'digest', display_date: '2026-11-09', is_published: true, published_at: new Date().toISOString() }); window.__emit('news', {}); });
@@ -249,30 +250,28 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await page.click('#news-tabs [data-filter="digest"]'); await sleep(200);
     T.check('v4.2 «Дайджесты»: только digest', (await vis()).join('|') === 'Дайджест недели', (await vis()).join('|'));
     await page.click('#news-tabs [data-filter="all"]'); await sleep(200);
-    await page.click('#news-tabs [data-filter="patch"]'); await sleep(450);
-    const pt = await vis();
-    T.check('«Патчи»: остаются только патчи, свежий патч выше старого', pt.join('|') === 'Патч новее|Обновление', pt.join('|'));
-    T.check('активная вкладка выделена (aria-selected, класс)', await page.$eval('#news-tabs [data-filter="patch"]', b => b.getAttribute('aria-selected') === 'true' && b.classList.contains('is-active')) && (await page.$$eval('#news-tabs [aria-selected="true"]', e => e.length)) === 1);
+    T.check('v4.4 кнопки «Патчи» нет в DOM', (await page.$$('#news-tabs [data-filter="patch"]')).length === 0);
     await page.click('#news-tabs [data-filter="news"]'); await sleep(450);
     const up = await vis();
-    T.check('«Обновления»: только type=news, свежее сверху', up.join('|') === 'amoore Studio — обновилось|Обновление старое', up.join('|'));
+    T.check('v4.4 «Обновления»: и type=news, и type=patch (4 карточки)', up.length === 4 && ['amoore Studio — обновилось', 'Обновление старое', 'Патч новее', 'Обновление'].every(x => up.includes(x)), up.join('|'));
+    T.check('активная вкладка выделена (aria-selected, класс)', await page.$eval('#news-tabs [data-filter="news"]', b => b.getAttribute('aria-selected') === 'true' && b.classList.contains('is-active')) && (await page.$$eval('#news-tabs [aria-selected="true"]', e => e.length)) === 1);
     await page.click('#news-tabs [data-filter="soon"]'); await sleep(450);
     T.check('«Планы»: только type=soon', (await vis()).join('|') === 'Голосовые, память и карма');
-    await page.evaluate(() => { window.__db.news.unshift({ id: 'nx', title: 'Свежий план', body: 'x', type: 'soon', display_date: '2026-11-07', is_published: true, published_at: new Date().toISOString() }); window.__emit('news', {}); });
+    await page.evaluate(() => { window.__db.news.unshift({ id: 'nx', title: 'Свежий план', body: 'x', type: 'soon', display_date: new Date().toISOString().slice(0, 10), is_published: true, published_at: new Date().toISOString() }); window.__emit('news', {}); });
     await until(async () => (await vis())[0] === 'Свежий план', 3000);
     T.check('новая новость по Realtime подчиняется активному фильтру и встаёт наверх', (await vis()).join('|') === 'Свежий план|Голосовые, память и карма', (await vis()).join('|'));
     await page.focus('#news-tabs [data-filter="soon"]'); await page.keyboard.press('ArrowRight'); await sleep(450);
     T.check('стрелки ← → переключают вкладки (доступность)', await page.$eval('#news-tabs [data-filter="all"]', b => b.getAttribute('aria-selected') === 'true'));
-    await page.evaluate(() => { window.__db.news = window.__db.news.filter(n => n.type !== 'patch'); window.__emit('news', {}); });
+    await page.evaluate(() => { window.__db.news = window.__db.news.filter(n => n.type !== 'soon'); window.__emit('news', {}); });
     await until(async () => (await page.$$eval('#news-tabs .news-count', e => e[3].textContent)) === '0', 3000);
-    await page.click('#news-tabs [data-filter="patch"]'); await sleep(450);
+    await page.click('#news-tabs [data-filter="soon"]'); await sleep(450);
     T.check('пустая категория: аккуратное сообщение вместо пустоты', /В этой категории пока ничего нет/.test(await page.textContent('#news-list')));
     await page.click('#news-tabs [data-filter="all"]'); await sleep(450);
     T.check('возврат на «Все» убирает сообщение и возвращает карточки', !(await page.$('.news-empty')) && (await vis()).length >= 3);
     await page.context().close(); }
   { const { page } = await open(S.seed(), { reducedMotion: 'reduce' });
     await until(async () => (await items(page)).filter(i => i.t).length >= 3, 5000);
-    await page.click('#news-tabs [data-filter="patch"]'); await sleep(60);
+    await page.click('#news-tabs [data-filter="soon"]'); await sleep(60);
     T.check('prefers-reduced-motion: фильтр срабатывает мгновенно', (await page.$$eval('#news-list .news-item[data-type]:not([hidden])', e => e.length)) === 1);
     await page.context().close(); }
   { const { page } = await open(S.seed(), { mockInit: "window.__mock={hang:[],fail:['news'],calls:[],rest:'fail'};" });
@@ -298,13 +297,14 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   // ---------- safe-area (статическая проверка: Chromium не эмулирует env()) ----------
   { const css = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8'), html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
     T.check('viewport-fit=cover включён', /viewport-fit=cover/.test(html));
-    T.check('safe-area-inset-* применён к шапке, меню, нижней панели, подвалу и модалке', ['.ux-topbar', '.ux-panel', '.mobile-cta', 'footer'].every(sel => new RegExp(sel.replace('.', '\\.') + '[^{]*\\{[^}]*safe-area-inset', 's').test(css + fs.readFileSync(path.join(ROOT, 'amoore-theme.css'), 'utf8'))));
-    T.check('кэш: CSS/JS подключены с версией ?v=4.3.0', /style\.css\?v=4\.3\.0/.test(html) && /amoore-core\.js\?v=4\.3\.0/.test(html) && /landing\.js\?v=4\.3\.0/.test(html));
+    T.check('v4.4 плавающей кнопки #mobile-cta в разметке нет, а в CSS она display:none !important', !/id="mobile-cta"/.test(html) && /\.mobile-cta[^{]*\{\s*display:\s*none\s*!important/.test(css));
+    T.check('safe-area-inset-* применён к шапке, меню, нижней панели, подвалу и модалке', ['.ux-topbar', '.ux-panel', 'footer'].every(sel => new RegExp(sel.replace('.', '\\.') + '[^{]*\\{[^}]*safe-area-inset', 's').test(css + fs.readFileSync(path.join(ROOT, 'amoore-theme.css'), 'utf8'))));
+    T.check('кэш: CSS/JS подключены с версией ?v=5.1.0', /style\.css\?v=5.1.0/.test(html) && /amoore-core\.js\?v=5.1.0/.test(html) && /landing\.js\?v=5.1.0/.test(html));
     const hdr = fs.readFileSync(path.join(ROOT, '_headers'), 'utf8');
     T.check('_headers: CSS больше не «immutable на год»', !/\/\*\.css\s*\n\s*Cache-Control:[^\n]*immutable/.test(hdr)); }
 
   // ---------- матрица адаптива ----------
-  console.log('Адаптив');
+  TAB = 'home'; console.log('Адаптив');
   const widths = [320, 360, 375, 390, 414, 430, 540, 768, 820, 1024, 1280, 1440, 1920];
   const matrix = [];
   for (const w of widths) {

@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v4.3.0 «POLISH»
+ * amoore-core.js — v5.1.0 «BUGFIX»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '4.3.0';
+  var AMOORE_VERSION = '5.1.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -693,7 +693,7 @@
       var local = await fetchChangelog('changelog.json');
       if (local && local.length) list = sortVersions(local);
     }
-    changelogList = list && list.length ? list : [{ version: '4.3.0', title: 'POLISH', items: ['Единая шапка, обновлённые настройки, умный бот, быстрее загрузка.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.1.0', title: 'BUGFIX', items: ['Исправлены мобильная вёрстка и бургер-меню, настроены права RLS.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }
@@ -754,7 +754,26 @@
       if (storedTokens().length) return;                    // админов в статистику не пишем
       sessionStorage.setItem(VISIT_KEY, '1');
     } catch (e) {}
-    try { client.from('site_visits').insert({ site_id: SITE_ID }).then(function () {}, function () {}); } catch (e) {}
+    var row = { site_id: SITE_ID, visitor_id: visitorId(), path: String(location.pathname || '/').slice(0, 200) };
+    geoLookup().then(function (g) {
+      if (g) { row.country_code = g.country_code || null; row.country = g.country || null; row.city = g.city || null; }
+      try { client.from('site_visits').insert(row).then(function () {}, function () {}); } catch (e) {}
+    });
+  }
+  // анонимный id посетителя (для «онлайн сейчас» и уникальных визитов); гео — Edge Function geo, IP не сохраняется
+  function visitorId() {
+    try { var k = 'amoore_vid', v = localStorage.getItem(k);
+      if (!v) { v = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Math.random().toString(36).slice(2) + Date.now().toString(36)); localStorage.setItem(k, v); }
+      return v; } catch (e) { return null; }
+  }
+  function geoLookup() {
+    try {
+      var c = sessionStorage.getItem('amoore_geo'); if (c) return Promise.resolve(JSON.parse(c));
+      var ctl = window.AbortController ? new AbortController() : null; if (ctl) setTimeout(function () { ctl.abort(); }, 2500);
+      return fetch(SB_URL + '/functions/v1/geo', { headers: { apikey: SB_ANON }, signal: ctl ? ctl.signal : undefined })
+        .then(function (r) { return r.json(); }).then(function (g) { try { sessionStorage.setItem('amoore_geo', JSON.stringify(g || {})); } catch (e) {} return g; })
+        .catch(function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
   }
 
   // ------------------------------------------------------------------ SEO

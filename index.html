@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <script src="amoore-ux.js?v=4.3.0"></script>
-  <link rel="stylesheet" href="style.css?v=4.3.0">
-  <link rel="stylesheet" href="amoore-theme.css?v=4.3.0">
-  <link rel="stylesheet" href="dev-theme.css?v=4.3.0">
+  <script src="amoore-ux.js?v=5.1.0"></script>
+  <link rel="stylesheet" href="style.css?v=5.1.0">
+  <link rel="stylesheet" href="amoore-theme.css?v=5.1.0">
+  <link rel="stylesheet" href="dev-theme.css?v=5.1.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -28,6 +28,11 @@
           <label for="email">Email</label>
           <input type="email" id="email" placeholder="founder@amoore.ru" required autocomplete="username">
         </div>
+        <div class="form-group" id="otp-group">
+          <label for="otp">Код из письма</label>
+          <div style="display:flex;gap:8px"><input type="text" id="otp" inputmode="numeric" maxlength="6" placeholder="6 цифр" autocomplete="one-time-code" style="flex:1">
+          <button type="button" class="btn btn-ghost" id="send-code-btn" style="font-size:12px;white-space:nowrap">Выслать код</button></div>
+        </div>
         <div class="form-group" id="password-group">
           <label for="password">Пароль</label>
           <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
@@ -37,6 +42,7 @@
           <input type="password" id="token" placeholder="Секретный токен" required autocomplete="off">
         </div>
         <button type="submit" class="btn btn-primary" id="login-btn"><span id="login-btn-text">Войти</span></button>
+        <button type="button" class="btn btn-ghost" id="magic-btn" style="width:100%;margin-top:10px;font-size:12px">Войти по ссылке из письма</button>
         <button type="button" class="btn btn-ghost" id="full-login-btn" style="width:100%;margin-top:10px;display:none;font-size:12px">Войти с email и паролем</button>
       </form>
       <div class="login-error" id="login-error"></div>
@@ -51,7 +57,7 @@
           <span class="ux-mark">a.</span>
           <span class="ux-name"><strong>amoore Dev</strong><small>Mission Control</small></span>
         </a>
-        <button type="button" class="ux-chip nx-version-chip" id="version-chip" data-ux-chip aria-haspopup="dialog" aria-label="История обновлений">v4.3</button>
+        <button type="button" class="ux-chip nx-version-chip" id="version-chip" data-ux-chip aria-haspopup="dialog" aria-label="История обновлений">v4.4</button>
       </div>
       <div class="ux-panel" id="ux-panel">
         <nav class="ux-nav" id="ux-nav" aria-label="Навигация">
@@ -60,6 +66,7 @@
           <button type="button" class="ux-tab" data-view="media" id="tab-media">Медиа</button>
           <button type="button" class="ux-tab" data-view="digest" id="tab-digest">Дайджест</button>
           <button type="button" class="ux-tab" data-view="team" id="tab-team">Команда</button>
+<button type="button" class="ux-tab" data-view="people" id="tab-people" style="display:none">Люди</button>
           <button type="button" class="ux-tab" data-view="logs" id="tab-logs">Логи</button>
           <button type="button" class="ux-tab" data-view="leads" id="tab-leads">Заявки<span class="ux-badge" id="leads-badge" hidden aria-label="Новых заявок">0</span></button>
         </nav>
@@ -288,8 +295,26 @@
         <div id="leads-list" class="stack" style="margin-top:16px"><div class="loading-state">Загрузка…</div></div>
       </div>
 
+      <div class="view" id="view-people">
+        <h2>Люди</h2><p class="muted">Все аккаунты Amoore ID. Доступно только Super Admin.</p>
+        <input type="search" id="people-search" placeholder="Поиск по email или username" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.05);color:inherit;font-size:16px;margin-top:12px">
+        <div id="people-list" class="stack" style="margin-top:16px"></div>
+      </div>
+
       <div class="view" id="view-logs">
         <div class="section-title">История действий</div>
+        <div class="logs-toolbar">
+          <label for="logs-filter" class="muted">Тип события</label>
+          <select id="logs-filter" aria-label="Фильтр по типу события">
+            <option value="">Все события</option>
+            <option value="login">Вход и выход</option>
+            <option value="password">Смена пароля</option>
+            <option value="profile">Профиль и Telegram</option>
+            <option value="security">Безопасность и роли</option>
+            <option value="content">Контент</option>
+            <option value="crm">Заявки (CRM)</option>
+          </select>
+        </div>
         <div class="logs-wrap glass" style="padding:0;overflow:hidden">
           <table class="logs-table">
             <thead><tr><th>Кто</th><th>Действие</th><th>Сайт</th><th>Заставка</th><th>Время</th></tr></thead>
@@ -407,7 +432,11 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="digest.js?v=4.3.0"></script>
-  <script src="app.js?v=4.3.0"></script>
+  <script src="amoore-id.js?v=5.1.0"></script>
+<script src="amoore-pwa.js?v=5.1.0" defer></script>
+<script src="amoore-cmdk.js?v=5.1.0" defer></script>
+  <script src="digest.js?v=5.1.0"></script>
+  <script src="app.js?v=5.1.0"></script>
+  <script src="amoore-admin-v5.js?v=5.1.0"></script>
 </body>
 </html>

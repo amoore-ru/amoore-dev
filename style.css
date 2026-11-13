@@ -1506,3 +1506,27 @@ body.menu-open { overflow: hidden; }
 @media (min-width: 1101px) and (max-width: 1440px) {
   .global-search-wrap { width: clamp(96px, 9vw, 150px); }
 }
+
+
+/* ===== v5.1 · Блок 4: карточки заявок и новостей без «пустот» ===== */
+.lead-card, .news-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;   /* кнопки прижаты к тексту, а не уезжают на край */
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+.lead-card .admin-card-info, .news-card .admin-card-info { flex: 0 1 auto; display: block; }
+.lead-card .admin-card-actions, .news-card .admin-card-actions { width: auto; justify-content: flex-start; flex-shrink: 1; gap: 8px; }
+.lead-card .admin-card-info p, .news-card .admin-card-info p { margin: 4px 0 0; }
+.lead-card .lead-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; }
+.lead-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.lead-tag { padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(212,175,55,.25); background: transparent; color: inherit; font: 12px inherit; cursor: pointer; opacity: .7; }
+.lead-tag.on { opacity: 1; background: rgba(212,175,55,.2); border-color: rgba(212,175,55,.6); font-weight: 700; }
+.lead-tag[data-tag="spam"].on { background: rgba(239,68,68,.2); border-color: rgba(239,68,68,.6); }
+.lead-tag[data-tag="pending"].on { background: rgba(100,140,255,.2); border-color: rgba(100,140,255,.6); }
+.logs-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; }
+.logs-toolbar select { min-width: 200px; }
+.leads-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.v5-chart canvas { max-width: 100% !important; }

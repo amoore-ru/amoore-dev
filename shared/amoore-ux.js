@@ -143,7 +143,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
   window.amooreUX = {
-    version: '4.3',
+    version: '4.4',
     getTheme: getTheme, setTheme: setTheme, toggleTheme: toggleTheme,
     setUser: setUser, clearUser: clearUser, session: session,
     setVersion: setVersion, shortVer: shortVer, closeMenu: closeMenu

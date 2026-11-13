@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '4.3.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '5.1.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -49,7 +49,7 @@ const ACTION_LABELS = {
   admin_add: 'Добавил пользователя', admin_delete: 'Удалил пользователя',
   role_change: 'Сменил роль', perms_change: 'Изменил права', media_upload: 'Загрузил медиа', backup: 'Скачал бэкап',
   admin_edit: 'Изменил профиль', news_edit: 'Изменил новость', digest_publish: 'Опубликовал дайджест', labels_edit: 'Изменил названия ролей', changelog_edit: 'Изменил changelog',
-  lead_done: 'Обработал заявку', digest_request: 'Запросил дайджест', bot_toggle: 'Переключил бота', broadcast: 'Сделал рассылку'
+  lead_done: 'Обработал заявку', lead_status: 'Сменил статус заявки', lead_tag: 'Поставил тег заявке', lead_export: 'Экспортировал заявки', login: 'Вход', logout: 'Выход', password_change: 'Смена пароля', profile_update: 'Обновил профиль', telegram_linked: 'Привязал Telegram', ban: 'Забанил', unban: 'Снял бан', set_role: 'Назначил роль', sessions_revoked: 'Завершил сессии', sso_issue: 'SSO-переход', digest_request: 'Запросил дайджест', bot_toggle: 'Переключил бота', broadcast: 'Сделал рассылку'
 };
 const OVERLAY_LABELS = { maintenance: 'Плановые работы', crash: 'Крах', private: 'Приват' };
 const NEWS_TYPES = { news: 'Новость', patch: 'Патч', soon: 'Скоро', digest: 'Дайджест' };
@@ -193,11 +193,14 @@ async function verifyAdmin(accessToken) {
     role: data.role, permissions: data.permissions || null, access_token: accessToken
   };
 }
-async function loginFull(email, password, token) {
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(friendlyError(error));
+async function loginFull(email, password, token, code) {
+  amooreID.init({ site: 'dev', sb });
   try {
-    const s = await verifyAdmin(token);
+    await amooreID.verifyCode(email, code);                 // 1) код из письма
+    await amooreID.signIn(email, password);                 // 2) пароль (5 ошибок → блок на 15 мин)
+  } catch (e) { await sb.auth.signOut().catch(() => {}); throw e; }
+  try {
+    const s = await verifyAdmin(token);                     // 3) секретный токен
     saveSession(s);
     return s;
   } catch (e) { await sb.auth.signOut().catch(() => {}); throw e; }
@@ -214,6 +217,8 @@ async function loginTokenOnly(token) {
 function setLoginMode(tokenOnly) {
   tokenOnlyMode = tokenOnly;
   $('email-group').style.display = tokenOnly ? 'none' : '';
+  $('otp-group').style.display = tokenOnly ? 'none' : '';
+  $('magic-btn').style.display = tokenOnly ? 'none' : '';
   $('password-group').style.display = tokenOnly ? 'none' : '';
   $('email').required = !tokenOnly;
   $('password').required = !tokenOnly;
@@ -230,6 +235,7 @@ function showLogin(preferTokenOnly) {
   setLoginMode(!!(preferTokenOnly && rememberedEmail()));
 }
 function showApp(session) {
+  amooreID.ensureOnboarded().then(() => amooreID.mountChip()).catch(() => {});      // username + аватарка обязательны
   me = { ...session, perms: resolvePermissions(session.role, session.permissions) };
   $('login-screen').style.display = 'none';
   $('app').classList.add('visible');
@@ -249,6 +255,7 @@ const VIEW_RULES = {
   dashboard: () => true,
   media:     () => can('manage_media'),
   team:      () => isSuper() || can('manage_admins'),
+  people:    () => isSuper() || me?.role === 'super_admin',
   logs:      () => can('view_logs'),
   settings:  () => isSuper() || me?.role === 'admin' || can('download_backup')
 };
@@ -299,6 +306,7 @@ function switchView(name) {
   if (name === 'logs') loadLogs();
   if (name === 'leads') loadLeads();
   if (name === 'digest') loadDigestView();
+  window.amooreV5?.onView(name);
 }
 const closeMobileMenu = () => window.amooreUX?.closeMenu();
 document.querySelectorAll('.ux-tab').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
@@ -628,6 +636,15 @@ async function loadMiniAudit() {
 }
 
 // ======================================================================= новости
+// v5.1: Web Push о новости (Edge Function push-news). Ошибка push не мешает публикации.
+async function sendNewsPush(id) {
+  if (!id) return;
+  try {
+    const { data, error } = await sb.functions.invoke('push-news', { body: { news_id: id } });
+    if (error || !data || data.error) return;
+    if (data.sent) toast(`Push отправлен: ${data.sent}`);
+  } catch (_) { /* push не настроен (VAPID) — новость всё равно опубликована */ }
+}
 $('news-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (!can('manage_news')) return toast('Недостаточно прав', 'error');
@@ -658,6 +675,7 @@ $('news-form').addEventListener('submit', async (e) => {
     }
     logAction('news_add', null, null, title);
     toast('Опубликовано на лендинге (Realtime / до 20 сек)');
+    sendNewsPush(data && data.id);
     e.target.reset();
     if ($('news-date')) $('news-date').value = todayISO();
     loadNewsAdmin();
@@ -819,7 +837,7 @@ async function loadLeads() {
   if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
   if (!data?.length) { list.innerHTML = '<div class="loading-state">Здесь пока пусто. Новые заявки появятся после отправки формы.</div>'; return; }
   list.innerHTML = data.map(l => `
-    <div class="admin-card glass" data-lead="${esc(l.id)}" data-new="${l.status === 'done' ? 0 : 1}">
+    <div class="admin-card glass lead-card" data-lead="${esc(l.id)}" data-new="${l.status === 'done' ? 0 : 1}">
       <div class="admin-card-info">
         <h4>${esc(l.name || 'Без имени')} <span class="role-badge ${l.status === 'done' ? 'admin' : 'moderator'}">${esc(l.status || 'new')}</span></h4>
         <p>${esc(l.contact || '')}</p>
@@ -946,10 +964,11 @@ async function publishDigestNews() {
   const btn = $('digest-publish'); if (btn) btn.disabled = true;
   const label = lastDigest.period && lastDigest.period.label ? lastDigest.period.label : todayISO();
   const row = { title: 'Дайджест недели · ' + label, body: String(lastDigest.text || '').slice(0, 4000), type: 'digest', display_date: todayISO(), is_published: true, published_at: new Date().toISOString() };
-  const { error } = await sb.from('news').insert(row);
+  const { data: ins, error } = await sb.from('news').insert(row).select('id').maybeSingle();
   if (btn) btn.disabled = false;
   if (error) return toast(friendlyError(error), 'error');
   logAction('digest_publish', null, null, row.title); toast('Дайджест опубликован: вкладка «Дайджесты» на лендинге');
+  sendNewsPush(ins && ins.id);
 }
 let digestPoll = 0;
 async function sendDigestToBot() {
@@ -1103,8 +1122,8 @@ if ($('telegram-broadcast-btn')) $('telegram-broadcast-btn').addEventListener('c
   if (btn.disabled) return;
   if (!confirm('Отправить это сообщение всем активным пользователям amoore-ai?')) return;
   btn.disabled=true; btn.setAttribute('aria-busy','true'); const old=btn.textContent; btn.textContent='Отправка…';
-  try { const {data,error}=await sb.functions.invoke('send-telegram',{body:{action:'broadcast',message}}); if(error) throw error; toast(`Рассылка завершена: ${data.sent} отправлено, ${data.failed} ошибок`,data.failed?'error':'success'); }
-  catch(e){toast(friendlyError(e),'error');}
+  try { const {data,error}=await sb.functions.invoke('send-telegram',{body:{action:'broadcast',message}}); if(error||!data||data.error) throw (error||new Error(data?.error||'broadcast')); toast(`Рассылка завершена: ${data.sent} отправлено, ${data.failed} ошибок`,data.failed?'error':'success'); }
+  catch(e){toast('Ошибка: проверьте BOT_TOKEN','error');}
   finally{btn.disabled=false;btn.removeAttribute('aria-busy');btn.textContent=old;}
 });
 
@@ -1326,9 +1345,11 @@ $('pf-save').addEventListener('click', async () => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast('Проверьте email', 'error');
   const btn = $('pf-save'); btn.disabled = true;
   try {
-    const { error } = await sb.from('admins').update({ nickname, email }).eq('id', me.admin_id);
+    // v4.4: email уходит в БД только если реально изменён (иначе UPDATE упирался в права колонки email → «Недостаточно прав (RLS)»)
+    const emailChanged = email !== String(me.email || '').toLowerCase();
+    const patch = emailChanged ? { nickname, email } : { nickname };
+    const { error } = await sb.from('admins').update(patch).eq('id', me.admin_id);
     if (error) return toast(friendlyError(error), 'error');
-    const emailChanged = email !== me.email;
     me.nickname = nickname; me.email = email;
     const s = loadSession(); if (s) saveSession({ ...s, nickname, email }, s.expires_at);
     paintUser(); logAction('admin_edit', null, null, nickname);
@@ -1393,7 +1414,7 @@ $('cl-save').addEventListener('click', async () => {
   const list = readClEditor().filter(v => v.version).map((v, i) => ({ ...v, order: i }));   // порядок — как расставлен перетаскиванием
   if (!list.length) return toast('Добавьте хотя бы одну версию', 'error');
   if (new Set(list.map(v => v.version)).size !== list.length) return toast('Версии не должны повторяться', 'error');
-  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 4.3.0', 'error');
+  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 5.1.0', 'error');
   const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: list[0].version, versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return toast(friendlyError(error), 'error');
   wnList = list; liveVersion = String(list[0].version); paintVersionChip();
@@ -1406,12 +1427,15 @@ function logRow(l, names, sites, full) {
   const where = sites[l.site_id] || l.site_id || l.details || '—';
   return { who: names[l.admin_id] || '—', act: ACTION_LABELS[l.action] || l.action || '—', where, t: fmtDateTime(l.created_at, !full) };
 }
+// v5.1: фильтр журнала по типу события (вход, смена пароля …)
+const LOG_FILTERS = { login: ['login', 'logout'], password: ['password_change'], profile: ['profile_update', 'telegram_linked'], security: ['ban', 'unban', 'set_role', 'role_change', 'sessions_revoked', 'sso_issue'], content: ['news_add', 'news_edit', 'news_delete', 'news_on', 'news_off', 'site_add', 'site_delete', 'media_upload', 'digest_publish', 'changelog_edit'], crm: ['lead_done', 'lead_status', 'lead_tag', 'lead_export'] };
+document.addEventListener('change', (e) => { if (e.target && e.target.id === 'logs-filter') loadLogs(); });
 async function loadLogs() {
   if (!can('view_logs')) return;
   const tbody = $('logs-tbody'), cards = $('logs-cards');
   tbody.innerHTML = '<tr><td colspan="5"><div class="skeleton-stack" aria-label="Загрузка логов"><i></i><i></i><i></i></div></td></tr>';
   const [{ data: logs, error }, names, sres] = await Promise.all([
-    sb.from('audit_logs').select('admin_id, action, site_id, overlay_type, details, created_at').order('created_at', { ascending: false }).limit(100),
+    (() => { let q = sb.from('audit_logs').select('admin_id, action, site_id, overlay_type, details, created_at').order('created_at', { ascending: false }).limit(100); const f = LOG_FILTERS[($('logs-filter') || {}).value]; return f ? q.in('action', f) : q; })(),
     adminMap(),
     sb.from('ecosystem_sites').select('id, name')
   ]);
@@ -1431,6 +1455,15 @@ async function loadLogs() {
 
 // ======================================================================= вход / выход / старт
 $('full-login-btn').addEventListener('click', () => setLoginMode(false));
+async function mailAction(fn, okText) {
+  const email = ($('email').value || '').trim(), box = $('login-error');
+  box.classList.remove('visible');
+  try { if (!email) throw new Error('Введите email'); amooreID.init({ site: 'dev', sb }); await fn(email); box.textContent = okText; }
+  catch (e) { box.textContent = friendlyError(e); }
+  box.classList.add('visible');
+}
+$('send-code-btn').addEventListener('click', () => mailAction(e => amooreID.sendCode(e), 'Код отправлен — проверьте почту'));
+$('magic-btn').addEventListener('click', () => mailAction(e => amooreID.sendMagicLink(e), 'Ссылка отправлена — откройте её на этом устройстве, затем введите токен'));
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('login-error').classList.remove('visible');
@@ -1440,7 +1473,7 @@ $('login-form').addEventListener('submit', async (e) => {
   const password = $('password').value;
   const token = $('token').value.trim();
   try {
-    if (!token || (!tokenOnlyMode && (!email || !password))) throw new Error('Заполните все поля');
+    if (!token || (!tokenOnlyMode && (!email || !password || !$('otp').value.trim()))) throw new Error('Заполните все поля');
     let session;
     if (tokenOnlyMode) {
       try { session = await loginTokenOnly(token); }
@@ -1448,7 +1481,7 @@ $('login-form').addEventListener('submit', async (e) => {
         if (err.message === 'NEED_PASSWORD') { setLoginMode(false); throw new Error('Сессия истекла — введите пароль'); }
         throw err;
       }
-    } else session = await loginFull(email, password, token);
+    } else session = await loginFull(email, password, token, $('otp').value.trim());
     showApp(session);
   } catch (err) {
     $('login-error').textContent = friendlyError(err);
@@ -1468,6 +1501,8 @@ document.addEventListener('amoore:logout', e => {
 });
 
 (async function boot() {
+  amooreID.init({ site: 'dev', sb });
+  try { if (await amooreID.consumeUrl()) { const u = (await sb.auth.getSession()).data.session?.user; if (u?.email) localStorage.setItem(EMAIL_KEY, u.email); } } catch (e) { console.warn('[amoore-id]', e); }
   const s = loadSession();
   if (s?.admin_id) {
     try {

@@ -104,3 +104,17 @@ table, th, td { background-color: transparent; }
 .cl-handle:active { cursor: grabbing; }
 .cl-move { display: inline-flex; gap: 6px; margin-left: auto; }
 .cl-move button { width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(212, 175, 55, 0.3); background: transparent; color: var(--gold); font-size: 16px; }
+
+/* v4.4 BUGFIX — светлая тема: мягкая рамка и лёгкая тень у карточек вместо жёсткого контура */
+:root[data-theme="light"] .glass,
+:root[data-theme="light"] .site-card,
+:root[data-theme="light"] .admin-card,
+:root[data-theme="light"] .stat-card,
+:root[data-theme="light"] .widget,
+:root[data-theme="light"] .team-form,
+:root[data-theme="light"] .settings-card,
+:root[data-theme="light"] .login-card,
+:root[data-theme="light"] .logs-wrap {
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
+}
