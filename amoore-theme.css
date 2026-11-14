@@ -396,3 +396,42 @@ html, body { overflow-x: hidden; max-width: 100%; }
 .skeleton-stack > i { height: 18px; } .skeleton-stack > i:first-child { width: 55%; } .skeleton-stack > i:last-child { width: 80%; }
 .skel-card { min-height: 150px; border-radius: 18px; }
 @media (prefers-reduced-motion: reduce) { .skel, .skeleton-stack > i { animation: none; } }
+
+/* =====================================================================
+   v5.3 «SMART AUTH» — мобильные фиксы (общий файл: правится только здесь, sync_shared.sh копирует на все сайты)
+   1) вкладки и ряды кнопок переносятся на новую строку и не вылезают за край экрана;
+   2) все тумблеры и переключатели темы имеют жёсткий размер (flex-shrink: 0);
+   3) карточки заявок/новостей: контент прижат к верху, без «пустот» от space-between.
+   ===================================================================== */
+.aid-tabs, .chip-tabs, .aid-nav, .settings-sidebar, .settings-menu, .theme-options, .theme-seg,
+.modal-actions, .hero-actions, .digest-actions, .logs-toolbar, .project-card-actions, .project-detail-actions,
+.admin-card-actions, .lead-actions, .row-actions, .btn-row, .button-row { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.aid-tabs { overflow-x: visible; }
+.aid-tabs > button, .chip-tabs > *, .aid-nav > *, .theme-seg > *, .theme-options > * { max-width: 100%; min-width: 0; }
+.btn, .btn-ghost, .btn-primary, .btn-sm, .aid-btn, .nx-btn, .primary-button, .secondary-button, .ghost-button { max-width: 100%; box-sizing: border-box; }
+@media (max-width: 640px) {
+  .btn, .btn-ghost, .btn-primary, .primary-button, .secondary-button, .ghost-button { white-space: normal; overflow-wrap: anywhere; }
+  .aid-tabs > button { flex: 1 1 auto; }
+  .modal-actions > *, .digest-actions > * { flex: 1 1 140px; }
+}
+/* тумблеры: никогда не сжимаются и не растягиваются во flex/grid-рядах */
+.toggle, .nx-switch, .aid-sw, input[type="checkbox"][role="switch"] {
+  flex: 0 0 auto !important; flex-shrink: 0 !important; align-self: center;
+  width: 46px !important; min-width: 46px !important; max-width: 46px !important;
+  height: 28px !important; min-height: 28px !important; max-height: 28px !important; box-sizing: border-box;
+}
+.toggle-row, .perm-row, .setting-row, .settings-row, .aid-inl { min-width: 0; align-items: center; }
+.toggle-row > :not(.toggle):not(.aid-sw), .perm-row > :not(.toggle):not(.aid-sw) { min-width: 0; }
+/* переключатель темы «Тёмная / Светлая» — кнопки в одну линию без растяжения на весь экран */
+.theme-seg { display: inline-flex; width: auto; max-width: 100%; }
+.theme-seg-btn { flex: 0 0 auto; white-space: nowrap; }
+.theme-option { flex: 0 1 auto; min-width: 0; }
+.theme-swatch { flex: 0 0 auto; flex-shrink: 0; }
+/* карточки без «пустот»: контент сверху, кнопки сразу под текстом */
+.admin-card.lead-card, .admin-card.news-card, #leads-list .admin-card, #news-admin-list .admin-card {
+  display: flex; flex-direction: column; justify-content: flex-start !important; align-items: stretch; align-content: flex-start;
+  height: auto; min-height: 0; gap: 10px;
+}
+.admin-card.lead-card .admin-card-info, .admin-card.news-card .admin-card-info { flex: 0 0 auto; display: block; min-height: 0; }
+.admin-card.lead-card .admin-card-actions, .admin-card.news-card .admin-card-actions { width: auto; justify-content: flex-start; align-self: flex-start; flex: 0 0 auto; }
+.stack, #leads-list, #news-admin-list { align-content: start; grid-auto-rows: max-content; }

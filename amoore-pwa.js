@@ -1,5 +1,5 @@
 /**
- * amoore-pwa.js — v5.2.0 · PWA: manifest, iOS meta, Service Worker, Телеграм Mini App, Web Push.
+ * amoore-pwa.js — v5.3.0 · PWA: manifest, iOS meta, Service Worker, Телеграм Mini App, Web Push.
  * Побайтно одинаков во всех трёх сайтах. Подключение: <script src="amoore-pwa.js" defer></script>
  */
 (function () {

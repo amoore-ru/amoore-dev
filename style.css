@@ -1530,3 +1530,8 @@ body.menu-open { overflow: hidden; }
 .logs-toolbar select { min-width: 200px; }
 .leads-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
 .v5-chart canvas { max-width: 100% !important; }
+
+/* ===== v5.3: заявки и новости — убираем пустоты окончательно (перебивает .glass и #leads-list .admin-card) ===== */
+#leads-list, #news-admin-list { align-content: start; grid-auto-rows: max-content; }
+#leads-list > .admin-card, #news-admin-list > .admin-card { height: auto; min-height: 0; justify-content: flex-start; }
+.lead-card .admin-card-info p:empty { display: none; }

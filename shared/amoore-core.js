@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v5.2.0 «BUGFIX»
+ * amoore-core.js — v5.3.0 «SMART AUTH & PRE-RUST»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '5.2.0';
+  var AMOORE_VERSION = '5.3.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -693,7 +693,7 @@
       var local = await fetchChangelog('changelog.json');
       if (local && local.length) list = sortVersions(local);
     }
-    changelogList = list && list.length ? list : [{ version: '5.2.0', title: 'BUGFIX', items: ['Исправлены мобильная вёрстка и бургер-меню, настроены права RLS.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.3.0', title: 'SMART AUTH & PRE-RUST', items: ['Вход по 6-значному коду из письма, починен онбординг, мобильная вёрстка.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }

@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, '../../amoore-studio'), SHOTS = path.join(_
     await sleep(1300);
     const m = await page.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth, v: window.AMOORE_VERSION, chip: (document.querySelector('[data-ux-chip]') || {}).textContent }));
     T.check(`${w}px: нет горизонтальной прокрутки`, m.over <= 1, m.over);
-    T.check(`${w}px: версия 5.2.0, чип v5.1 в единой шапке`, m.v === '5.2.0' && m.chip === 'v5.1', JSON.stringify(m));
+    T.check(`${w}px: версия 5.3.0, чип v5.3 в единой шапке`, m.v === '5.3.0' && m.chip === 'v5.3', JSON.stringify(m));
     await page.click('#new-project-button').catch(() => {}); await sleep(500);
     const modal = await page.evaluate(() => { const e = document.querySelector('.modal-card'); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, vw: innerWidth, vh: innerHeight }; });
     T.check(`${w}px: окно «Новый проект» помещается на экран`, !modal || (modal.l >= 0 && modal.r <= modal.vw + 1 && modal.t >= 0 && modal.b <= modal.vh + 1), JSON.stringify(modal));
@@ -19,7 +19,7 @@ const ROOT = path.resolve(__dirname, '../../amoore-studio'), SHOTS = path.join(_
     matrix.push({ w, over: m.over }); await page.context().close();
   }
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  T.check('кэш: все скрипты и CSS подключены с ?v=5.2.0', (html.match(/\?v=5.2.0/g) || []).length >= 13, (html.match(/\?v=5.2.0/g) || []).length);
+  T.check('кэш: все скрипты и CSS подключены с ?v=5.3.0', (html.match(/\?v=5.3.0/g) || []).length >= 13, (html.match(/\?v=5.3.0/g) || []).length);
   T.check('безопасные зоны iPhone: env(safe-area-inset-*) в CSS', /safe-area-inset-top/.test(fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8') + fs.readFileSync(path.join(ROOT, 'amoore-theme.css'), 'utf8')));
   await b.close(); srv.close(); process.exit(T.finish({ matrix }) ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });

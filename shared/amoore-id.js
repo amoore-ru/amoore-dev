@@ -1,8 +1,8 @@
 /**
- * amoore-id.js — v5.2.0 «POLISH & SYNC» · amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
+ * amoore-id.js — v5.3.0 «SMART AUTH & PRE-RUST» · amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
  * Подключение (после supabase-js):  <script src="amoore-id.js"></script>
  *   amooreID.init({ site: 'dev'|'studio'|'landing', sb: <существующий клиент, необязательно> })
- * API: signIn(email,pw) · sendCode/verifyCode · sendMagicLink · consumeUrl() (magic link + SSO) · ensureOnboarded()
+ * API: signIn(email,pw) · sendCode(email, create)/verifyCode (вход ТОЛЬКО по 6-значному коду из письма) · consumeUrl() (SSO) · ensureOnboarded()
  *      openProfile() / renderProfile(host) (вкладки: Профиль · Бизнес-ассистент · Баллы · Безопасность · Уведомления) · ssoOpen(target) · listSessions/revokeOthers · linkTelegram · people.* (только Boss)
  */
 (function () {
@@ -106,33 +106,24 @@
     return afterLogin();
   }
   // шаг «код из письма» (в шаблоне письма Supabase должен быть {{ .Token }})
-  async function sendCode(email) {
-    var e = (email || '').trim().toLowerCase(); var left = await lockLeft(e); if (left > 0) throw new Error(lockMsg(left));
-    var r = await sb.auth.signInWithOtp({ email: e, options: { shouldCreateUser: false } }); if (r.error) throw new Error(err(r.error));
+  async function sendCode(email, create) {
+    var e = (email || '').trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('Введите корректный email');
+    var left = await lockLeft(e); if (left > 0) throw new Error(lockMsg(left));
+    var r = await sb.auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!create } }); if (r.error) throw new Error(err(r.error));
   }
   async function verifyCode(email, code) {
     var r = await sb.auth.verifyOtp({ email: (email || '').trim().toLowerCase(), token: String(code).trim(), type: 'email' });
     if (r.error) { await sb.rpc('auth_note_failure', { p_email: email }); throw new Error(err(r.error)); }
     return afterLogin();
   }
-  // Magic Link: письмо со ссылкой → при возврате вызывается consumeUrl()
-  async function sendMagicLink(email, create) {
-    var r = await sb.auth.signInWithOtp({ email: (email || '').trim().toLowerCase(),
-      options: { shouldCreateUser: !!create, emailRedirectTo: location.origin + location.pathname } });
-    if (r.error) throw new Error(err(r.error));
-  }
   async function signOut() { try { await sb.rpc('log_event', { p_action: 'logout' }); } catch (e) {} await sb.auth.signOut(); profile = null; }
 
-  // ---------------------------------------------------------------- возврат по ссылке и SSO (#access_token… / #sso=…)
+  // ---------------------------------------------------------------- возврат по SSO (#sso=…); вход по ссылке из письма отключён с v5.3
   async function consumeUrl() {
     var h = new URLSearchParams(location.hash.replace(/^#/, ''));
     var clean = function () { history.replaceState(null, '', location.pathname + location.search); };   // токен не остаётся в адресной строке
-    if (h.get('access_token') && h.get('refresh_token')) {
-      clean();
-      var r = await sb.auth.setSession({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token') });
-      if (r.error) throw new Error(err(r.error));
-      return afterLogin();
-    }
+    if (h.get('access_token') || h.get('refresh_token')) { clean(); return null; }   // v5.3: вход по ссылке из письма не поддерживается — просто стираем токены из адресной строки
     if (h.get('sso')) {
       var tok = h.get('sso'); clean();
       var res = await fetch(SB_URL + '/functions/v1/sso-exchange', { method: 'POST',
@@ -207,16 +198,25 @@
     '.aid-sw{appearance:none;-webkit-appearance:none;width:46px;height:28px;border-radius:999px;background:rgba(255,255,255,.16);position:relative;cursor:pointer;flex:0 0 46px;margin:0;transition:background .2s}.aid-sw:before{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s}.aid-sw:checked{background:#d4af37}.aid-sw:checked:before{transform:translateX(18px)}' +
     '.aid-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid rgba(212,175,55,.12);font-size:13px}.aid-row small{color:var(--nx-muted,#8b90a5)}' +
     '.aid-av-ph{display:flex;align-items:center;justify-content:center;font:800 34px var(--nx-font-head,system-ui);color:#17151d;border-color:rgba(255,255,255,.25)}.aid-pal{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}.aid-sw-c{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;box-shadow:0 0 0 1px rgba(255,255,255,.2)}.aid-sw-c.on{border-color:#fff;box-shadow:0 0 0 2px rgba(212,175,55,.9)}' +
-    '.aid-inline{max-width:100%;max-height:none;overflow:visible;box-shadow:none;border:0;background:transparent;padding:0}.aid-role{display:inline-block;padding:3px 12px;border-radius:999px;font:700 12px var(--nx-font-body,system-ui);background:rgba(212,175,55,.16);color:var(--nx-gold,#d4af37);border:1px solid rgba(212,175,55,.35)}.aid-center{text-align:center}.aid-card input,.aid-card textarea,.aid-card select{box-sizing:border-box;max-width:100%}.aid-card{overflow-x:hidden}';
+    '.aid-inline{max-width:100%;max-height:none;overflow:visible;box-shadow:none;border:0;background:transparent;padding:0}.aid-role{display:inline-block;padding:3px 12px;border-radius:999px;font:700 12px var(--nx-font-body,system-ui);background:rgba(212,175,55,.16);color:var(--nx-gold,#d4af37);border:1px solid rgba(212,175,55,.35)}.aid-center{text-align:center}.aid-card input,.aid-card textarea,.aid-card select{box-sizing:border-box;max-width:100%}.aid-card{overflow-x:hidden}' +
+    '.aid-send{margin:-2px 0 12px;background:transparent;color:inherit;border:1px solid rgba(212,175,55,.45)}.aid-codebox{margin:0 0 4px}.aid-codebox input{letter-spacing:.35em;text-align:center;font-weight:700}.aid-white{margin-top:10px;background:#fff;color:#17151d;border:1px solid rgba(0,0,0,.12)}' +
+    '.aid-tabs{flex-wrap:wrap;overflow-x:visible}.aid-tabs button{max-width:100%;white-space:normal;text-align:center}.aid-sw{min-width:46px;max-width:46px;height:28px;min-height:0;max-height:28px;flex-shrink:0}';
   function ensureCss() { if (!document.getElementById('aid-css')) { var s = el('style', { id: 'aid-css' }); s.textContent = CSS; document.head.appendChild(s); } }
   function overlay(card) { ensureCss(); var ov = el('div', { class: 'aid-ov', role: 'dialog', 'aria-modal': 'true' }, [card]); document.body.appendChild(ov); return ov; }
 
-  // обязательный онбординг: окно нельзя закрыть, пока нет username и аватарки
+  // v5.3: профиль считается заполненным, если в базе уже есть username (раньше флаг onboarded требовал ещё и avatar_url —
+  // у тех, кто выбрал цвет вместо фото, окно «Добро пожаловать» вылезало при каждой перезагрузке).
+  var OB_KEY = 'amoore_onboarded_';
+  function hasUsername(p) { return !!(p && String(p.username || '').trim()); }
+  function isOnboarded(p) { return !!(p && (p.onboarded || hasUsername(p))); }
+  function obFlag(uid, set) { try { if (set) localStorage.setItem(OB_KEY + uid, '1'); return localStorage.getItem(OB_KEY + uid) === '1'; } catch (e) { return false; } }
+  // обязательный онбординг: окно нельзя закрыть, пока нет username и аватарки (если username уже есть — окно не показывается)
   function ensureOnboarded() {
     return getProfile(true).then(function (p) {
       if (!p) return null;
       if (p.is_banned) { alert('Аккаунт заблокирован' + (p.ban_reason ? ': ' + p.ban_reason : '')); return signOut().then(function () { return null; }); }
-      if (p.onboarded) return p;
+      if (isOnboarded(p)) { obFlag(p.id, true); return p; }
+      if (obFlag(p.id)) return p;          // уже проходил онбординг на этом устройстве (запасной флаг на случай сбоя чтения профиля)
       return new Promise(function (done) {
         var picked = null, color = p.avatar_color || AVATAR_COLORS[0], avWrap = el('div', { class: 'aid-center' });
         function paintAv() { avWrap.textContent = ''; avWrap.appendChild(avatarEl({ username: name.value || p.username, avatar_url: picked ? URL.createObjectURL(picked) : p.avatar_url, avatar_color: color })); }
@@ -230,7 +230,7 @@
         var go = el('button', { class: 'aid-btn', type: 'button', text: 'Продолжить' });
         go.addEventListener('click', function () {
           go.disabled = true; msg.textContent = '';
-          saveProfile(name.value, picked, picked || p.avatar_url ? '' : color).then(function (np) { ov.remove(); done(np); }).catch(function (e) { msg.textContent = err(e); go.disabled = false; });
+          saveProfile(name.value, picked, picked || p.avatar_url ? '' : color).then(function (np) { obFlag(np.id, true); ov.remove(); done(np); }).catch(function (e) { msg.textContent = err(e); go.disabled = false; });
         });
         var out = el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Выйти', onclick: function () { signOut().then(function () { ov.remove(); done(null); }); } });
         var ov = overlay(el('div', { class: 'aid-card' }, [el('h2', { text: 'Добро пожаловать в amoore' }), el('p', { text: 'Выберите никнейм и аватарку: загрузите фото или просто выберите цвет — без этого внутренние функции недоступны.' }),
@@ -242,7 +242,7 @@
   // ---------------------------------------------------------------- устройства, Телеграм
   async function listSessions() { var r = await sb.from('user_sessions').select('id,user_agent,ip,created_at,last_seen_at').order('last_seen_at', { ascending: false }); if (r.error) throw new Error(err(r.error)); return r.data; }
   async function revokeOthers() { var r = await sb.rpc('revoke_other_sessions'); if (r.error) throw new Error(err(r.error)); return r.data; }
-  async function linkTelegram(code) { var r = await sb.rpc('link_telegram', { p_code: String(code).trim() }); if (r.error) throw new Error(err(r.error)); return r.data; }
+  async function linkTelegram(code) { var r = await sb.rpc('claim_telegram_code', { input_code: String(code).trim() }); if (r.error) throw new Error(err(r.error)); return r.data; }
   function ua(s) {
     s = s || ''; var b = /Edg\//.test(s) ? 'Edge' : /OPR\//.test(s) ? 'Opera' : /Chrome\//.test(s) ? 'Chrome' : /Firefox\//.test(s) ? 'Firefox' : /Safari\//.test(s) ? 'Safari' : 'Браузер';
     var o = /iPhone|iPad/.test(s) ? 'iOS' : /Android/.test(s) ? 'Android' : /Windows/.test(s) ? 'Windows' : /Mac OS/.test(s) ? 'macOS' : /Linux/.test(s) ? 'Linux' : '';
@@ -428,7 +428,7 @@
   // ---------------------------------------------------------------- плавающий аккаунт-чип (профиль · SSO · выход) на любом сайте
   async function mountChip() {
     var p = await getProfile(true); var old = document.getElementById('aid-chip'); if (old) old.remove();
-    if (!p || !p.onboarded) return; ensureCss();
+    if (!isOnboarded(p)) return; ensureCss();
     var st = document.getElementById('aid-chip-css') || el('style', { id: 'aid-chip-css' });
     st.textContent = '#aid-chip>.aid-chip-ph{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 18px system-ui;color:#17151d;background:' + (p.avatar_color || '#d4af37') + ';border:2px solid rgba(212,175,55,.5);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}#aid-chip{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:9990}#aid-chip>img{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid rgba(212,175,55,.5);cursor:pointer;display:block;transition:transform .35s cubic-bezier(.34,1.56,.64,1)}#aid-chip>img:active{transform:scale(.9)}#aid-menu{position:absolute;bottom:52px;left:0;min-width:210px;padding:6px;border-radius:14px;background:var(--nx-modal-bg,rgba(13,18,32,.95));border:var(--nx-glass-border,1px solid rgba(212,175,55,.2));display:none}#aid-menu.open{display:block}#aid-menu button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:none;color:var(--nx-ink,#eef0f7);font:14px var(--nx-font-body,system-ui);border-radius:10px;cursor:pointer}#aid-menu button:hover{background:rgba(212,175,55,.12)}';
     if (!st.parentNode) document.head.appendChild(st);
@@ -442,33 +442,60 @@
       : el('div', { class: 'aid-chip-ph', text: initial(p), 'aria-label': '@' + p.username, onclick: function () { menu.classList.toggle('open'); } });
     document.body.appendChild(el('div', { id: 'aid-chip' }, [menu, img]));
   }
-  // одна строка для сайта: обработать ссылку/SSO → онбординг → чип
+  // одна строка для сайта: обработать SSO → онбординг → чип
+  async function postLogin() {
+    if (await user()) { await register(); var okp = await ensureOnboarded(); if (okp) await claimRef(); await mountChip(); }
+  }
   async function boot(o) {
     init(o);
     try { await consumeUrl(); } catch (e) { console.warn('[amoore-id]', e); }
-    if (await user()) { await register(); var okp = await ensureOnboarded(); if (okp) await claimRef(); await mountChip(); }
+    await postLogin();
   }
   async function register() { try { await sb.rpc('register_session'); } catch (e) {} }
 
 
-  // окно входа по ссылке из письма (для сайтов без собственного экрана входа)
+  // v5.3: окно входа — только 6-значный код из письма (ссылок больше нет).
+  // Email → «Выслать код» → поле кода (maxlength=6) → «Войти».  «Зарегистрироваться» — тот же код, но с созданием аккаунта.
   function openLogin(reason) {
-    var inp = el('input', { type: 'text', inputmode: 'email', placeholder: 'email', autocomplete: 'username', autocapitalize: 'none' }), msg = el('div', { class: 'aid-err', role: 'status' });
-    var go = el('button', { class: 'aid-btn', type: 'button', text: 'Выслать ссылку для входа' });
-    go.addEventListener('click', function () { go.disabled = true; msg.textContent = '';
-      sendMagicLink(inp.value).then(function () { msg.style.color = '#3ddc84'; msg.textContent = 'Письмо отправлено — откройте ссылку на этом устройстве'; })
-        .catch(function (e) { msg.style.color = ''; msg.textContent = err(e); go.disabled = false; }); });
-    var kids = [el('h2', { text: 'Вход в amoore ID' }), el('p', { text: reason || 'Мы пришлём одноразовую ссылку на почту — пароль не нужен.' }), inp, msg, go];
-    var hasRef = !!pendingRef();   // бонус начисляется только если пришли по ?ref=…; создать аккаунт может любой
-    kids.push(el('button', { class: 'aid-btn aid-ghost', type: 'button', id: 'aid-register', text: hasRef ? 'Создать аккаунт по приглашению' : 'Создать аккаунт', onclick: function () {
-      msg.textContent = ''; sendMagicLink(inp.value, true).then(function () { msg.style.color = '#3ddc84'; msg.textContent = 'Письмо отправлено — откройте ссылку на этом устройстве'; })
-        .catch(function (e) { msg.style.color = ''; msg.textContent = err(e); }); } }));
+    var inp = el('input', { type: 'text', inputmode: 'email', placeholder: 'email', autocomplete: 'username', autocapitalize: 'none', spellcheck: 'false', id: 'aid-email' });
+    var msg = el('div', { class: 'aid-err', role: 'status' });
+    var codeInp = el('input', { type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '6', placeholder: '6 цифр из письма', autocomplete: 'one-time-code', id: 'aid-code' });
+    var codeBox = el('div', { class: 'aid-codebox', hidden: '' }, [codeInp]);
+    var send = el('button', { class: 'aid-btn aid-send', type: 'button', id: 'aid-send', text: 'Выслать код' });
+    var go = el('button', { class: 'aid-btn', type: 'button', id: 'aid-login', text: 'Войти' });
+    var reg = el('button', { class: 'aid-btn aid-white', type: 'button', id: 'aid-register', text: 'Зарегистрироваться' });
+    var creating = false;
+    function say(t, ok) { msg.style.color = ok ? '#3ddc84' : ''; msg.textContent = t || ''; }
+    function sent(isNew) {
+      creating = !!isNew; codeBox.hidden = false; codeInp.value = ''; say('Код отправлен на ' + inp.value.trim() + ' — введите его ниже', true);
+      send.textContent = 'Выслать код ещё раз'; setTimeout(function () { try { codeInp.focus(); } catch (e) {} }, 30);
+    }
+    function request(isNew, btn) {
+      say(''); btn.disabled = true;
+      return sendCode(inp.value, isNew).then(function () { sent(isNew); })
+        .catch(function (e) { say(err(e)); }).then(function () { btn.disabled = false; });
+    }
+    send.addEventListener('click', function () { request(false, send); });
+    reg.addEventListener('click', function () { request(true, reg); });
+    codeInp.addEventListener('input', function () { codeInp.value = codeInp.value.replace(/\D/g, '').slice(0, 6); if (codeInp.value.length === 6) go.focus(); });
+    go.addEventListener('click', function () {
+      if (codeBox.hidden) { say('Сначала нажмите «Выслать код» — пришлём 6 цифр на почту'); return; }
+      if (codeInp.value.length !== 6) { say('Введите 6 цифр из письма'); return; }
+      go.disabled = true; say('');
+      verifyCode(inp.value, codeInp.value).then(function () { return postLogin(); })
+        .then(function () { ov.remove(); document.dispatchEvent(new CustomEvent('amoore:login')); })
+        .catch(function (e) { say(err(e)); go.disabled = false; });
+    });
+    var kids = [el('h2', { text: 'Вход в amoore ID' }),
+      el('p', { text: reason || 'Введите Email, и мы пришлём 6-значный код' }),
+      inp, send, codeBox, msg, go, reg];
     var ov = overlay(el('div', { class: 'aid-card' }, kids.concat([
       el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Закрыть', onclick: function () { ov.remove(); } })])));
+    setTimeout(function () { try { inp.focus(); } catch (e) {} }, 30);
   }
 
-  var api = { openLogin: openLogin, renderProfile: renderProfile, pendingRef: pendingRef, claimRef: claimRef, shareUrl: shareUrl, boot: boot, mountChip: mountChip,  init: init, signIn: signIn, sendCode: sendCode, verifyCode: verifyCode, sendMagicLink: sendMagicLink, signOut: signOut, consumeUrl: consumeUrl, ssoOpen: ssoOpen,
-    getProfile: getProfile, saveProfile: saveProfile, ensureOnboarded: ensureOnboarded, openProfile: openProfile, listSessions: listSessions, revokeOthers: revokeOthers,
+  var api = { openLogin: openLogin, renderProfile: renderProfile, pendingRef: pendingRef, claimRef: claimRef, shareUrl: shareUrl, boot: boot, mountChip: mountChip,  init: init, signIn: signIn, sendCode: sendCode, verifyCode: verifyCode, signOut: signOut, consumeUrl: consumeUrl, ssoOpen: ssoOpen,
+    getProfile: getProfile, saveProfile: saveProfile, ensureOnboarded: ensureOnboarded, isOnboarded: isOnboarded, openProfile: openProfile, listSessions: listSessions, revokeOthers: revokeOthers,
     linkTelegram: linkTelegram, roleRu: roleRu, registerSite: registerSite, avatarEl: avatarEl, AVATAR_COLORS: AVATAR_COLORS, lockLeft: lockLeft, people: people, friendlyError: err, USERNAME_RE: USERNAME_RE, sb: null };
   window.amooreID = api;
 })();

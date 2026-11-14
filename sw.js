@@ -1,6 +1,6 @@
-/* sw.js — v5.2.0. Стратегия: HTML — сеть с запасом из кэша (офлайн-оболочка); статика — stale-while-revalidate.
+/* sw.js — v5.3.0. Стратегия: HTML — сеть с запасом из кэша (офлайн-оболочка); статика — stale-while-revalidate.
    Запросы к Supabase / Edge Functions / чужим доменам НЕ кэшируются (авторизация и данные всегда живые). */
-const VER = 'amoore-v5.2.0';
+const VER = 'amoore-v5.3.0';
 const SHELL = ['./', 'manifest.json'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VER).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

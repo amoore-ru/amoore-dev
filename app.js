@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '5.2.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '5.3.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -218,7 +218,6 @@ function setLoginMode(tokenOnly) {
   tokenOnlyMode = tokenOnly;
   $('email-group').style.display = tokenOnly ? 'none' : '';
   $('otp-group').style.display = tokenOnly ? 'none' : '';
-  $('magic-btn').style.display = tokenOnly ? 'none' : '';
   $('password-group').style.display = tokenOnly ? 'none' : '';
   $('email').required = !tokenOnly;
   $('password').required = !tokenOnly;
@@ -1419,7 +1418,7 @@ $('cl-save').addEventListener('click', async () => {
   const list = readClEditor().filter(v => v.version).map((v, i) => ({ ...v, order: i }));   // порядок — как расставлен перетаскиванием
   if (!list.length) return toast('Добавьте хотя бы одну версию', 'error');
   if (new Set(list.map(v => v.version)).size !== list.length) return toast('Версии не должны повторяться', 'error');
-  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 5.2.0', 'error');
+  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 5.3.0', 'error');
   const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: list[0].version, versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return toast(friendlyError(error), 'error');
   wnList = list; liveVersion = String(list[0].version); paintVersionChip();
@@ -1468,7 +1467,6 @@ async function mailAction(fn, okText) {
   box.classList.add('visible');
 }
 $('send-code-btn').addEventListener('click', () => mailAction(e => amooreID.sendCode(e), 'Код отправлен — проверьте почту'));
-$('magic-btn').addEventListener('click', () => mailAction(e => amooreID.sendMagicLink(e), 'Ссылка отправлена — откройте её на этом устройстве, затем введите токен'));
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('login-error').classList.remove('visible');

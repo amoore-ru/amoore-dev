@@ -1,4 +1,4 @@
-/* amoore-admin-v5.js — v5.2.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
+/* amoore-admin-v5.js — v5.3.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
    Классический скрипт после app.js: использует его глобальные sb, $, esc, toast, friendlyError, me, isSuper, fmtDate. */
 (function () {
   'use strict';
