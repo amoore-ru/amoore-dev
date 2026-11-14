@@ -1,9 +1,9 @@
-/* amoore-admin-v5.js — v5.5.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
+/* amoore-admin-v5.js — v5.7.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
    Классический скрипт после app.js: использует его глобальные sb, $, esc, toast, friendlyError, me, isSuper, fmtDate. */
 (function () {
   'use strict';
   const STATUS = { new: 'Новая', in_progress: 'В работе', rejected: 'Отказ', done: 'Обработана' };
-  const TAGS = { vip: 'VIP', spam: 'Спам', pending: 'В ожидании' };
+  const TAGS = { vip: 'VIP', spam: 'Спам', pending: 'В ожидании', access: 'Проблема с доступом' };
   const ROLE_LABEL = { user: 'Пользователь', moderator: 'Модератор', admin: 'Администратор', super_admin: 'Основатель' };
   const CC = { RU:[61,100],UA:[49,32],BY:[53.7,28],KZ:[48,68],UZ:[41,64],GE:[42,43.5],AM:[40,45],AZ:[40.4,47.7],MD:[47,28.4],LV:[57,25],LT:[55.3,23.9],EE:[58.6,25],PL:[52,19],DE:[51,10],FR:[46.6,2.5],GB:[54,-2],IE:[53,-8],ES:[40,-4],PT:[39.5,-8],IT:[42.8,12.5],NL:[52.2,5.3],BE:[50.6,4.6],CH:[46.8,8.2],AT:[47.6,14.1],CZ:[49.8,15.5],SK:[48.7,19.7],HU:[47.2,19.5],RO:[45.9,25],BG:[42.7,25.5],GR:[39,22],RS:[44,21],HR:[45.1,15.2],FI:[64,26],SE:[62,15],NO:[61,9],DK:[56,10],TR:[39,35],IL:[31,35],AE:[24,54],SA:[24,45],EG:[26.8,30.8],IN:[21,78],CN:[35,103],JP:[36,138],KR:[36.5,127.8],TH:[15,101],VN:[16,106],ID:[-2,118],MY:[4,102],SG:[1.35,103.8],PH:[12.9,122],US:[39.8,-98.6],CA:[56,-106],MX:[23.6,-102.5],BR:[-10,-52],AR:[-34,-64],CL:[-30,-71],CO:[4,-72],AU:[-25,134],NZ:[-41,174],ZA:[-29,24],NG:[9,8],KE:[0,38],MA:[31.8,-7] };
   const D = (n) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n); return d; };
@@ -200,5 +200,45 @@
     } catch (_) { /* без Realtime остаётся опрос онлайна раз в 20 с */ }
   }
 
-  window.amooreV5 = { onView(name) { if (name === 'people') loadPeople(); if (name === 'dashboard') loadAnalytics(); } };
+  // =========================================================== Промокоды (админ и Основатель; лимиты проверяет БД)
+  function paintPromoList(rows) {
+    const box = $('pm-list'); if (!box) return;
+    if (!rows.length) { box.innerHTML = '<div class="loading-state">Промокодов пока нет</div>'; return; }
+    box.innerHTML = rows.map(r => {
+      const exp = r.expires_at ? fmtDate(r.expires_at) : 'бессрочно';
+      const left = r.max_uses == null ? `${r.uses} / ∞` : `${r.uses} / ${r.max_uses}`;
+      return `<div class="promo-row"><div class="promo-main"><b>${esc(r.code)}</b><small>+${esc(r.points)} · активаций ${esc(left)} · ${esc(exp)}</small></div>
+        <button type="button" class="btn btn-ghost btn-sm" data-pm-toggle="${esc(r.id)}" data-active="${r.active ? '1' : '0'}">${r.active ? 'Выключить' : 'Включить'}</button></div>`;
+    }).join('');
+  }
+  async function loadPromo() {
+    const card = $('set-promo'); if (!card) return;
+    const ok = me && (me.role === 'super_admin' || me.role === 'admin');
+    card.hidden = !ok; if (!ok) return;
+    const pts = $('pm-points'); if (me.role !== 'super_admin') pts.max = 100;
+    const r = await sb.rpc('admin_list_promocodes');
+    if (r.error) { $('pm-list').innerHTML = `<div class="loading-state">${esc(friendlyError(r.error))}</div>`; return; }
+    paintPromoList(r.data || []);
+  }
+  document.addEventListener('click', async e => {
+    if (e.target.id === 'pm-create') {
+      const code = $('pm-code').value.trim(), points = parseInt($('pm-points').value, 10), mx = parseInt($('pm-max').value, 10);
+      const exp = $('pm-forever').checked || !$('pm-exp').value ? null : new Date($('pm-exp').value).toISOString();
+      if (!code || !points) return toast('Укажите название и номинал', 'error');
+      if (me.role !== 'super_admin' && points > 100) return toast('Админ может создавать коды до 100 баллов', 'error');
+      const r = await sb.rpc('admin_create_promocode', { p_code: code, p_points: points, p_max_uses: Number.isFinite(mx) ? mx : null, p_expires: exp });
+      if (r.error) return toast(friendlyError(r.error), 'error');
+      ['pm-code', 'pm-points', 'pm-max'].forEach(i => { $(i).value = ''; });
+      toast('Промокод создан'); loadPromo();
+    }
+    const t = e.target.closest('[data-pm-toggle]');
+    if (t) {
+      const r = await sb.rpc('admin_toggle_promocode', { p_id: t.dataset.pmToggle, p_active: t.dataset.active !== '1' });
+      if (r.error) return toast(friendlyError(r.error), 'error');
+      loadPromo();
+    }
+  });
+  document.addEventListener('change', e => { if (e.target.id === 'pm-forever') $('pm-exp').disabled = e.target.checked; });
+
+  window.amooreV5 = { onView(name) { if (name === 'settings') loadPromo(); if (name === 'people') loadPeople(); if (name === 'dashboard') loadAnalytics(); } };
 })();

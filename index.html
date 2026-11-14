@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <script src="amoore-ux.js?v=5.5.0"></script>
-  <link rel="stylesheet" href="style.css?v=5.5.0">
-  <link rel="stylesheet" href="amoore-theme.css?v=5.5.0">
-  <link rel="stylesheet" href="dev-theme.css?v=5.5.0">
+  <script src="amoore-ux.js?v=5.7.0"></script>
+  <link rel="stylesheet" href="style.css?v=5.7.0">
+  <link rel="stylesheet" href="amoore-theme.css?v=5.7.0">
+  <link rel="stylesheet" href="dev-theme.css?v=5.7.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -231,6 +231,20 @@
             <div id="set-profile-host" class="aid-host"><div class="skeleton-stack" aria-label="Профиль загружается"><i></i><i></i><i></i></div></div>
           </section>
 
+          <section class="settings-card glass" id="set-promo" aria-labelledby="set-promo-h" hidden>
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">✦</span><div><h3 id="set-promo-h">Промокоды</h3><p>Баллы за код начисляются на сайте и в боте (/promo). Основатель — любой номинал, админы — до 100 баллов.</p></div></header>
+            <div class="promo-form">
+              <input id="pm-code" maxlength="32" placeholder="Название кода (A-Z, 0-9)" autocapitalize="characters" autocomplete="off">
+              <input id="pm-points" type="number" min="1" inputmode="numeric" placeholder="Номинал, баллов">
+              <input id="pm-max" type="number" min="1" inputmode="numeric" placeholder="Лимит активаций (пусто — без лимита)">
+              <label class="promo-fld">Срок действия<input id="pm-exp" type="datetime-local"></label>
+              <label class="promo-chk"><input id="pm-forever" type="checkbox" checked> Бессрочно</label>
+              <button type="button" class="btn btn-primary" id="pm-create">Создать промокод</button>
+            </div>
+            <div id="pm-list" class="promo-list"></div>
+          </section>
+
+          
           
 
           
@@ -467,11 +481,11 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="amoore-id.js?v=5.5.0"></script>
-<script src="amoore-pwa.js?v=5.5.0" defer></script>
-<script src="amoore-cmdk.js?v=5.5.0" defer></script>
-  <script src="digest.js?v=5.5.0"></script>
-  <script src="app.js?v=5.5.0"></script>
-  <script src="amoore-admin-v5.js?v=5.5.0"></script>
+  <script src="amoore-id.js?v=5.7.0"></script>
+<script src="amoore-pwa.js?v=5.7.0" defer></script>
+<script src="amoore-cmdk.js?v=5.7.0" defer></script>
+  <script src="digest.js?v=5.7.0"></script>
+  <script src="app.js?v=5.7.0"></script>
+  <script src="amoore-admin-v5.js?v=5.7.0"></script>
 </body>
 </html>

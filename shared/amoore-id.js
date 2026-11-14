@@ -1,5 +1,5 @@
 /**
- * amoore-id.js — v5.5.0 «SMART AUTH & PRE-RUST» · amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
+ * amoore-id.js — v5.7.0 «SMART AUTH & PRE-RUST» · amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
  * Подключение (после supabase-js):  <script src="amoore-id.js"></script>
  *   amooreID.init({ site: 'dev'|'studio'|'landing', sb: <существующий клиент, необязательно> })
  * API: signIn(email,pw) · sendCode(email, create)/verifyCode (вход ТОЛЬКО по 6-значному коду из письма) · consumeUrl() (SSO) · ensureOnboarded()
@@ -149,7 +149,7 @@
   async function getProfile(force) {
     if (profile && !force) return profile;
     var u = await user(); if (!u) return null;
-    var r = await sb.from('profiles').select('id,username,avatar_url,role,telegram_id,is_banned,ban_reason,onboarded,rewards_balance,bio,is_public,referred_by,display_name,avatar_color').eq('id', u.id).maybeSingle();
+    var r = await sb.from('profiles').select('id,username,avatar_url,role,telegram_id,is_banned,ban_reason,onboarded,rewards_balance,bio,is_public,referred_by,display_name,avatar_color,banner_url,show_telegram,show_points').eq('id', u.id).maybeSingle();
     profile = r.data || null; window.amooreProfileCache = profile; if (profile) announce(profile); return profile;
   }
   function toWebp(file, size) {
@@ -208,6 +208,13 @@
     '.aid-card .aid-f{width:100%;min-width:0}.aid-card .aid-f input,.aid-card .aid-f textarea{display:block;width:100%;margin-bottom:0}.aid-card .aid-f+.aid-f{margin-top:14px}' +
     '.aid-card .aid-av{flex:none;margin-left:auto;margin-right:auto}.aid-card .aid-center{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px}.aid-card .aid-center>*{margin-top:0;margin-bottom:0}' +
     '.aid-card .aid-f.aid-inl{display:flex;flex-flow:row nowrap;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:4px 0}.aid-card .aid-f.aid-inl>span{flex:1 1 auto;min-width:0;margin:0;font-size:14px;color:inherit;overflow-wrap:anywhere}.aid-card .aid-f.aid-inl>.aid-sw{order:2}' +
+    '.aid-banner{width:100%;height:110px;border-radius:16px;background:linear-gradient(120deg,#d4af37 0%,#8a5cf6 55%,#2dd4bf 100%);background-size:cover;background-position:center}.aid-banwrap{margin-bottom:8px}' +
+    '.aid-link{display:block;margin:-4px 0 10px;padding:0;border:0;background:none;color:var(--nx-gold,#d4af37);font-size:13px;cursor:pointer;text-align:left;text-decoration:underline}' +
+    '.aid-sel,.aid-card textarea,.aid-search{width:100%;box-sizing:border-box;padding:11px 12px;margin-bottom:8px;border-radius:12px;border:1px solid rgba(139,144,165,.32);background:transparent;color:inherit;font-size:16px}' +
+    '.aid-person{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;text-decoration:none;color:inherit;border:1px solid rgba(139,144,165,.22);margin-bottom:6px;min-width:0}.aid-person span{display:flex;flex-direction:column;min-width:0}.aid-person b,.aid-person small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.aid-person:hover{border-color:rgba(212,175,55,.6)}' +
+    '.aid-btnrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}.aid-pill{padding:7px 16px;border-radius:999px;font-weight:600;font-size:13px;cursor:pointer;color:inherit;background:rgba(139,144,165,.16);border:1px solid rgba(139,144,165,.32)}.aid-pill:hover{background:rgba(139,144,165,.26)}' +
+    '.aid-soon{padding:22px 16px;text-align:center;border-radius:16px;border:1px dashed rgba(139,144,165,.4);margin-top:12px}.aid-soon p{margin:6px 0 0;font-size:13px;opacity:.75}' +
+    '.aid-toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;z-index:100000;padding:12px 22px;border-radius:999px;font-weight:700;color:#17151d;background:var(--nx-btn-gradient,#d4af37);box-shadow:0 12px 32px rgba(0,0,0,.35);transition:all .35s ease}.aid-toast.on{opacity:1;transform:translate(-50%,0)}' +
     '@media (max-width:420px){.aid-card{padding:18px 14px}.aid-ov{padding-left:10px;padding-right:10px}}';
   function ensureCss() { if (!document.getElementById('aid-css')) { var s = el('style', { id: 'aid-css' }); s.textContent = CSS; document.head.appendChild(s); } }
   function overlay(card) { ensureCss(); var ov = el('div', { class: 'aid-ov', role: 'dialog', 'aria-modal': 'true' }, [card]); document.body.appendChild(ov); return ov; }
@@ -257,7 +264,7 @@
     return b + (o ? ' · ' + o : '');
   }
   // ---------------------------------------------------------------- профиль с вкладками (модалка или inline-панель на лендинге)
-  var TABS = [['profile', 'Профиль'], ['business', 'Бизнес-ассистент'], ['rewards', 'Баллы'], ['security', 'Безопасность'], ['notify', 'Уведомления']];
+  var TABS = [['profile', 'Профиль'], ['business', 'Бизнес-ассистент'], ['rewards', 'Баллы'], ['follows', 'Подписки'], ['security', 'Безопасность'], ['notify', 'Уведомления']];
   function fmtDt(d) { return new Date(d).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
   function field(label, node) { return el('label', { class: 'aid-f' }, [el('span', { text: label }), node]); }
   function toggle(on, onchange) {
@@ -267,6 +274,61 @@
   function publicUrl(p) { return location.origin + '/#u/' + encodeURIComponent(p.username || ''); }
   async function copy(text, msg, ok) { try { await navigator.clipboard.writeText(text); msg.style.color = '#3ddc84'; msg.textContent = ok || 'Скопировано'; } catch (e) { msg.style.color = ''; msg.textContent = text; } }
   function say(msg, text, good) { msg.style.color = good ? '#3ddc84' : ''; msg.textContent = text || ''; }
+
+  // ---- v5.7: обложка, поддержка, поиск людей
+  async function uploadBanner(file, u) {
+    if (file.size > 8 * 1024 * 1024) throw new Error('Файл больше 8 МБ');
+    var url = URL.createObjectURL(file), img = new Image();
+    await new Promise(function (ok, bad) { img.onload = ok; img.onerror = function () { bad(new Error('Не удалось прочитать картинку')); }; img.src = url; });
+    var W = 1200, H = 400, c = document.createElement('canvas'); c.width = W; c.height = H;
+    var k = Math.max(W / img.width, H / img.height), w = img.width * k, h = img.height * k;
+    c.getContext('2d').drawImage(img, (W - w) / 2, (H - h) / 2, w, h); URL.revokeObjectURL(url);
+    var blob = await new Promise(function (ok) { c.toBlob(ok, 'image/webp', 0.85); });
+    var path = u.id + '/banner.webp';
+    var up = await sb.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/webp', cacheControl: '3600' });
+    if (up.error) throw new Error(err(up.error));
+    return sb.storage.from('avatars').getPublicUrl(path).data.publicUrl + '?v=' + Date.now();
+  }
+  function bannerEl(url) {
+    var d = el('div', { class: 'aid-banner' }); if (/^https:\/\//.test(url || '')) d.style.backgroundImage = 'url("' + url.replace(/"/g, '%22') + '")'; return d;
+  }
+  function openSupport(prefillEmail) {
+    var msg = el('div', { class: 'aid-err', role: 'status' }), ov;
+    var name = el('input', { type: 'text', maxlength: '80', placeholder: 'Как к вам обращаться?', autocomplete: 'name' });
+    var prob = el('textarea', { maxlength: '1000', rows: '3', placeholder: 'В чём проблема? (кратко)' });
+    var way = el('select', { class: 'aid-sel' }, [el('option', { value: 'Email', text: 'Email' }), el('option', { value: 'Телефон', text: 'Телефон' }), el('option', { value: 'Telegram', text: 'Telegram' })]);
+    var con = el('input', { type: 'text', maxlength: '120', placeholder: 'Ваш контакт', autocapitalize: 'none', spellcheck: 'false' }); if (prefillEmail) con.value = prefillEmail;
+    var send = el('button', { class: 'aid-btn', type: 'button', text: 'Отправить' });
+    function shut() { ov.remove(); }
+    send.addEventListener('click', async function () {
+      if (name.value.trim().length < 2 || !prob.value.trim() || !con.value.trim()) { say(msg, 'Заполните все поля'); return; }
+      send.disabled = true; say(msg, '');
+      var r = await sb.from('leads').insert({ name: name.value.trim().slice(0, 120), contact: (way.value + ': ' + con.value.trim()).slice(0, 200), message: prob.value.trim().slice(0, 2000), status: 'new', tags: ['access'] });
+      send.disabled = false;
+      if (r.error) { say(msg, 'Не удалось отправить. Попробуйте позже.'); return; }
+      say(msg, 'Заявка отправлена — ответим лично', true); setTimeout(shut, 1600);
+    });
+    ov = overlay(el('div', { class: 'aid-card' }, [el('h2', { text: 'Нет доступа к почте?', style: 'font-size:18px;margin:0 0 6px' }), el('p', { class: 'aid-hint', text: 'Опишите ситуацию — мы свяжемся с вами и поможем восстановить доступ.' }), name, prob, way, con, msg, send,
+      el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Закрыть', onclick: shut })]));
+    ov.addEventListener('click', function (e) { if (e.target === ov) shut(); });
+  }
+  function personRow(x) {
+    var a = el('a', { class: 'aid-person', href: '#u/' + encodeURIComponent(x.username) }, [avatarEl({ username: x.username, display_name: x.display_name, avatar_url: x.avatar_url, avatar_color: x.avatar_color }), el('span', {}, [el('b', { text: x.display_name || x.username }), el('small', { text: '@' + x.username })])]);
+    return a;
+  }
+  function peopleSearch() {
+    var inp = el('input', { type: 'search', maxlength: '40', placeholder: 'Поиск людей по имени или username', autocomplete: 'off', class: 'aid-search' }), res = el('div', { class: 'aid-results' }), tm = null;
+    inp.addEventListener('input', function () {
+      clearTimeout(tm); var q = inp.value.trim();
+      if (q.length < 2) { res.textContent = ''; return; }
+      tm = setTimeout(async function () {
+        var r = await sb.rpc('search_profiles', { p_q: q }); res.textContent = '';
+        if (r.error || !r.data || !r.data.length) { res.appendChild(el('p', { class: 'aid-hint', text: 'Никого не найдено' })); return; }
+        r.data.forEach(function (x) { res.appendChild(personRow(x)); });
+      }, 250);
+    });
+    return el('div', { class: 'aid-people' }, [inp, res]);
+  }
 
   async function tabProfile(p, box, reload) {
     await loadRoleLabels();
@@ -287,20 +349,39 @@
         .catch(function (e) { say(msg, err(e)); });
     });
     paintAv();
+    var banWrap = el('div', { class: 'aid-banwrap' }), banFile = el('input', { type: 'file', accept: 'image/*', hidden: '' });
+    function paintBan() { banWrap.textContent = ''; banWrap.appendChild(bannerEl(p.banner_url)); }
+    banFile.addEventListener('change', function () {
+      var f = banFile.files && banFile.files[0]; if (!f) return; say(msg, 'Загружаю обложку…');
+      user().then(function (u) { return uploadBanner(f, u); }).then(function (url) { return sb.from('profiles').update({ banner_url: url }).eq('id', p.id).then(function (r) { if (r.error) throw r.error; p.banner_url = url; paintBan(); say(msg, 'Обложка обновлена', true); }); })
+        .catch(function (e) { say(msg, err(e)); });
+    });
+    paintBan(); box.appendChild(banWrap);
+    box.appendChild(el('div', { class: 'aid-btnrow' }, [el('button', { class: 'aid-btn aid-ghost aid-sm', type: 'button', text: 'Загрузить обложку', onclick: function () { banFile.click(); } }),
+      p.banner_url ? el('button', { class: 'aid-btn aid-ghost aid-sm', type: 'button', text: 'Убрать', onclick: function () { sb.from('profiles').update({ banner_url: null }).eq('id', p.id).then(function (r) { if (r.error) return say(msg, err(r.error)); p.banner_url = null; paintBan(); }); } }) : null].filter(Boolean)));
+    box.appendChild(banFile);
     box.appendChild(avWrap);
     box.appendChild(el('div', { class: 'aid-center', style: 'margin:0 0 12px' }, [el('h2', { text: p.display_name || ('@' + (p.username || '—')), style: 'margin:0 0 6px' }), el('span', { class: 'aid-role', id: 'aid-role', text: roleRu(p.role) })]));
     box.appendChild(el('button', { class: 'aid-btn aid-ghost aid-sm', type: 'button', text: 'Загрузить фото', onclick: function () { file.click(); } })); box.appendChild(file);
     if (p.avatar_url) box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Убрать фото (будет цвет)', onclick: function () {
       sb.from('profiles').update({ avatar_url: '', avatar_color: color }).eq('id', p.id).then(function (r) { if (r.error) return say(msg, err(r.error)); p.avatar_url = ''; paintAv(); getProfile(true).then(announce); reload && reload(); }); } }));
     box.appendChild(el('p', { class: 'aid-hint', text: 'Цвет аватарки (если нет фото):', style: 'margin-top:14px' })); box.appendChild(pal);
+    var uname = el('input', { type: 'text', maxlength: '24', placeholder: 'username', autocapitalize: 'none', spellcheck: 'false', id: 'aid-username' }); uname.value = p.username || '';
     box.appendChild(field('Никнейм', nick));
+    box.appendChild(field('Имя пользователя (username)', uname));
+    box.appendChild(el('p', { class: 'aid-hint', text: 'Только a–z, 0–9 и _, уникальное. Ссылка на профиль: /u/username' }));
     box.appendChild(field('О себе', bio));
+    var showTg = toggle(p.show_telegram, null), showPts = toggle(p.show_points, null);
     box.appendChild(el('label', { class: 'aid-f aid-inl' }, [pub, el('span', { text: 'Публичная страница профиля' })]));
+    box.appendChild(el('label', { class: 'aid-f aid-inl' }, [showTg, el('span', { text: 'Показывать Telegram' })]));
+    box.appendChild(el('label', { class: 'aid-f aid-inl' }, [showPts, el('span', { text: 'Показывать баллы' })]));
+    if (!p.telegram_id) box.appendChild(el('p', { class: 'aid-hint', text: 'Кнопка «Написать в Telegram» появится, когда бот будет привязан (/link).' }));
     box.appendChild(el('p', { class: 'aid-hint' }, [el('a', { href: publicUrl(p), text: publicUrl(p) })]));
     box.appendChild(el('button', { class: 'aid-btn', type: 'button', id: 'aid-save', text: 'Сохранить', onclick: function () {
-      var dn = nick.value.trim().slice(0, 40);
-      sb.from('profiles').update({ display_name: dn || null, avatar_color: color, bio: bio.value.trim().slice(0, 300), is_public: pub.checked }).eq('id', p.id).then(function (r) {
-        if (r.error) return say(msg, err(r.error)); sb.rpc('log_event', { p_action: 'profile_update' }).then(function () {});
+      var dn = nick.value.trim().slice(0, 40), un = uname.value.trim().toLowerCase();
+      if (!USERNAME_RE.test(un)) return say(msg, 'Username: 3–24 символа, a–z, 0–9 и _');
+      sb.from('profiles').update({ display_name: dn || null, username: un, avatar_color: color, bio: bio.value.trim().slice(0, 300), is_public: pub.checked, show_telegram: showTg.checked, show_points: showPts.checked }).eq('id', p.id).then(function (r) {
+        if (r.error) return say(msg, /duplicate|unique|23505/i.test(String(r.error.message || r.error.code)) ? 'Этот username уже занят' : err(r.error)); sb.rpc('log_event', { p_action: 'profile_update' }).then(function () {});
         say(msg, 'Сохранено', true); return getProfile(true).then(announce); }); } }));
     // мои сайты
     box.appendChild(el('h2', { text: 'Мои сайты', style: 'font-size:16px;margin-top:18px' }));
@@ -332,7 +413,7 @@
   }
 
   // Бизнес-ассистент (Телеграм Business): настройки читает бот (amoore-ai) из business_automations
-  async function tabBusiness(p, box) {
+  async function tabBusinessFull(p, box) {
     var msg = el('div', { class: 'aid-err', role: 'status' });
     var r = await sb.from('business_automations').select('is_enabled,company_name,working_hours,custom_instructions').eq('user_id', p.id).maybeSingle();
     var d = r.data || { is_enabled: false, company_name: '', working_hours: '', custom_instructions: '' };
@@ -351,6 +432,38 @@
     box.appendChild(msg);
   }
 
+  // v5.5.1: вкладка пока не готова — показываем заглушку (рабочая версия сохранена как tabBusinessFull)
+  async function tabBusiness(p, box) {
+    box.appendChild(el('h2', { text: 'AI Бизнес-ассистент', style: 'font-size:18px' }));
+    box.appendChild(el('div', { class: 'aid-soon' }, [el('b', { text: 'В разработке' }), el('p', { text: 'Ассистент для ваших клиентов в Telegram скоро появится. Мы сообщим, когда он будет готов.' })]));
+  }
+
+  function promoToast(text) {
+    var t = el('div', { class: 'aid-toast', role: 'status', text: text }); document.body.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add('on'); });
+    setTimeout(function () { t.classList.remove('on'); setTimeout(function () { t.remove(); }, 400); }, 3200);
+  }
+  function openPromo(onDone) {
+    var msg = el('div', { class: 'aid-err', role: 'status' });
+    var inp = el('input', { type: 'text', maxlength: '32', placeholder: 'Промокод', autocomplete: 'off', autocapitalize: 'characters', id: 'promo-input' });
+    var ov, btn = el('button', { class: 'aid-btn', type: 'button', text: 'Активировать' });
+    function shut() { ov.remove(); }
+    async function go() {
+      var code = inp.value.trim(); if (!code) { say(msg, 'Введите промокод'); return; }
+      btn.disabled = true; say(msg, '');
+      var r = await sb.rpc('redeem_promocode', { p_code: code });
+      btn.disabled = false;
+      if (r.error) { say(msg, err(r.error)); return; }
+      shut(); promoToast('+' + r.data + ' баллов'); if (onDone) onDone(r.data);
+    }
+    btn.addEventListener('click', go);
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+    var card = el('div', { class: 'aid-card' }, [el('h2', { text: 'Промокод', style: 'font-size:18px;margin:0 0 10px' }), inp, msg, btn,
+      el('button', { class: 'aid-x', type: 'button', 'aria-label': 'Закрыть', text: '×', onclick: shut, style: 'position:absolute;top:10px;right:10px' })]);
+    card.style.position = 'relative';
+    ov = overlay(card); ov.addEventListener('click', function (e) { if (e.target === ov) shut(); }); setTimeout(function () { inp.focus(); }, 50);
+  }
+
   async function tabRewards(p, box) {
     var msg = el('div', { class: 'aid-err', role: 'status' });
     box.appendChild(el('h2', { text: 'Баллы', style: 'font-size:18px' }));
@@ -358,12 +471,28 @@
     box.appendChild(el('p', { text: 'Приглашайте друзей: +10 баллов за каждого, кто зарегистрируется по вашей ссылке.' }));
     var link = shareUrl(p), inp = el('input', { type: 'text', readonly: '', value: link, id: 'rw-link' });
     box.appendChild(inp);
-    box.appendChild(el('button', { class: 'aid-btn', type: 'button', text: 'Скопировать ссылку', onclick: function () { copy(link, msg, 'Ссылка скопирована'); } }));
+    box.appendChild(el('div', { class: 'aid-btnrow' }, [
+      el('button', { class: 'aid-btn aid-sm', type: 'button', text: 'Скопировать ссылку', onclick: function () { copy(link, msg, 'Ссылка скопирована'); } }),
+      el('button', { class: 'aid-pill', type: 'button', text: 'Ввести промокод', onclick: function () { openPromo(function (n) { p.rewards_balance = (p.rewards_balance || 0) + n; var b = document.getElementById('rw-balance'); if (b) b.textContent = p.rewards_balance + ' баллов'; paintHistory(); }); } })]));
     box.appendChild(msg);
     var h = el('div'); box.appendChild(el('h2', { text: 'История', style: 'font-size:16px;margin-top:16px' })); box.appendChild(h);
-    var r = await sb.from('rewards_log').select('delta,reason,created_at').order('created_at', { ascending: false }).limit(20);
-    if (r.error || !r.data || !r.data.length) h.appendChild(el('p', { class: 'aid-hint', text: 'Пока пусто.' }));
-    else r.data.forEach(function (x) { h.appendChild(el('div', { class: 'aid-row' }, [el('div', { text: (x.delta > 0 ? '+' : '') + x.delta + ' · ' + (x.reason === 'referral' ? 'приглашение' : x.reason) }), el('small', { text: fmtDt(x.created_at) })])); });
+    var RS = { referral: 'приглашение', promocode: 'промокод' };
+    async function paintHistory() {
+      h.textContent = '';
+      var r = await sb.from('rewards_log').select('delta,reason,created_at').order('created_at', { ascending: false }).limit(20);
+      if (r.error || !r.data || !r.data.length) h.appendChild(el('p', { class: 'aid-hint', text: 'Пока пусто.' }));
+      else r.data.forEach(function (x) { h.appendChild(el('div', { class: 'aid-row' }, [el('div', { text: (x.delta > 0 ? '+' : '') + x.delta + ' · ' + (RS[x.reason] || x.reason) }), el('small', { text: fmtDt(x.created_at) })])); });
+    }
+    await paintHistory();
+  }
+
+  async function tabFollows(p, box) {
+    box.appendChild(el('h2', { text: 'Люди', style: 'font-size:18px' })); box.appendChild(peopleSearch());
+    box.appendChild(el('h2', { text: 'Мои подписки', style: 'font-size:16px;margin-top:16px' }));
+    var h = el('div'); box.appendChild(h);
+    var r = await sb.rpc('my_following');
+    if (r.error || !r.data || !r.data.length) h.appendChild(el('p', { class: 'aid-hint', text: 'Вы пока ни на кого не подписаны.' }));
+    else r.data.forEach(function (x) { h.appendChild(personRow(x)); });
   }
 
   async function tabSecurity(p, box) {
@@ -375,6 +504,34 @@
       });
     }
     box.appendChild(el('h2', { text: 'Безопасность', style: 'font-size:18px' }));
+    var newEmail = el('input', { type: 'text', inputmode: 'email', placeholder: 'Новый email', autocapitalize: 'none', autocomplete: 'email', id: 'aid-newemail' });
+    var emailCode = el('input', { type: 'text', inputmode: 'numeric', maxlength: '6', placeholder: 'Код с новой почты', autocomplete: 'one-time-code', hidden: '', id: 'aid-emailcode' });
+    var emailBtn = el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Выслать код на новую почту' }), pendingEmail = '';
+    emailBtn.addEventListener('click', async function () {
+      emailBtn.disabled = true; say(msg, '');
+      try {
+        if (!pendingEmail) {
+          var em = newEmail.value.trim().toLowerCase(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new Error('Введите корректный email');
+          var u1 = await sb.auth.updateUser({ email: em }); if (u1.error) throw u1.error;
+          pendingEmail = em; emailCode.hidden = false; emailBtn.textContent = 'Подтвердить email'; say(msg, 'Код отправлен на ' + em, true);
+        } else {
+          var v = await sb.auth.verifyOtp({ email: pendingEmail, token: emailCode.value.trim(), type: 'email_change' }); if (v.error) throw v.error;
+          pendingEmail = ''; emailCode.hidden = true; emailCode.value = ''; newEmail.value = ''; emailBtn.textContent = 'Выслать код на новую почту'; say(msg, 'Email изменён', true);
+        }
+      } catch (e) { say(msg, err(e)); }
+      emailBtn.disabled = false;
+    });
+    var pw1 = el('input', { type: 'password', minlength: '8', placeholder: 'Новый пароль (от 8 символов)', autocomplete: 'new-password', id: 'aid-newpw' });
+    var pw2 = el('input', { type: 'password', minlength: '8', placeholder: 'Повторите пароль', autocomplete: 'new-password', id: 'aid-newpw2' });
+    var pwBtn = el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Сменить пароль' });
+    pwBtn.addEventListener('click', async function () {
+      if (pw1.value.length < 8) return say(msg, 'Пароль — от 8 символов');
+      if (pw1.value !== pw2.value) return say(msg, 'Пароли не совпадают');
+      pwBtn.disabled = true; var r2 = await sb.auth.updateUser({ password: pw1.value }); pwBtn.disabled = false;
+      if (r2.error) return say(msg, err(r2.error)); pw1.value = ''; pw2.value = ''; say(msg, 'Пароль изменён', true);
+    });
+    box.appendChild(el('h2', { text: 'Смена email', style: 'font-size:16px' })); box.appendChild(newEmail); box.appendChild(emailCode); box.appendChild(emailBtn);
+    box.appendChild(el('h2', { text: 'Смена пароля', style: 'font-size:16px;margin-top:14px' })); box.appendChild(pw1); box.appendChild(pw2); box.appendChild(pwBtn);
     box.appendChild(el('h2', { text: 'Устройства', style: 'font-size:16px' })); box.appendChild(list);
     box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', id: 'revoke-others', text: 'Завершить все другие сессии', onclick: function () {
       revokeOthers().then(function (n) { say(msg, 'Завершено сессий: ' + n, true); return paint(); }).catch(function (e) { say(msg, err(e)); }); } }));
@@ -407,7 +564,7 @@
     box.appendChild(btn); box.appendChild(msg); refresh();
   }
 
-  var BUILD = { profile: tabProfile, business: tabBusiness, rewards: tabRewards, security: tabSecurity, notify: tabNotify };
+  var BUILD = { profile: tabProfile, business: tabBusiness, rewards: tabRewards, follows: tabFollows, security: tabSecurity, notify: tabNotify };
   // host — контейнер (inline на лендинге) или null → модальное окно. tab — какую вкладку открыть.
   async function renderProfile(host, tab, onClose) {
     var p = await getProfile(true); if (!p) return null; ensureCss(); await loadRoleLabels();
@@ -504,13 +661,13 @@
     });
     var kids = [el('h2', { text: 'Вход в amoore ID' }),
       el('p', { text: reason || 'Введите Email, и мы пришлём 6-значный код' }),
-      inp, send, codeBox, msg, go, reg];
+      inp, el('button', { class: 'aid-link', type: 'button', id: 'aid-nomail', text: 'Нет доступа к почте?', onclick: function () { openSupport(inp.value.trim()); } }), send, codeBox, msg, go, reg];
     var ov = overlay(el('div', { class: 'aid-card' }, kids.concat([
       el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Закрыть', onclick: function () { ov.remove(); } })])));
     setTimeout(function () { try { inp.focus(); } catch (e) {} }, 30);
   }
 
-  var api = { openLogin: openLogin, renderProfile: renderProfile, pendingRef: pendingRef, claimRef: claimRef, shareUrl: shareUrl, boot: boot, mountChip: mountChip,  init: init, signIn: signIn, sendCode: sendCode, verifyCode: verifyCode, signOut: signOut, consumeUrl: consumeUrl, ssoOpen: ssoOpen,
+  var api = { openLogin: openLogin, openSupport: openSupport, peopleSearch: peopleSearch, renderProfile: renderProfile, pendingRef: pendingRef, claimRef: claimRef, shareUrl: shareUrl, boot: boot, mountChip: mountChip,  init: init, signIn: signIn, sendCode: sendCode, verifyCode: verifyCode, signOut: signOut, consumeUrl: consumeUrl, ssoOpen: ssoOpen,
     getProfile: getProfile, saveProfile: saveProfile, ensureOnboarded: ensureOnboarded, isOnboarded: isOnboarded, openProfile: openProfile, listSessions: listSessions, revokeOthers: revokeOthers,
     linkTelegram: linkTelegram, roleRu: roleRu, registerSite: registerSite, avatarEl: avatarEl, AVATAR_COLORS: AVATAR_COLORS, lockLeft: lockLeft, people: people, friendlyError: err, USERNAME_RE: USERNAME_RE, sb: null };
   window.amooreID = api;

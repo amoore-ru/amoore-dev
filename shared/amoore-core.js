@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v5.5.0 «SMART AUTH & PRE-RUST»
+ * amoore-core.js — v5.7.0 «SMART AUTH & PRE-RUST»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '5.5.0';
+  var AMOORE_VERSION = '5.7.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -718,11 +718,14 @@
     var list = null;
     var db = await fetchGlobalSetting('changelog');
     if (db && db.versions instanceof Array && db.versions.length) list = sortVersions(db.versions);
-    if (!list || !list.length) {
-      var local = await fetchChangelog('changelog.json');
-      if (local && local.length) list = sortVersions(local);
+    // v5.5.1: локальный changelog.json дополняет базу — версии, которых в БД нет (например 5.4), больше не теряются
+    var local = await fetchChangelog('changelog.json');
+    if (local && local.length) {
+      var have = {}; (list || []).forEach(function (v) { have[v.version] = 1; });
+      var extra = local.filter(function (v) { return v && v.version && !have[v.version]; });
+      list = sortVersions((list || []).concat(extra));
     }
-    changelogList = list && list.length ? list : [{ version: '5.5.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.7.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }
@@ -745,7 +748,7 @@
     return sec;
   }
   function paintUpdates(box, list) {
-    // группы по major.minor: «v5.4» → подверсии 5.5.0, 5.4.1 …; единственная версия в группе показывается сразу
+    // группы по major.minor: «v5.4» → подверсии 5.7.0, 5.4.1 …; единственная версия в группе показывается сразу
     var groups = [], map = {};
     asc(list).forEach(function (v) { var k = verKey(v.version), g = k[0] + '.' + k[1]; if (!map[g]) { map[g] = { key: g, items: [] }; groups.push(map[g]); } map[g].items.push(v); });
     groups.forEach(function (g, gi) {
@@ -758,13 +761,22 @@
   }
   function paintEras(box, list) {
     ERAS.forEach(function (era) {
-      var inEra = asc(list).filter(function (v) { var m = verKey(v.version)[0]; return m >= era.from && m <= era.to; });
+      var inEra = asc(list).filter(function (v) { var m = verKey(v.version)[0]; return m >= era.from && m <= era.to; }).reverse();
       var sec = el('section', 'nx-cl-era');
       var h = document.createElement('h3'); h.textContent = era.title; var sm = document.createElement('small'); sm.textContent = era.range; h.appendChild(sm); sec.appendChild(h);
-      var p = document.createElement('p'); p.className = 'nx-cl-empty';
-      if (!inEra.length) p.textContent = 'Скоро.';
-      else p.textContent = inEra.map(function (v) { return 'v' + v.version + (v.title ? ' — ' + v.title : ''); }).join(' → ');
-      sec.appendChild(p); box.appendChild(sec);
+      if (!inEra.length) { var p = document.createElement('p'); p.className = 'nx-cl-empty'; p.textContent = 'Скоро.'; sec.appendChild(p); }
+      else {
+        var tl = el('ol', 'nx-cl-timeline');
+        inEra.forEach(function (v) {
+          var li = el('li', 'nx-cl-node'), card = el('div', 'nx-cl-nodecard');
+          var t = document.createElement('b'); t.textContent = 'v' + v.version + (v.title ? ' · ' + v.title : ''); card.appendChild(t);
+          if (v.date) { var d = document.createElement('time'); d.textContent = String(v.date).split('-').reverse().join('.'); card.appendChild(d); }
+          var first = (v.items || [])[0]; if (first) { var q = document.createElement('p'); q.textContent = first; card.appendChild(q); }
+          li.appendChild(card); tl.appendChild(li);
+        });
+        sec.appendChild(tl);
+      }
+      box.appendChild(sec);
     });
   }
   function renderChangelog(box, list) {
