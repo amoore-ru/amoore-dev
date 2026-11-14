@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '5.3.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '5.4.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -35,9 +35,10 @@ const ADMIN_DEFAULT = ['toggle_status', 'toggle_banner', 'toggle_chat', 'toggle_
 const roleDefault = (role, key) => role === 'super_admin' ? true : role === 'admin' ? ADMIN_DEFAULT.includes(key) : role === 'moderator' ? MODERATOR_DEFAULT.includes(key) : false;
 
 // ---- названия ролей (global_settings.role_labels): ключи ролей неизменны, меняется только подпись ----
-const ROLE_DEFAULT_LABELS = { super_admin: 'Основатель', admin: 'Администратор', moderator: 'Модератор' };
+const ROLE_DEFAULT_LABELS = { super_admin: 'Основатель', founder: 'Основатель', admin: 'Администратор', moderator: 'Модератор', user: 'Пользователь' };
+const ROLE_EN2RU = { founder: 'Основатель', cofounder: 'Сооснователь', super_admin: 'Основатель', superadmin: 'Основатель', admin: 'Администратор', administrator: 'Администратор', moder: 'Модератор', moderator: 'Модератор', mod: 'Модератор', user: 'Пользователь' };       // v5.4: founder / moder / user в подписи → по-русски
 let roleLabels = { ...ROLE_DEFAULT_LABELS };
-const rl = (role) => roleLabels[role] || role;
+const rl = (role) => { const v = String(roleLabels[role] || '').trim() || ROLE_DEFAULT_LABELS[role] || role; return ROLE_EN2RU[v.toLowerCase()] || v; };
 
 const ACTION_LABELS = {
   close: 'Закрыл сайт', open: 'Открыл сайт',
@@ -193,14 +194,13 @@ async function verifyAdmin(accessToken) {
     role: data.role, permissions: data.permissions || null, access_token: accessToken
   };
 }
-async function loginFull(email, password, token, code) {
+async function loginFull(email, password, token) {
   amooreID.init({ site: 'dev', sb });
   try {
-    await amooreID.verifyCode(email, code);                 // 1) код из письма
-    await amooreID.signIn(email, password);                 // 2) пароль (5 ошибок → блок на 15 мин)
+    await amooreID.signIn(email, password);                 // 1) пароль (5 ошибок → блок на 15 мин); вход в админку — только Email, Пароль, Токен
   } catch (e) { await sb.auth.signOut().catch(() => {}); throw e; }
   try {
-    const s = await verifyAdmin(token);                     // 3) секретный токен
+    const s = await verifyAdmin(token);                     // 2) секретный токен
     saveSession(s);
     return s;
   } catch (e) { await sb.auth.signOut().catch(() => {}); throw e; }
@@ -217,7 +217,6 @@ async function loginTokenOnly(token) {
 function setLoginMode(tokenOnly) {
   tokenOnlyMode = tokenOnly;
   $('email-group').style.display = tokenOnly ? 'none' : '';
-  $('otp-group').style.display = tokenOnly ? 'none' : '';
   $('password-group').style.display = tokenOnly ? 'none' : '';
   $('email').required = !tokenOnly;
   $('password').required = !tokenOnly;
@@ -774,7 +773,7 @@ function paintBotStatus(state, hbText) {
     line.removeAttribute('aria-busy');
   }
   if (hb && hbText != null) hb.textContent = hbText;
-  if (btn) btn.textContent = state === 'online' ? 'Выключить бота' : 'Включить бота';
+  if (btn) btn.textContent = state === 'online' ? 'Выключить' : 'Включить';
 }
 async function loadBotStatus() {
   if (!$('bot-status-line')) return;
@@ -783,13 +782,19 @@ async function loadBotStatus() {
     const { data, error } = await withTimeout(sb.from('bot_status').select('is_online,last_heartbeat').eq('id', 'main').maybeSingle());
     if (error) throw error;
     const online = data ? data.is_online !== false : true;
-    paintBotStatus(online ? 'online' : 'offline',
-      data && data.last_heartbeat ? 'Пульс: ' + new Date(data.last_heartbeat).toLocaleString('ru-RU') : 'Пульс: ещё не было');
+    // v5.4: пульс приходит раз в 5 минут; если тишина дольше 12 минут — честно пишем, что бот не отвечает (дата больше не «застывает» молча)
+    const hbAt = data && data.last_heartbeat ? Date.parse(data.last_heartbeat) : 0, age = hbAt ? Date.now() - hbAt : Infinity;
+    const ago = !hbAt ? '' : age < 60e3 ? 'только что' : age < 3600e3 ? Math.round(age / 60e3) + ' мин назад' : age < 864e5 ? Math.round(age / 3600e3) + ' ч назад' : Math.round(age / 864e5) + ' дн назад';
+    paintBotStatus(online ? 'online' : 'offline', hbAt ? 'Пульс: ' + new Date(hbAt).toLocaleString('ru-RU') + ' · ' + ago + (age > 12 * 60e3 ? ' — бот давно не выходил на связь' : '') : 'Пульс: ещё не было');
+    const hb = $('bot-hb-line'); if (hb) hb.style.color = age > 12 * 60e3 ? '#e8a0a0' : '';
   } catch (e) {
     paintBotStatus('unknown', 'Пульс: нет связи');
   }
 }
 
+
+// v5.4: статус бота обновляется сам раз в минуту (раньше — только при заходе на дашборд)
+setInterval(() => { if (!document.hidden && $('bot-status-line') && $('app') && $('app').classList.contains('visible')) loadBotStatus(); }, 60000);
 async function toggleBotOnline() {
   if (!isSuper() && !can('manage_sites')) return toast('Недостаточно прав', 'error');
   const btn = $('bot-toggle-btn'); if (btn) btn.disabled = true;
@@ -813,6 +818,17 @@ async function toggleBotOnline() {
     toast(friendlyError(e), 'error');
     paintBotStatus('unknown');
   } finally { if (btn) btn.disabled = false; }
+}
+
+async function reconnectWebhook() {
+  if (!isSuper()) return toast('Только основатель', 'error');
+  const btn = $('bot-webhook-btn'); if (btn) btn.disabled = true;
+  try {
+    const { data, error } = await sb.functions.invoke('reconnect-webhook', { body: {} });
+    if (error || !data || !data.ok) return toast((data && data.error) || friendlyError(error), 'error');
+    toast('Telegram переподключён' + (data.pending ? ' · в очереди: ' + data.pending : '') + (data.last_error ? ' · последняя ошибка: ' + data.last_error : ''));
+  } catch (e) { toast('Edge Function reconnect-webhook недоступна', 'error'); }
+  finally { if (btn) btn.disabled = false; }
 }
 
 async function sendBotTest() {
@@ -854,7 +870,7 @@ async function loadLeads() {
   list.innerHTML = data.map(l => `
     <div class="admin-card glass lead-card" data-lead="${esc(l.id)}" data-new="${l.status === 'done' ? 0 : 1}">
       <div class="admin-card-info">
-        <h4>${esc(l.name || 'Без имени')} <span class="role-badge ${l.status === 'done' ? 'admin' : 'moderator'}">${esc(l.status || 'new')}</span></h4>
+        <h4>${esc(l.name || 'Без имени')} <span class="role-badge ${l.status === 'done' ? 'admin' : 'moderator'}">${esc(({ new: 'Новая', in_progress: 'В работе', rejected: 'Отказ', done: 'Обработана' })[l.status || 'new'] || l.status)}</span></h4>
         <p>${esc(l.contact || '')}</p>
         <p class="muted">${esc((l.message || '').slice(0, 200))}</p>
         <p class="muted" style="font-size:12px">${esc(fmtDate(l.created_at))}</p>
@@ -865,6 +881,7 @@ async function loadLeads() {
 
 if ($('bot-toggle-btn')) $('bot-toggle-btn').addEventListener('click', toggleBotOnline);
 if ($('bot-test-btn')) $('bot-test-btn').addEventListener('click', sendBotTest);
+if ($('bot-webhook-btn')) $('bot-webhook-btn').addEventListener('click', reconnectWebhook);
 if ($('bot-logs-csv')) $('bot-logs-csv').addEventListener('click', downloadBotLogsCsv);
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('.lead-done');
@@ -1459,14 +1476,6 @@ async function loadLogs() {
 
 // ======================================================================= вход / выход / старт
 $('full-login-btn').addEventListener('click', () => setLoginMode(false));
-async function mailAction(fn, okText) {
-  const email = ($('email').value || '').trim(), box = $('login-error');
-  box.classList.remove('visible');
-  try { if (!email) throw new Error('Введите email'); amooreID.init({ site: 'dev', sb }); await fn(email); box.textContent = okText; }
-  catch (e) { box.textContent = friendlyError(e); }
-  box.classList.add('visible');
-}
-$('send-code-btn').addEventListener('click', () => mailAction(e => amooreID.sendCode(e), 'Код отправлен — проверьте почту'));
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('login-error').classList.remove('visible');
@@ -1476,7 +1485,7 @@ $('login-form').addEventListener('submit', async (e) => {
   const password = $('password').value;
   const token = $('token').value.trim();
   try {
-    if (!token || (!tokenOnlyMode && (!email || !password || !$('otp').value.trim()))) throw new Error('Заполните все поля');
+    if (!token || (!tokenOnlyMode && (!email || !password))) throw new Error('Заполните все поля');
     let session;
     if (tokenOnlyMode) {
       try { session = await loginTokenOnly(token); }
@@ -1484,7 +1493,7 @@ $('login-form').addEventListener('submit', async (e) => {
         if (err.message === 'NEED_PASSWORD') { setLoginMode(false); throw new Error('Сессия истекла — введите пароль'); }
         throw err;
       }
-    } else session = await loginFull(email, password, token, $('otp').value.trim());
+    } else session = await loginFull(email, password, token);
     showApp(session);
   } catch (err) {
     $('login-error').textContent = friendlyError(err);

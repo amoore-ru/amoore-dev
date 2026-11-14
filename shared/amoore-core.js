@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v5.3.0 «SMART AUTH & PRE-RUST»
+ * amoore-core.js — v5.4.0 «SMART AUTH & PRE-RUST»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '5.3.0';
+  var AMOORE_VERSION = '5.4.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -312,7 +312,7 @@
   }
 
   // ------------------------------------------------------------------ Quick Admin (плавающее меню)
-  var ROLE_FALLBACK = { super_admin: 'Основатель', admin: 'Администратор', moderator: 'Модератор' };
+  var ROLE_FALLBACK = { super_admin: 'Основатель', founder: 'Основатель', admin: 'Администратор', moderator: 'Модератор', user: 'Пользователь' };
   var roleLabelsCache = null;
   async function fetchGlobalSetting(key) {
     try {
@@ -330,6 +330,8 @@
     if (roleLabelsCache) return roleLabelsCache;
     var v = await fetchGlobalSetting('role_labels');
     roleLabelsCache = Object.assign({}, ROLE_FALLBACK, v && typeof v === 'object' ? v : {});
+    var EN2RU = { founder: 'Основатель', cofounder: 'Сооснователь', super_admin: 'Основатель', superadmin: 'Основатель', admin: 'Администратор', administrator: 'Администратор', moder: 'Модератор', moderator: 'Модератор', mod: 'Модератор', user: 'Пользователь' };      // v5.4: английские служебные слова в подписях → по-русски
+    Object.keys(roleLabelsCache).forEach(function (k) { var t = String(roleLabelsCache[k] == null ? '' : roleLabelsCache[k]).trim(); roleLabelsCache[k] = EN2RU[t.toLowerCase()] || t || ROLE_FALLBACK[k] || k; });
     return roleLabelsCache;
   }
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -693,25 +695,65 @@
       var local = await fetchChangelog('changelog.json');
       if (local && local.length) list = sortVersions(local);
     }
-    changelogList = list && list.length ? list : [{ version: '5.3.0', title: 'SMART AUTH & PRE-RUST', items: ['Вход по 6-значному коду из письма, починен онбординг, мобильная вёрстка.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.4.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
+  }
+  // ---- Changelog 2.0 (v5.4): вкладки «Обновления» (с подверсиями) и «Эры»; старые версии сверху
+  var ERAS = [
+    { id: 'I', title: 'Эра I: Истоки', range: 'v1–v5.9', from: 1, to: 5 },
+    { id: 'II', title: 'Эра II: Синтез', range: 'v6–v12', from: 6, to: 12 }
+  ];
+  function asc(list) { return (list || []).slice().sort(function (a, b) { return -verCmp(a.version, b.version); }); }
+  function entryNode(v) {
+    var sec = el('section', 'nx-cl-entry');
+    var h = document.createElement('h3');
+    h.appendChild(document.createTextNode('v' + v.version));
+    if (v.title) { var sm = document.createElement('small'); sm.textContent = v.title; h.appendChild(sm); }
+    if (v.date) { var dt = document.createElement('time'); dt.textContent = String(v.date).split('-').reverse().join('.'); h.appendChild(dt); }
+    sec.appendChild(h);
+    var ul = document.createElement('ul');
+    (v.items || []).forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+    sec.appendChild(ul);
+    return sec;
+  }
+  function paintUpdates(box, list) {
+    // группы по major.minor: «v5.4» → подверсии 5.4.0, 5.4.1 …; единственная версия в группе показывается сразу
+    var groups = [], map = {};
+    asc(list).forEach(function (v) { var k = verKey(v.version), g = k[0] + '.' + k[1]; if (!map[g]) { map[g] = { key: g, items: [] }; groups.push(map[g]); } map[g].items.push(v); });
+    groups.forEach(function (g, gi) {
+      if (g.items.length === 1) { box.appendChild(entryNode(g.items[0])); return; }
+      var d = document.createElement('details'); d.className = 'nx-cl-group'; if (gi === groups.length - 1) d.open = true;
+      var sm = document.createElement('summary'); sm.textContent = 'v' + g.key + ' · подверсий: ' + g.items.length; d.appendChild(sm);
+      g.items.forEach(function (v) { d.appendChild(entryNode(v)); });
+      box.appendChild(d);
+    });
+  }
+  function paintEras(box, list) {
+    ERAS.forEach(function (era) {
+      var inEra = asc(list).filter(function (v) { var m = verKey(v.version)[0]; return m >= era.from && m <= era.to; });
+      var sec = el('section', 'nx-cl-era');
+      var h = document.createElement('h3'); h.textContent = era.title; var sm = document.createElement('small'); sm.textContent = era.range; h.appendChild(sm); sec.appendChild(h);
+      var p = document.createElement('p'); p.className = 'nx-cl-empty';
+      if (!inEra.length) p.textContent = 'Скоро.';
+      else p.textContent = inEra.map(function (v) { return 'v' + v.version + (v.title ? ' — ' + v.title : ''); }).join(' → ');
+      sec.appendChild(p); box.appendChild(sec);
+    });
   }
   function renderChangelog(box, list) {
     box.textContent = '';
     if (!list.length) { var e = el('p', 'nx-cl-empty'); e.textContent = 'История пока пуста.'; box.appendChild(e); return; }
-    list.forEach(function (v) {
-      var sec = el('section', 'nx-cl-entry');
-      var h = document.createElement('h3');
-      h.appendChild(document.createTextNode('v' + v.version));
-      if (v.title) { var sm = document.createElement('small'); sm.textContent = v.title; h.appendChild(sm); }
-      if (v.date) { var dt = document.createElement('time'); dt.textContent = String(v.date).split('-').reverse().join('.'); h.appendChild(dt); }
-      sec.appendChild(h);
-      var ul = document.createElement('ul');
-      (v.items || []).forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
-      sec.appendChild(ul);
-      box.appendChild(sec);
+    var tabs = el('div', 'nx-cl-tabs'), body = el('div', 'nx-cl-pane');
+    tabs.setAttribute('role', 'tablist');
+    [['updates', 'Обновления'], ['eras', 'Эры']].forEach(function (t, i) {
+      var b = el('button', 'nx-cl-tab' + (i === 0 ? ' on' : '')); b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = t[1];
+      b.addEventListener('click', function () {
+        Array.prototype.forEach.call(tabs.children, function (x) { x.classList.remove('on'); }); b.classList.add('on');
+        body.textContent = ''; (t[0] === 'eras' ? paintEras : paintUpdates)(body, list);
+      });
+      tabs.appendChild(b);
     });
+    box.appendChild(tabs); box.appendChild(body); paintUpdates(body, list);
   }
   var clLastFocus = null;
   async function openChangelog() {

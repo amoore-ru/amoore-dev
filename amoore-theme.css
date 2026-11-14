@@ -435,3 +435,25 @@ html, body { overflow-x: hidden; max-width: 100%; }
 .admin-card.lead-card .admin-card-info, .admin-card.news-card .admin-card-info { flex: 0 0 auto; display: block; min-height: 0; }
 .admin-card.lead-card .admin-card-actions, .admin-card.news-card .admin-card-actions { width: auto; justify-content: flex-start; align-self: flex-start; flex: 0 0 auto; }
 .stack, #leads-list, #news-admin-list { align-content: start; grid-auto-rows: max-content; }
+
+/* ===== v5.4 TITAN ===== */
+#aid-chip { display: none !important; }                              /* круглая плавающая «A» убрана */
+.nx-cl-tabs { display: flex; gap: 6px; margin: 0 0 12px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.nx-cl-tabs::-webkit-scrollbar { display: none; }
+.nx-cl-tab { flex: 0 0 auto; padding: 7px 16px; border-radius: 999px; border: 1px solid rgba(var(--nx-gold-rgb), .3); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.nx-cl-tab.on { background: rgba(var(--nx-gold-rgb), .18); border-color: rgba(var(--nx-gold-rgb), .6); }
+.nx-cl-group { border-top: 1px solid rgba(var(--nx-gold-rgb), .14); padding: 10px 0; }
+.nx-cl-group > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.nx-cl-era { padding: 12px 0; border-top: 1px solid rgba(var(--nx-gold-rgb), .14); }
+.nx-cl-era:first-child { border-top: 0; }
+.nx-cl-era h3 small { margin-left: 8px; opacity: .7; font-weight: 400; }
+.board { margin-top: 28px; }
+.board-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.board-list li { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(var(--nx-gold-rgb), .18); }
+.board-list a { color: inherit; text-decoration: none; overflow-wrap: anywhere; }
+.board-n { opacity: .6; text-align: center; }
+.board-empty { display: block !important; opacity: .7; }
+.aid-tabs { flex-wrap: nowrap !important; overflow-x: auto !important; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.aid-tabs::-webkit-scrollbar { display: none; }
+.aid-tabs > button { flex: 0 0 auto !important; max-width: none !important; white-space: nowrap !important; }
+@media (max-width: 760px) { .settings-sidebar { flex-wrap: nowrap !important; overflow-x: auto !important; white-space: nowrap; } .settings-sidebar > * { flex: 0 0 auto !important; white-space: nowrap !important; max-width: none !important; } }

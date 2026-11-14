@@ -1,5 +1,5 @@
 /**
- * amoore-id.js — v5.3.0 «SMART AUTH & PRE-RUST» · amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
+ * amoore-id.js — v5.4.0 «SMART AUTH & PRE-RUST» · amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
  * Подключение (после supabase-js):  <script src="amoore-id.js"></script>
  *   amooreID.init({ site: 'dev'|'studio'|'landing', sb: <существующий клиент, необязательно> })
  * API: signIn(email,pw) · sendCode(email, create)/verifyCode (вход ТОЛЬКО по 6-значному коду из письма) · consumeUrl() (SSO) · ensureOnboarded()
@@ -14,9 +14,12 @@
   var sb = null, site = 'landing', profile = null;
   var USERNAME_RE = /^[a-z0-9_]{3,24}$/;
   // v5.2: подписи ролей — только по-русски (названия можно переопределить в «Команда → Управление ролями»)
-  var ROLE_RU = { user: 'Пользователь', moderator: 'Модератор', admin: 'Администратор', super_admin: 'Основатель' };
+  var ROLE_RU = { user: 'Пользователь', moderator: 'Модератор', admin: 'Администратор', super_admin: 'Основатель', founder: 'Основатель' };
   var roleOverrides = null;
-  function roleRu(role) { return (roleOverrides && roleOverrides[role]) || ROLE_RU[role] || role; }
+  // v5.4: если в подписи оказалось английское служебное слово (founder, moder, user…), показываем русское
+  var ROLE_EN2RU = { founder: 'Основатель', cofounder: 'Сооснователь', super_admin: 'Основатель', superadmin: 'Основатель', admin: 'Администратор', administrator: 'Администратор', moder: 'Модератор', moderator: 'Модератор', mod: 'Модератор', user: 'Пользователь' };
+  function ruLabel(v, role) { var t = String(v == null ? '' : v).trim(); if (!t) return ROLE_RU[role] || role; var k = t.toLowerCase(); return ROLE_EN2RU[k] || t; }
+  function roleRu(role) { return ruLabel((roleOverrides && roleOverrides[role]) || ROLE_RU[role] || ROLE_EN2RU[String(role).toLowerCase()] || role, role); }
   function loadRoleLabels() {
     if (roleOverrides || !sb) return Promise.resolve();
     return Promise.resolve(sb.from('global_settings').select('value').eq('key', 'role_labels').maybeSingle())
@@ -200,7 +203,7 @@
     '.aid-av-ph{display:flex;align-items:center;justify-content:center;font:800 34px var(--nx-font-head,system-ui);color:#17151d;border-color:rgba(255,255,255,.25)}.aid-pal{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}.aid-sw-c{width:30px;height:30px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;box-shadow:0 0 0 1px rgba(255,255,255,.2)}.aid-sw-c.on{border-color:#fff;box-shadow:0 0 0 2px rgba(212,175,55,.9)}' +
     '.aid-inline{max-width:100%;max-height:none;overflow:visible;box-shadow:none;border:0;background:transparent;padding:0}.aid-role{display:inline-block;padding:3px 12px;border-radius:999px;font:700 12px var(--nx-font-body,system-ui);background:rgba(212,175,55,.16);color:var(--nx-gold,#d4af37);border:1px solid rgba(212,175,55,.35)}.aid-center{text-align:center}.aid-card input,.aid-card textarea,.aid-card select{box-sizing:border-box;max-width:100%}.aid-card{overflow-x:hidden}' +
     '.aid-send{margin:-2px 0 12px;background:transparent;color:inherit;border:1px solid rgba(212,175,55,.45)}.aid-codebox{margin:0 0 4px}.aid-codebox input{letter-spacing:.35em;text-align:center;font-weight:700}.aid-white{margin-top:10px;background:#fff;color:#17151d;border:1px solid rgba(0,0,0,.12)}' +
-    '.aid-tabs{flex-wrap:wrap;overflow-x:visible}.aid-tabs button{max-width:100%;white-space:normal;text-align:center}.aid-sw{min-width:46px;max-width:46px;height:28px;min-height:0;max-height:28px;flex-shrink:0}';
+    '.aid-tabs{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;scrollbar-width:none}.aid-tabs::-webkit-scrollbar{display:none}.aid-tabs button{flex:0 0 auto;max-width:none;white-space:nowrap;text-align:center}.aid-btn.aid-sm{width:auto;min-height:0;padding:7px 16px;font-size:13px;border-radius:10px}.aid-sw{min-width:46px;max-width:46px;height:28px;min-height:0;max-height:28px;flex-shrink:0}';
   function ensureCss() { if (!document.getElementById('aid-css')) { var s = el('style', { id: 'aid-css' }); s.textContent = CSS; document.head.appendChild(s); } }
   function overlay(card) { ensureCss(); var ov = el('div', { class: 'aid-ov', role: 'dialog', 'aria-modal': 'true' }, [card]); document.body.appendChild(ov); return ov; }
 
@@ -234,7 +237,7 @@
         });
         var out = el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Выйти', onclick: function () { signOut().then(function () { ov.remove(); done(null); }); } });
         var ov = overlay(el('div', { class: 'aid-card' }, [el('h2', { text: 'Добро пожаловать в amoore' }), el('p', { text: 'Выберите никнейм и аватарку: загрузите фото или просто выберите цвет — без этого внутренние функции недоступны.' }),
-          avWrap, el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Загрузить фото', onclick: function () { file.click(); } }), file, el('div', { style: 'height:12px' }), pal, name, msg, go, out]));
+          avWrap, el('button', { class: 'aid-btn aid-ghost aid-sm', type: 'button', text: 'Загрузить фото', onclick: function () { file.click(); } }), file, el('div', { style: 'height:12px' }), pal, name, msg, go, out]));
       });
     });
   }
@@ -281,7 +284,7 @@
     paintAv();
     box.appendChild(avWrap);
     box.appendChild(el('div', { class: 'aid-center', style: 'margin:0 0 12px' }, [el('h2', { text: p.display_name || ('@' + (p.username || '—')), style: 'margin:0 0 6px' }), el('span', { class: 'aid-role', id: 'aid-role', text: roleRu(p.role) })]));
-    box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Загрузить фото', onclick: function () { file.click(); } })); box.appendChild(file);
+    box.appendChild(el('button', { class: 'aid-btn aid-ghost aid-sm', type: 'button', text: 'Загрузить фото', onclick: function () { file.click(); } })); box.appendChild(file);
     if (p.avatar_url) box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Убрать фото (будет цвет)', onclick: function () {
       sb.from('profiles').update({ avatar_url: '', avatar_color: color }).eq('id', p.id).then(function (r) { if (r.error) return say(msg, err(r.error)); p.avatar_url = ''; paintAv(); getProfile(true).then(announce); reload && reload(); }); } }));
     box.appendChild(el('p', { class: 'aid-hint', text: 'Цвет аватарки (если нет фото):', style: 'margin-top:14px' })); box.appendChild(pal);
@@ -370,6 +373,9 @@
     box.appendChild(el('h2', { text: 'Устройства', style: 'font-size:16px' })); box.appendChild(list);
     box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', id: 'revoke-others', text: 'Завершить все другие сессии', onclick: function () {
       revokeOthers().then(function (n) { say(msg, 'Завершено сессий: ' + n, true); return paint(); }).catch(function (e) { say(msg, err(e)); }); } }));
+    box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', id: 'revoke-all', text: 'Завершить все сессии', onclick: function () {
+      if (!window.confirm('Выйти на всех устройствах, включая это?')) return;
+      sb.rpc('revoke_all_sessions').then(function (r) { if (r.error) throw r.error; return sb.auth.signOut({ scope: 'global' }); }).then(function () { location.reload(); }).catch(function (e) { say(msg, err(e)); }); } }));
     var pw = el('input', { type: 'password', autocomplete: 'new-password', minlength: '8', placeholder: 'Новый пароль (от 8 символов)' });
     box.appendChild(el('h2', { text: 'Смена пароля', style: 'font-size:16px;margin-top:16px' })); box.appendChild(pw);
     box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Сменить пароль', onclick: function () {
@@ -408,7 +414,8 @@
       try { await BUILD[t](await getProfile(true), body, function () { renderProfile(host, t, onClose); if (ov) ov.remove(); }); } catch (e) { body.appendChild(el('div', { class: 'aid-err', text: err(e) })); }
     }
     var P0 = window.amoorePush, pushOk = !!(P0 && P0.supported && P0.supported() && P0.configured && P0.configured());
-    TABS.filter(function (t) { return t[0] !== 'notify' || pushOk; }).forEach(function (t) { nav.appendChild(el('button', { type: 'button', role: 'tab', 'data-tab': t[0], text: t[1], onclick: function () { show(t[0]); } })); });
+    var inStudio = !!(host && host.id === 'studio-profile-host');   // v5.4: в Студии внешняя вкладка уже называется «Профиль» — внутренняя «Основное», без двойных вкладок
+    TABS.filter(function (t) { return t[0] !== 'notify' || pushOk; }).forEach(function (t) { nav.appendChild(el('button', { type: 'button', role: 'tab', 'data-tab': t[0], text: (inStudio && t[0] === 'profile') ? 'Основное' : t[1], onclick: function () { show(t[0]); } })); });
     var ov = null;
     if (host) { host.textContent = ''; host.appendChild(card); }
     else { card.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Закрыть', onclick: function () { ov.remove(); onClose && onClose(); } })); ov = overlay(card); }
@@ -427,7 +434,11 @@
 
   // ---------------------------------------------------------------- плавающий аккаунт-чип (профиль · SSO · выход) на любом сайте
   async function mountChip() {
-    var p = await getProfile(true); var old = document.getElementById('aid-chip'); if (old) old.remove();
+    // v5.4: круглая плавающая кнопка с буквой (слева внизу) убрана — она перекрывала текст на телефоне.
+    // Профиль, выход и переходы между сайтами доступны из шапки, «Настройки → Профиль» и меню «⚡ Admin».
+    var old = document.getElementById('aid-chip'); if (old) old.remove();
+    return;
+    var p = await getProfile(true);
     if (!isOnboarded(p)) return; ensureCss();
     var st = document.getElementById('aid-chip-css') || el('style', { id: 'aid-chip-css' });
     st.textContent = '#aid-chip>.aid-chip-ph{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 18px system-ui;color:#17151d;background:' + (p.avatar_color || '#d4af37') + ';border:2px solid rgba(212,175,55,.5);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}#aid-chip{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:9990}#aid-chip>img{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid rgba(212,175,55,.5);cursor:pointer;display:block;transition:transform .35s cubic-bezier(.34,1.56,.64,1)}#aid-chip>img:active{transform:scale(.9)}#aid-menu{position:absolute;bottom:52px;left:0;min-width:210px;padding:6px;border-radius:14px;background:var(--nx-modal-bg,rgba(13,18,32,.95));border:var(--nx-glass-border,1px solid rgba(212,175,55,.2));display:none}#aid-menu.open{display:block}#aid-menu button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;background:none;color:var(--nx-ink,#eef0f7);font:14px var(--nx-font-body,system-ui);border-radius:10px;cursor:pointer}#aid-menu button:hover{background:rgba(212,175,55,.12)}';

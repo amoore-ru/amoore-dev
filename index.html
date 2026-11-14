@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <script src="amoore-ux.js?v=5.3.0"></script>
-  <link rel="stylesheet" href="style.css?v=5.3.0">
-  <link rel="stylesheet" href="amoore-theme.css?v=5.3.0">
-  <link rel="stylesheet" href="dev-theme.css?v=5.3.0">
+  <script src="amoore-ux.js?v=5.4.0"></script>
+  <link rel="stylesheet" href="style.css?v=5.4.0">
+  <link rel="stylesheet" href="amoore-theme.css?v=5.4.0">
+  <link rel="stylesheet" href="dev-theme.css?v=5.4.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -27,11 +27,6 @@
         <div class="form-group" id="email-group">
           <label for="email">Email</label>
           <input type="email" id="email" placeholder="you@amoore.ru" required autocomplete="username">
-        </div>
-        <div class="form-group" id="otp-group">
-          <label for="otp">Код из письма</label>
-          <div style="display:flex;gap:8px"><input type="text" id="otp" inputmode="numeric" maxlength="6" placeholder="6 цифр" autocomplete="one-time-code" style="flex:1">
-          <button type="button" class="btn btn-ghost" id="send-code-btn" style="font-size:12px;white-space:nowrap">Выслать код</button></div>
         </div>
         <div class="form-group" id="password-group">
           <label for="password">Пароль</label>
@@ -122,16 +117,17 @@
         <div class="sites-grid" id="sites-grid"><div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div></div>
 
         
-        <div class="admin-card glass" id="bot-status-card" style="margin-top:24px">
+        <div class="admin-card glass bot-card" id="bot-status-card" style="margin-top:24px">
           <div class="admin-card-info">
             <h3 style="margin:0 0 8px">Телеграм-бот</h3>
             <p class="muted" id="bot-status-line">Статус: загрузка…</p>
             <p class="muted" id="bot-hb-line" style="font-size:12px"></p>
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
-            <button type="button" class="btn btn-primary btn-sm" id="bot-toggle-btn">Вкл/Выкл</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="bot-test-btn">Тестовое сообщение</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="bot-logs-csv">Скачать логи CSV</button>
+          <div class="bot-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="bot-toggle-btn">Выключить</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="bot-test-btn">Тест</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="bot-webhook-btn" data-super title="Переустановить Telegram-вебхук">Вебхук</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="bot-logs-csv" title="Скачать логи бота (CSV)">Логи</button>
           </div>
 
         
@@ -441,11 +437,11 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="amoore-id.js?v=5.3.0"></script>
-<script src="amoore-pwa.js?v=5.3.0" defer></script>
-<script src="amoore-cmdk.js?v=5.3.0" defer></script>
-  <script src="digest.js?v=5.3.0"></script>
-  <script src="app.js?v=5.3.0"></script>
-  <script src="amoore-admin-v5.js?v=5.3.0"></script>
+  <script src="amoore-id.js?v=5.4.0"></script>
+<script src="amoore-pwa.js?v=5.4.0" defer></script>
+<script src="amoore-cmdk.js?v=5.4.0" defer></script>
+  <script src="digest.js?v=5.4.0"></script>
+  <script src="app.js?v=5.4.0"></script>
+  <script src="amoore-admin-v5.js?v=5.4.0"></script>
 </body>
 </html>

@@ -41,9 +41,9 @@ check('токен SSO и ссылки стираются из адресной �
 check('нет innerHTML в amoore-id.js (XSS)', !/innerHTML/.test(idCode));
 
 // ---- версии
-const v = '5.3.0';
-check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.3.0'/.test(read('amoore-ru/amoore-core.js')));
-check('версия в bot.py', /AMOORE_VERSION = "5.3.0"/.test(read('amoore-ai/bot.py')));
+const v = '5.4.0';
+check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.4.0'/.test(read('amoore-ru/amoore-core.js')));
+check('версия в bot.py', /AMOORE_VERSION = "5.4.0"/.test(read('amoore-ai/bot.py')));
 for (const d of ['amoore-dev', 'amoore-ru', 'amoore-studio', 'amoore-ai']) check(`changelog ${d}`, JSON.parse(read(`${d}/changelog.json`)).current === v);
 
 // ---- PWA
@@ -61,13 +61,13 @@ check('sw.js: только GET', /r\.method !== 'GET'/.test(sw));
 const bot = read('amoore-ai/bot.py');
 check('бот: /link зарегистрирован', /"\/link": cmd_link/.test(bot) && /def cmd_link/.test(bot));
 check('бот: /link только в личке', /chat_type_of\(chat_id\) != "private"/.test(bot));
-check('бот: код привязки из secrets, не random', /import secrets/.test(read('amoore-ai/supabase_bridge.py')) && /randbelow/.test(read('amoore-ai/supabase_bridge.py')));
+check('бот: код привязки из secrets, не random', /import secrets/.test(read('amoore-ai/db_bridge.py')) && /randbelow/.test(read('amoore-ai/db_bridge.py')));
 
 
 // ======================================================================= v5.1 «MASTER»
 const sqlDir = path.join(ROOT, 'amoore-dev/shared/sql');
-check('SQL: в shared/sql ровно две миграции — 001 (заморожена) и 002_v53_updates.sql (кроме cleanup.sql)', fs.readdirSync(sqlDir).filter((f) => /^\d+_.*\.sql$/.test(f)).join() === '001_init_database.sql,002_v53_updates.sql', fs.readdirSync(sqlDir).join());
-check('SQL: других миграций (003–010) нет ни в shared/sql, ни в корне', !fs.readdirSync(sqlDir).some((f) => /^0(0[3-9]|10)_/.test(f)) && !fs.readdirSync(ROOT).some((f) => /^0\d\d_.*\.sql$/.test(f)));
+check('SQL: в shared/sql ровно три миграции — 001 (заморожена), 002_v53_updates.sql и 003_v54_titan.sql (кроме cleanup.sql)', fs.readdirSync(sqlDir).filter((f) => /^\d+_.*\.sql$/.test(f)).join() === '001_init_database.sql,002_v53_updates.sql,003_v54_titan.sql', fs.readdirSync(sqlDir).join());
+check('SQL: других миграций (004–010) нет ни в shared/sql, ни в корне', !fs.readdirSync(sqlDir).some((f) => /^0(0[4-9]|10)_/.test(f)) && !fs.readdirSync(ROOT).some((f) => /^0\d\d_.*\.sql$/.test(f)));
 for (const t of ['admins', 'profiles', 'business_automations', 'changelog_versions', 'leads', 'news', 'audit_logs', 'user_sessions', 'push_subscriptions', 'user_sites', 'rewards_log']) check(`SQL: таблица ${t} создаётся в едином файле`, new RegExp(`create table if not exists public\\.${t}\\b`).test(sql));
 check('SQL: Storage bucket media и политики', /storage\.buckets/.test(sql) && /'media'/.test(sql));
 check('SQL: идемпотентность — у каждой политики есть DROP POLICY IF EXISTS', [...sql.matchAll(/^create policy (\w+) on ([\w.]+)/gm)].every((m) => new RegExp(`drop policy if exists ${m[1]} on ${m[2].replace('.', '\\.')}`).test(sql)));
@@ -100,9 +100,9 @@ check('CSS: .lead-card / .news-card — column, gap 12px, без space-between',
 check('админка: рассылка полностью удалена (v5.2)', !/telegram-broadcast-btn|broadcast-card/.test(read('amoore-dev/app.js') + read('amoore-dev/index.html')));
 check('админка: теги заявок, CSV, фильтр журнала, Realtime-графики', /Экспорт в CSV/.test(read('amoore-dev/amoore-admin-v5.js')) && /amoore-live-activity/.test(read('amoore-dev/amoore-admin-v5.js')) && /id="logs-filter"/.test(read('amoore-dev/index.html')));
 const cl = JSON.parse(read('amoore-ru/changelog.json')).versions[0];
-check('changelog: v5.3 SMART AUTH & PRE-RUST от 2026-11-15', cl.version === '5.3.0' && cl.title === 'v5.3 SMART AUTH & PRE-RUST' && cl.date === '2026-11-15' && cl.items.length >= 6);
+check('changelog: v5.4 TITAN от 2026-11-14', cl.version === '5.4.0' && cl.title === 'TITAN' && cl.date === '2026-11-14' && cl.items.length >= 6);
 const cl2 = JSON.parse(read('amoore-ru/changelog.json')).versions[1];
-check('changelog: предыдущая запись 5.2.0 сохранена', cl2.version === '5.2.0');
+check('changelog: предыдущая запись 5.3.0 сохранена', cl2.version === '5.3.0');
 
 // ---- v5.3 SMART AUTH & PRE-RUST
 check('вход: подзаголовок про 6-значный код', /Введите Email, и мы пришлём 6-значный код/.test(idCode));
@@ -112,15 +112,31 @@ check('вход по ссылке удалён навсегда (id.js, адми
 check('онбординг: профиль с username не показывает окно', /function isOnboarded\(p\)[^}]*hasUsername\(p\)/.test(idCode) && /amoore_onboarded_/.test(idCode));
 check('Студия: кнопка «Войти», старый текст про работу без входа удалён', /studio-login-btn/.test(read('amoore-studio/studio-v5.js')) && !/работает и без входа/i.test(read('amoore-studio/studio-v5.js') + read('amoore-studio/index.html')));
 const css53 = read('amoore-ru/amoore-theme.css');
-check('CSS v5.3: вкладки переносятся, тумблеры не сжимаются, карточки без space-between', /v5\.3 «SMART AUTH»/.test(css53) && /\.aid-tabs[^{]*\{[^}]*flex-wrap: wrap/.test(css53) && /flex-shrink: 0 !important/.test(css53) && /justify-content: flex-start !important/.test(css53));
+check('CSS v5.3: вкладки переносятся, тумблеры не сжимаются, карточки без space-between', /v5\.3 «SMART AUTH»/.test(css53) && /\.aid-tabs[^{]*\{[^}]*flex-wrap: wrap/.test(css53) /* v5.4: переопределено на горизонтальный скролл ниже */ && /flex-shrink: 0 !important/.test(css53) && /justify-content: flex-start !important/.test(css53));
 const sql2 = read('amoore-dev/shared/sql/002_v53_updates.sql');
 check('SQL: 001 заморожен (1786 строк)', sql.split('\n').length - (sql.endsWith('\n') ? 1 : 0) === 1786, String(sql.split('\n').length));
 check('SQL 002: tg_link_codes (15 минут) и claim_telegram_code(input_code text)', /tg_link_codes/.test(sql2) && /interval '15 minutes'/.test(sql2) && /function public\.claim_telegram_code\(input_code text\)/.test(sql2) && /auth\.uid\(\)/.test(sql2) && /expires_at > now\(\)/.test(sql2));
 check('SQL 002: security definer имеют search_path, RLS у новых таблиц', (sql2.split(/create or replace function/i).slice(1)).every((b) => !/security definer/i.test(b) || /set search_path/i.test(b.slice(0, 400))) && /alter table public\.tg_claim_attempts enable row level security/.test(sql2));
 check('SQL 002: онбординг считается по username', /new\.onboarded := btrim\(coalesce\(new\.username/.test(sql2));
 check('клиент зовёт claim_telegram_code', /claim_telegram_code/.test(idCode));
-for (const f of ['ai_engine.py', 'storage.py', 'tg_api.py', 'handlers_system.py', 'identity.py', 'amoore_identity.txt', 'ARCHITECTURE.md']) check(`бот: файл ${f} на месте`, fs.existsSync(path.join(ROOT, 'amoore-ai', f)));
-check('бот: ключи GROQ_API_KEY_1… и экономия токенов (3 последних сообщения)', /GROQ_API_KEY/.test(read('amoore-ai/ai_engine.py')) && /FALLBACK_KEEP_LAST = 3/.test(read('amoore-ai/ai_engine.py')));
+for (const f of ['ai_logic.py', 'db_bridge.py', 'tg_handlers.py', 'ai_engine.py', 'storage.py', 'tg_api.py', 'handlers_system.py', 'identity.py', 'amoore_identity.txt', 'ARCHITECTURE.md']) check(`бот: файл ${f} на месте`, fs.existsSync(path.join(ROOT, 'amoore-ai', f)));
+check('бот: ключи GROQ_API_KEY_1… и экономия токенов (3 последних сообщения)', /GROQ_API_KEY/.test(read('amoore-ai/ai_logic.py')) && /GOOGLE_AI_KEY/.test(read('amoore-ai/ai_logic.py')) && /FALLBACK_KEEP_LAST = 3/.test(read('amoore-ai/ai_logic.py')));
+
+// ---- v5.4 TITAN
+const sql3 = read('amoore-dev/shared/sql/003_v54_titan.sql');
+check('SQL 003: tg_link_codes + RLS без доступа клиентам', /create table if not exists public\.tg_link_codes/.test(sql3) && /enable row level security/.test(sql3) && /revoke all on public\.tg_link_codes from anon, authenticated/.test(sql3));
+check('SQL 003: online_now 90 с, leaderboard_top10, revoke_all_sessions', /interval '90 seconds'/.test(sql3) && /leaderboard_top10/.test(sql3) && /revoke_all_sessions/.test(sql3));
+check('SQL 003: security definer с search_path', (sql3.split(/create or replace function/i).slice(1)).every((b) => !/security definer/i.test(b.split('$$')[0]) || /search_path/i.test(b.split('$$')[0])));
+check('админка: вход без кода из письма и без «Зарегистрироваться»', !/otp-group|send-code-btn|verifyCode/.test(read('amoore-dev/app.js') + read('amoore-dev/index.html')));
+check('админка: кнопки бота «Выключить», «Тест», «Логи», «Вебхук»', /id="bot-test-btn">Тест</.test(read('amoore-dev/index.html')) && /id="bot-logs-csv"[^>]*>Логи</.test(read('amoore-dev/index.html')) && /reconnect-webhook/.test(read('amoore-dev/app.js')));
+check('Edge Function reconnect-webhook: только Основатель', /super_admin/.test(read('supabase/functions/reconnect-webhook/index.ts')));
+check('geo: ip-api.com + запасной ipwho.is', /ip-api\.com/.test(read('supabase/functions/geo/index.ts')) && /ipwho\.is/.test(read('supabase/functions/geo/index.ts')));
+check('плавающая «A» убрана, вкладки профиля скроллятся', /return;\s*var p = await getProfile/.test(idCode) && /#aid-chip \{ display: none !important/.test(read('amoore-ru/amoore-theme.css')) && /\.aid-tabs \{ flex-wrap: nowrap !important; overflow-x: auto !important/.test(read('amoore-ru/amoore-theme.css')));
+check('роли по-русски: founder/moder/user нормализуются', /ROLE_EN2RU/.test(idCode) && /ROLE_EN2RU/.test(read('amoore-dev/app.js')) && /EN2RU/.test(read('amoore-ru/amoore-core.js')));
+check('лендинг: лидерборд и «Завершить все сессии»', /id="board-list"/.test(read('amoore-ru/index.html')) && /leaderboard_top10/.test(read('amoore-ru/amoore-board.js')) && /revoke_all_sessions/.test(idCode));
+check('Changelog 2.0: вкладки «Обновления» и «Эры», Эра I/II', /Эра I: Истоки/.test(read('amoore-ru/amoore-core.js')) && /Эра II: Синтез/.test(read('amoore-ru/amoore-core.js')) && /'Обновления'/.test(read('amoore-ru/amoore-core.js')));
+check('presence: amoore-live.js сам создаёт visitor id', /localStorage\.setItem\('amoore_vid'/.test(read('amoore-ru/amoore-live.js')));
+check('бот: ai_logic / db_bridge / tg_handlers + Google AI + upsert пульса', /GOOGLE_AI_KEY/.test(read('amoore-ai/ai_logic.py')) && /on_conflict=id/.test(read('amoore-ai/db_bridge.py')) && /rate_limited/.test(read('amoore-ai/tg_handlers.py')));
 
 console.log(`v5: ${pass}/${pass + fail} проверок пройдено`);
 process.exit(fail ? 1 : 0);
