@@ -406,12 +406,10 @@ html, body { overflow-x: hidden; max-width: 100%; }
 .aid-tabs, .chip-tabs, .aid-nav, .settings-sidebar, .settings-menu, .theme-options, .theme-seg,
 .modal-actions, .hero-actions, .digest-actions, .logs-toolbar, .project-card-actions, .project-detail-actions,
 .admin-card-actions, .lead-actions, .row-actions, .btn-row, .button-row { flex-wrap: wrap; min-width: 0; max-width: 100%; }
-.aid-tabs { overflow-x: visible; }
-.aid-tabs > button, .chip-tabs > *, .aid-nav > *, .theme-seg > *, .theme-options > * { max-width: 100%; min-width: 0; }
+.chip-tabs > *, .aid-nav > *, .theme-seg > *, .theme-options > * { max-width: 100%; min-width: 0; }
 .btn, .btn-ghost, .btn-primary, .btn-sm, .aid-btn, .nx-btn, .primary-button, .secondary-button, .ghost-button { max-width: 100%; box-sizing: border-box; }
 @media (max-width: 640px) {
   .btn, .btn-ghost, .btn-primary, .primary-button, .secondary-button, .ghost-button { white-space: normal; overflow-wrap: anywhere; }
-  .aid-tabs > button { flex: 1 1 auto; }
   .modal-actions > *, .digest-actions > * { flex: 1 1 140px; }
 }
 /* тумблеры: никогда не сжимаются и не растягиваются во flex/grid-рядах */
@@ -453,7 +451,68 @@ html, body { overflow-x: hidden; max-width: 100%; }
 .board-list a { color: inherit; text-decoration: none; overflow-wrap: anywhere; }
 .board-n { opacity: .6; text-align: center; }
 .board-empty { display: block !important; opacity: .7; }
-.aid-tabs { flex-wrap: nowrap !important; overflow-x: auto !important; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-.aid-tabs::-webkit-scrollbar { display: none; }
-.aid-tabs > button { flex: 0 0 auto !important; max-width: none !important; white-space: nowrap !important; }
-@media (max-width: 760px) { .settings-sidebar { flex-wrap: nowrap !important; overflow-x: auto !important; white-space: nowrap; } .settings-sidebar > * { flex: 0 0 auto !important; white-space: nowrap !important; max-width: none !important; } }
+
+/* =====================================================================
+   v5.5 «STABILITY» — единый стандарт навигации «Пилюли» (эталон: вкладки «Новости» на лендинге).
+   Один компонент на всю экосистему: профиль Amoore ID (.aid-tabs), настройки студии (.settings-sidebar/.settings-tab),
+   панель amoore-dev (.ux-nav/.ux-tab, .chip-tabs/.chip-tab), новости (.news-tabs/.tab).
+   Контейнер — всегда ОДНА строка: на узких экранах превращается в горизонтальную ленту со свайпом, полоса прокрутки скрыта.
+   Размер кнопки не меняется ни в одном состоянии (обводка и подъём — через box-shadow), поэтому ничего не «прыгает».
+   ===================================================================== */
+html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs) {
+  display: flex; flex-flow: row nowrap; align-items: center; gap: 8px;
+  width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; margin: 0 0 14px; padding: 6px 4px 12px;
+  overflow-x: auto; overflow-y: hidden; white-space: nowrap;
+  -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; scroll-behavior: smooth; scroll-snap-type: x proximity;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs)::-webkit-scrollbar { display: none; width: 0; height: 0; }
+html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs)[hidden] { display: none; }
+html body :is(.pill-tabs > button, .aid-tabs > button, .settings-sidebar > .settings-tab, .chip-tabs > .chip-tab, .news-tabs > .tab) {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 40px; width: auto; max-width: none; margin: 0; padding: 8px 16px; box-sizing: border-box;
+  font: 600 13px/1.2 var(--font, inherit); letter-spacing: 0; white-space: nowrap; text-align: center; text-decoration: none;
+  color: var(--muted, #8b90a5); background: transparent; border: 0; border-radius: 999px; cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line, rgba(139, 144, 165, .28)); transform: none; scroll-snap-align: start;
+  transition: color .2s ease, background-color .2s ease, box-shadow .2s ease;
+}
+html body :is(.pill-tabs > button, .aid-tabs > button, .settings-sidebar > .settings-tab, .chip-tabs > .chip-tab, .news-tabs > .tab):hover {
+  color: var(--ink, inherit); background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--gold-rgb, 212, 175, 55), .45);
+}
+html body :is(.pill-tabs > button, .aid-tabs > button, .settings-sidebar > .settings-tab, .chip-tabs > .chip-tab, .news-tabs > .tab):active { transform: none; }
+html body :is(.pill-tabs > button, .aid-tabs > button, .settings-sidebar > .settings-tab, .chip-tabs > .chip-tab, .news-tabs > .tab):focus-visible {
+  outline: 2px solid rgba(var(--gold-rgb, 212, 175, 55), .7); outline-offset: 2px;
+}
+html body :is(.pill-tabs > button.on, .pill-tabs > button.active, .pill-tabs > button[aria-selected="true"],
+  .aid-tabs > button.on, .aid-tabs > button.active, .aid-tabs > button[aria-selected="true"],
+  .settings-sidebar > .settings-tab.active,
+  .chip-tabs > .chip-tab.active, .chip-tabs > .chip-tab[aria-selected="true"], .news-tabs > .tab.is-active, .news-tabs > .tab[aria-pressed="true"]) {
+  color: var(--ink, inherit); background: color-mix(in srgb, var(--ink, #fff) 6%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(var(--gold-rgb, 212, 175, 55), .7), 0 6px 14px rgba(var(--gold-rgb, 212, 175, 55), .16);
+}
+/* серый кружок-счётчик (как «0/3» в новостях); бейджи в админке получают тот же вид */
+html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs) :is(.news-count, .ux-badge, .pill-count) {
+  position: static; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin: 0;
+  font-size: 11px; font-weight: 700; border-radius: 999px; box-sizing: border-box;
+  background: color-mix(in srgb, var(--ink, #fff) 9%, transparent); color: var(--muted, #8b90a5);
+}
+html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs) :is(.news-count, .ux-badge, .pill-count)[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs) { scroll-behavior: auto; } }
+
+/* Студия: общий «подложечный» бокс вокруг вкладок настроек убираем — пилюли стоят прямо на странице */
+html body .settings-sidebar { background: transparent; border: 0 !important; box-shadow: none !important; border-radius: 0; flex-direction: row; }
+html body .settings-sidebar > .settings-tab { --ink: var(--text, inherit); --muted: var(--text-secondary, #8b90a5); --line: var(--border, rgba(139,144,165,.28)); text-align: center; }
+html body .settings-sidebar { --ink: var(--text, inherit); --muted: var(--text-secondary, #8b90a5); --line: var(--border, rgba(139,144,165,.28)); }
+/* Панель amoore-dev (десктоп): вкладки шапки — те же пилюли. В мобильном меню (<1120px) остаётся вертикальный список без переполнения. */
+@media (min-width: 1120px) {
+  html body .ux-nav { gap: 8px; padding: 4px; justify-content: flex-start; scroll-snap-type: x proximity; }
+  html body .ux-nav > .ux-tab {
+    flex: 0 0 auto; min-height: 38px; padding: 8px 16px; font: 600 13px/1.2 var(--nx-btn-font, inherit); border-radius: 999px;
+    color: var(--nx-muted, #8b90a5); background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--nx-gold-rgb, 212, 175, 55), .28); scroll-snap-align: start;
+  }
+  html body .ux-nav > .ux-tab:hover { color: var(--nx-ink, inherit); background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--nx-gold-rgb, 212, 175, 55), .55); }
+  html body .ux-nav > .ux-tab.active, html body .ux-nav > .ux-tab[aria-current="page"] {
+    color: var(--nx-ink, inherit); background: rgba(var(--nx-gold-rgb, 212, 175, 55), .1);
+    box-shadow: inset 0 0 0 1px rgba(var(--nx-gold-rgb, 212, 175, 55), .7), 0 6px 14px rgba(var(--nx-gold-rgb, 212, 175, 55), .16);
+  }
+}

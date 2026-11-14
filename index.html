@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <script src="amoore-ux.js?v=5.4.0"></script>
-  <link rel="stylesheet" href="style.css?v=5.4.0">
-  <link rel="stylesheet" href="amoore-theme.css?v=5.4.0">
-  <link rel="stylesheet" href="dev-theme.css?v=5.4.0">
+  <script src="amoore-ux.js?v=5.5.0"></script>
+  <link rel="stylesheet" href="style.css?v=5.5.0">
+  <link rel="stylesheet" href="amoore-theme.css?v=5.5.0">
+  <link rel="stylesheet" href="dev-theme.css?v=5.5.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -123,14 +123,21 @@
             <p class="muted" id="bot-status-line">Статус: загрузка…</p>
             <p class="muted" id="bot-hb-line" style="font-size:12px"></p>
           </div>
+          <div class="bot-switches" role="group" aria-label="Переключатели">
+            <div class="bot-switch-row">
+              <div class="bot-switch-text"><b>Telegram-бот</b><small>Вебхук: отвечает ли бот пользователям</small></div>
+              <button type="button" class="btn btn-primary btn-sm" id="bot-toggle-btn">Выключить</button>
+            </div>
+            <div class="bot-switch-row">
+              <div class="bot-switch-text"><b>Чат на сайте</b><small>Видимость вкладки «Чат» на amoore.ru. Не зависит от бота</small></div>
+              <button type="button" class="btn btn-primary btn-sm" id="chat-widget-btn" data-needs="toggle_chat">Выключить</button>
+            </div>
+          </div>
           <div class="bot-actions">
-            <button type="button" class="btn btn-primary btn-sm" id="bot-toggle-btn">Выключить</button>
             <button type="button" class="btn btn-ghost btn-sm" id="bot-test-btn">Тест</button>
             <button type="button" class="btn btn-ghost btn-sm" id="bot-webhook-btn" data-super title="Переустановить Telegram-вебхук">Вебхук</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="bot-logs-csv" title="Скачать логи бота (CSV)">Логи</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="bot-logs-btn" title="Открыть логи бота">Логи</button>
           </div>
-
-        
         </div>
 
       
@@ -332,6 +339,29 @@
   </div>
 
   <!-- Close site modal -->
+    <!-- v5.5: интерактивные логи бота (вместо скачивания файла) -->
+  <div class="modal-overlay" id="bot-logs-modal" aria-hidden="true">
+    <div class="modal glass sheet logs-modal" role="dialog" aria-modal="true" aria-labelledby="bot-logs-title">
+      <div class="logs-modal-head">
+        <h3 id="bot-logs-title" style="margin:0">Логи бота</h3>
+        <button type="button" class="btn btn-ghost btn-sm" id="bot-logs-close" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="logs-modal-tools">
+        <input type="search" id="bot-logs-search" placeholder="Поиск: пользователь, событие, сообщение…" autocomplete="off" aria-label="Поиск по логам">
+        <select id="bot-logs-level" aria-label="Уровень"><option value="">Все уровни</option><option value="INFO">INFO</option><option value="WARN">WARN</option><option value="ERROR">ERROR</option></select>
+        <button type="button" class="btn btn-primary btn-sm" id="bot-logs-refresh">Обновить</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="bot-logs-csv">CSV</button>
+      </div>
+      <p class="muted" id="bot-logs-meta" style="font-size:12px;margin:0 0 8px"></p>
+      <div class="logs-modal-scroll">
+        <table class="logs-table" id="bot-logs-table">
+          <thead><tr><th>Время</th><th>Уровень</th><th>Пользователь</th><th>Событие / команда</th><th>Сообщение</th></tr></thead>
+          <tbody id="bot-logs-body"><tr><td colspan="5" class="muted">Загрузка…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="close-modal">
     <div class="modal glass sheet">
       <h2>Закрыть сайт</h2>
@@ -437,11 +467,11 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="amoore-id.js?v=5.4.0"></script>
-<script src="amoore-pwa.js?v=5.4.0" defer></script>
-<script src="amoore-cmdk.js?v=5.4.0" defer></script>
-  <script src="digest.js?v=5.4.0"></script>
-  <script src="app.js?v=5.4.0"></script>
-  <script src="amoore-admin-v5.js?v=5.4.0"></script>
+  <script src="amoore-id.js?v=5.5.0"></script>
+<script src="amoore-pwa.js?v=5.5.0" defer></script>
+<script src="amoore-cmdk.js?v=5.5.0" defer></script>
+  <script src="digest.js?v=5.5.0"></script>
+  <script src="app.js?v=5.5.0"></script>
+  <script src="amoore-admin-v5.js?v=5.5.0"></script>
 </body>
 </html>

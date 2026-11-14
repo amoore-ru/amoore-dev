@@ -157,3 +157,24 @@ table, th, td { background-color: transparent; }
   #team-list .admin-card-actions, #people-list .admin-card-actions { gap: 6px; flex-wrap: wrap; }
 }
 #view-logs .logs-cards, .logs-cards * { overflow-wrap: anywhere; word-break: break-word; min-width: 0; max-width: 100%; }
+
+/* v5.5: переключатели бота/чата и модалка логов */
+.bot-switches { display: grid; gap: 10px; margin-top: 12px; }
+.bot-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; }
+.bot-switch-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bot-switch-text small { font-size: 12px; color: var(--text-muted, #8b90a5); overflow-wrap: anywhere; }
+.bot-switch-row .btn { flex: 0 0 auto; min-width: 104px; }
+.logs-modal { width: min(960px, 100%); max-height: 88vh; max-height: 88dvh; display: flex; flex-direction: column; box-sizing: border-box; }
+.logs-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.logs-modal-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.logs-modal-tools input[type=search] { flex: 1 1 220px; min-width: 0; box-sizing: border-box; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: inherit; font-size: 16px; }
+.logs-modal-tools select { padding: 9px 10px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: inherit; }
+.logs-modal-scroll { overflow: auto; min-height: 0; border: 1px solid var(--border); border-radius: 12px; -webkit-overflow-scrolling: touch; }
+.logs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.logs-table th, .logs-table td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.logs-table th { position: sticky; top: 0; background: var(--surface, #0d1220); z-index: 1; font-size: 12px; white-space: nowrap; }
+.logs-table td.nowrap { white-space: nowrap; }
+.logs-table td.msg { overflow-wrap: anywhere; min-width: 220px; }
+.lvl-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 700 11px/1.4 inherit; background: rgba(125,206,160,.18); color: #7dcea0; }
+.lvl-pill.warn { background: rgba(232,190,90,.2); color: #e8be5a; }
+.lvl-pill.error { background: rgba(232,100,100,.2); color: #e86464; }

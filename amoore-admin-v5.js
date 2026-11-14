@@ -1,4 +1,4 @@
-/* amoore-admin-v5.js — v5.3.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
+/* amoore-admin-v5.js — v5.5.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
    Классический скрипт после app.js: использует его глобальные sb, $, esc, toast, friendlyError, me, isSuper, fmtDate. */
 (function () {
   'use strict';
@@ -28,8 +28,7 @@
     box.innerHTML = rows.map(p => `<div class="admin-card glass" data-uid="${esc(p.id)}"><div class="admin-card-info">
       <h4>${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="" width="28" height="28" loading="lazy" style="border-radius:50%;vertical-align:middle;margin-right:8px">` : ''}${esc(p.username ? '@' + p.username : 'без username')}
         <span class="role-badge ${p.role === 'user' ? 'moderator' : 'admin'}">${esc(ROLE_LABEL[p.role] || p.role)}</span>${p.is_banned ? ' <span class="role-badge" style="background:#c0392b;color:#fff">бан</span>' : ''}</h4>
-      <p>${esc(p.email || '')}</p>
-      <p class="muted" style="font-size:12px">Регистрация: ${esc(fmtDate(p.created_at))}${p.last_sign_in_at ? ' · вход: ' + esc(fmtDate(p.last_sign_in_at)) : ''}${p.telegram_id ? ' · TG ' + esc(p.telegram_id) : ''}</p>
+      <dl class="pp-grid"><dt>Email</dt><dd>${esc(p.email || '—')}</dd><dt>Регистрация</dt><dd>${esc(fmtDate(p.created_at))}</dd>${p.last_sign_in_at ? `<dt>Вход</dt><dd>${esc(fmtDate(p.last_sign_in_at))}</dd>` : ''}${p.telegram_id ? `<dt>Telegram</dt><dd>${esc(p.telegram_id)}</dd>` : ''}</dl>
       ${p.is_banned && p.ban_reason ? `<p class="muted" style="font-size:12px">Причина: ${esc(p.ban_reason)}</p>` : ''}</div>
       ${p.role === 'super_admin' ? '' : `<div class="v5-row">
         <select class="v5-sel" data-role="${esc(p.id)}" aria-label="Роль"><option value="user"${p.role === 'user' ? ' selected' : ''}>Пользователь</option><option value="moderator"${p.role === 'moderator' ? ' selected' : ''}>Модератор</option><option value="admin"${p.role === 'admin' ? ' selected' : ''}>Админ</option></select>

@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '5.4.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '5.5.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -765,33 +765,68 @@ function withTimeout(promise, ms = BOT_TIMEOUT_MS) {
   return Promise.race([Promise.resolve(promise).finally(() => clearTimeout(t)), timer]);
 }
 function paintBotStatus(state, hbText) {
-  // state: 'online' | 'offline' | 'unknown' — «unknown» (нет ответа от БД) показываем как Офлайн
+  // v5.5: 'online' (тумблер вкл + пульс свежий) | 'stale' (тумблер вкл, но пульса нет) | 'off' (выключен тумблером) | 'unknown' (нет связи с БД)
+  if (state === 'offline') state = 'off';
   const line = $('bot-status-line'), hb = $('bot-hb-line'), btn = $('bot-toggle-btn');
   if (line) {
-    line.textContent = state === 'online' ? 'Статус: Онлайн' : state === 'offline' ? 'Статус: Офлайн (техобслуживание)' : 'Статус: Офлайн';
-    line.style.color = state === 'online' ? '#7dcea0' : '#e8a0a0';
+    const T = { online: 'Статус: Онлайн', stale: 'Статус: Офлайн — бот не выходит на связь', off: 'Статус: Выключен (тумблер)', unknown: 'Статус: неизвестен (нет связи с базой)' };
+    line.textContent = T[state] || T.unknown;
+    line.style.color = state === 'online' ? '#7dcea0' : state === 'off' ? '' : '#e8a0a0';
     line.removeAttribute('aria-busy');
   }
   if (hb && hbText != null) hb.textContent = hbText;
-  if (btn) btn.textContent = state === 'online' ? 'Выключить' : 'Включить';
+  if (btn) btn.textContent = state === 'off' ? 'Включить' : 'Выключить';
+}
+function paintChatWidgetBtn(on) {
+  const b = $('chat-widget-btn'); if (!b) return;
+  b.textContent = on ? 'Выключить' : 'Включить';
+  b.className = 'btn btn-sm ' + (on ? 'btn-primary' : 'btn-ghost');
+  b.dataset.on = on ? '1' : '0';
+}
+function ageText(ms) {
+  return ms < 60e3 ? 'только что' : ms < 3600e3 ? Math.round(ms / 60e3) + ' мин назад' : ms < 864e5 ? Math.round(ms / 3600e3) + ' ч назад' : Math.round(ms / 864e5) + ' дн назад';
 }
 async function loadBotStatus() {
   if (!$('bot-status-line')) return;
   try {
-    // читаем ТОЛЬКО те колонки, что есть в любой версии таблицы
-    const { data, error } = await withTimeout(sb.from('bot_status').select('is_online,last_heartbeat').eq('id', 'main').maybeSingle());
-    if (error) throw error;
-    const online = data ? data.is_online !== false : true;
-    // v5.4: пульс приходит раз в 5 минут; если тишина дольше 12 минут — честно пишем, что бот не отвечает (дата больше не «застывает» молча)
-    const hbAt = data && data.last_heartbeat ? Date.parse(data.last_heartbeat) : 0, age = hbAt ? Date.now() - hbAt : Infinity;
-    const ago = !hbAt ? '' : age < 60e3 ? 'только что' : age < 3600e3 ? Math.round(age / 60e3) + ' мин назад' : age < 864e5 ? Math.round(age / 3600e3) + ' ч назад' : Math.round(age / 864e5) + ' дн назад';
-    paintBotStatus(online ? 'online' : 'offline', hbAt ? 'Пульс: ' + new Date(hbAt).toLocaleString('ru-RU') + ' · ' + ago + (age > 12 * 60e3 ? ' — бот давно не выходил на связь' : '') : 'Пульс: ещё не было');
-    const hb = $('bot-hb-line'); if (hb) hb.style.color = age > 12 * 60e3 ? '#e8a0a0' : '';
+    // v5.5: состояние считает сервер (bot_health: нет зависимости от часов устройства); если RPC ещё нет — читаем таблицу
+    let h = null;
+    const rpc = await withTimeout(sb.rpc('bot_health'));
+    if (!rpc.error && rpc.data) h = rpc.data;
+    else {
+      const { data, error } = await withTimeout(sb.from('bot_status').select('is_online,last_heartbeat').eq('id', 'main').maybeSingle());
+      if (error) throw error;
+      const t = data && data.last_heartbeat ? Date.parse(data.last_heartbeat) : 0;
+      h = { is_online: data ? data.is_online !== false : true, last_heartbeat: data && data.last_heartbeat, age_seconds: t ? Math.floor((Date.now() - t) / 1000) : null, alive: !!t && Date.now() - t < 15 * 60e3 };
+    }
+    const hbAt = h.last_heartbeat ? Date.parse(h.last_heartbeat) : 0, age = h.age_seconds != null ? h.age_seconds * 1000 : Infinity;
+    const state = h.is_online === false ? 'off' : (h.alive ? 'online' : 'stale');
+    paintBotStatus(state, hbAt ? 'Последний пульс: ' + new Date(hbAt).toLocaleString('ru-RU') + ' · ' + ageText(age) : 'Пульса ещё не было');
+    const hbEl = $('bot-hb-line'); if (hbEl) hbEl.style.color = state === 'stale' ? '#e8a0a0' : '';
   } catch (e) {
     paintBotStatus('unknown', 'Пульс: нет связи');
   }
+  try {
+    const { data } = await withTimeout(sb.from('ecosystem_sites').select('demo_chat_active').eq('id', LANDING_ID).maybeSingle());
+    if (data) paintChatWidgetBtn(data.demo_chat_active !== false);
+  } catch (_) {}
 }
 
+async function toggleChatWidget() {
+  if (!isSuper() && !can('toggle_chat')) return toast('Недостаточно прав', 'error');
+  const btn = $('chat-widget-btn'); if (btn) btn.disabled = true;
+  try {
+    const next = !(btn && btn.dataset.on === '1');
+    const { data, error } = await withTimeout(sb.from('ecosystem_sites').update({ demo_chat_active: next }).eq('id', LANDING_ID).select('id'));
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('Сайт landing не найден в ecosystem_sites');
+    const site = sitesCache.find(x => x.id === LANDING_ID); if (site) site.demo_chat_active = next;
+    paintChatWidgetBtn(next);
+    logAction(next ? 'chat_on' : 'chat_off', LANDING_ID);
+    toast(next ? 'Чат на сайте включён' : 'Чат на сайте скрыт');
+  } catch (e) { toast(friendlyError(e), 'error'); }
+  finally { if (btn) btn.disabled = false; }
+}
 
 // v5.4: статус бота обновляется сам раз в минуту (раньше — только при заходе на дашборд)
 setInterval(() => { if (!document.hidden && $('bot-status-line') && $('app') && $('app').classList.contains('visible')) loadBotStatus(); }, 60000);
@@ -842,22 +877,53 @@ async function sendBotTest() {
   }
 }
 
-async function downloadBotLogsCsv() {
+// ---- v5.5: интерактивные логи бота (модальное окно вместо скачивания файла)
+let botLogsRows = [];
+const LOG_EXT_COLS = 'id,message,status,error_text,source,created_at,level,event,tg_user_id,tg_username';
+function logLevel(r) {
+  if (r.level) return String(r.level).toUpperCase();
+  const st = String(r.status || '').toLowerCase();
+  return /error|fail|exception|critical/.test(st) ? 'ERROR' : /warn|partial|maintenance/.test(st) ? 'WARN' : 'INFO';
+}
+function logUser(r) { return r.tg_username ? '@' + r.tg_username + (r.tg_user_id ? ' (' + r.tg_user_id + ')' : '') : (r.tg_user_id ? String(r.tg_user_id) : '—'); }
+function renderBotLogs() {
+  const body = $('bot-logs-body'); if (!body) return;
+  const q = ($('bot-logs-search').value || '').trim().toLowerCase(), lv = $('bot-logs-level').value;
+  const rows = botLogsRows.filter(r => (!lv || logLevel(r) === lv) &&
+    (!q || [r.message, r.error_text, r.event, r.source, r.status, r.tg_username, r.tg_user_id].some(v => String(v ?? '').toLowerCase().includes(q))));
+  $('bot-logs-meta').textContent = 'Показано ' + rows.length + ' из ' + botLogsRows.length + ' (последние 500)';
+  body.innerHTML = rows.length ? rows.map(r => {
+    const L = logLevel(r), msg = [r.message, r.error_text].filter(Boolean).join(' — ');
+    return `<tr class="lvl-${L.toLowerCase()}"><td class="nowrap">${esc(fmtDateTime(r.created_at))}</td><td><span class="lvl-pill ${L.toLowerCase()}">${L}</span></td><td>${esc(logUser(r))}</td><td>${esc(r.event || r.source || '—')}</td><td class="msg">${esc(msg)}</td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="muted">Ничего не найдено</td></tr>';
+}
+async function loadBotLogs() {
   if (!isSuper() && !can('view_logs')) return toast('Недостаточно прав', 'error');
+  const btn = $('bot-logs-refresh'); if (btn) { btn.disabled = true; btn.textContent = 'Обновляю…'; }
   try {
-    const { data, error } = await sb.from('bot_logs').select(LOG_COLS).order('created_at', { ascending: false }).limit(500);
-    if (error) return toast(friendlyError(error), 'error');
-    const rows = data || [];
-    const header = 'id,created_at,status,message,error_text,source';
-    const escCsv = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-    const body = rows.map(r => [r.id, r.created_at, r.status, r.message, r.error_text, r.source].map(escCsv).join(',')).join('\n');
-    const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'bot-logs.csv';
-    a.click();
-    toast('CSV скачан');
-  } catch (e) { toast('Не удалось выгрузить', 'error'); }
+    let res = await withTimeout(sb.from('bot_logs').select(LOG_EXT_COLS).order('created_at', { ascending: false }).limit(500), 12000);
+    if (res.error) res = await withTimeout(sb.from('bot_logs').select(LOG_COLS).order('created_at', { ascending: false }).limit(500), 12000);   // миграция 004 ещё не применена
+    if (res.error) throw res.error;
+    botLogsRows = res.data || [];
+    renderBotLogs();
+  } catch (e) {
+    $('bot-logs-body').innerHTML = `<tr><td colspan="5" class="muted">${esc(friendlyError(e))}</td></tr>`;
+  } finally { if (btn) { btn.disabled = false; btn.textContent = 'Обновить'; } }
+}
+function openBotLogs() {
+  const m = $('bot-logs-modal'); if (!m) return;
+  m.classList.add('visible'); m.setAttribute('aria-hidden', 'false');
+  loadBotLogs();
+}
+function closeBotLogs() { const m = $('bot-logs-modal'); if (m) { m.classList.remove('visible'); m.setAttribute('aria-hidden', 'true'); } }
+function downloadBotLogsCsv() {
+  const rows = botLogsRows; if (!rows.length) return toast('Нет данных', 'error');
+  const esc2 = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const csv = ['created_at,level,user,event,message,error_text'].concat(rows.map(r => [r.created_at, logLevel(r), logUser(r), r.event || r.source, r.message, r.error_text].map(esc2).join(','))).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'bot-logs.csv'; a.click();
+  toast('CSV скачан');
 }
 
 async function loadLeads() {
@@ -882,7 +948,15 @@ async function loadLeads() {
 if ($('bot-toggle-btn')) $('bot-toggle-btn').addEventListener('click', toggleBotOnline);
 if ($('bot-test-btn')) $('bot-test-btn').addEventListener('click', sendBotTest);
 if ($('bot-webhook-btn')) $('bot-webhook-btn').addEventListener('click', reconnectWebhook);
+if ($('bot-logs-btn')) $('bot-logs-btn').addEventListener('click', openBotLogs);
 if ($('bot-logs-csv')) $('bot-logs-csv').addEventListener('click', downloadBotLogsCsv);
+if ($('bot-logs-refresh')) $('bot-logs-refresh').addEventListener('click', loadBotLogs);
+if ($('bot-logs-close')) $('bot-logs-close').addEventListener('click', closeBotLogs);
+if ($('bot-logs-modal')) $('bot-logs-modal').addEventListener('click', e => { if (e.target === $('bot-logs-modal')) closeBotLogs(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBotLogs(); });
+if ($('bot-logs-search')) { let t; $('bot-logs-search').addEventListener('input', () => { clearTimeout(t); t = setTimeout(renderBotLogs, 150); }); }
+if ($('bot-logs-level')) $('bot-logs-level').addEventListener('change', renderBotLogs);
+if ($('chat-widget-btn')) $('chat-widget-btn').addEventListener('click', toggleChatWidget);
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('.lead-done');
   if (!b) return;

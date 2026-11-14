@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v5.4.0 «SMART AUTH & PRE-RUST»
+ * amoore-core.js — v5.5.0 «SMART AUTH & PRE-RUST»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '5.4.0';
+  var AMOORE_VERSION = '5.5.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -49,7 +49,8 @@
   var godToken = null;     // проверенный токен или null
   var godChecked = false;
   var newsCache = [];
-  var botOnline = null; // null = unknown; only explicit false pauses the demo chat
+  var botOnline = null; // тумблер «бот включён» (bot_status.is_online); null = неизвестно
+  var botAlive = null;  // v5.5: пульс бота свежий (bot_health.alive); null = неизвестно. Влияет ТОЛЬКО на уведомление внутри чата, вкладку не скрывает
 
   // Глобальный state экосистемы
   window.AMOORE_STATE = {
@@ -452,11 +453,16 @@
       '.amoore-news-paused .section-lead{opacity:.75}'
     ].join(''));
 
-    var chatOff = (!!cfg && cfg.demo_chat_active === false) || botOnline === false;
+    // v5.5: две НЕЗАВИСИМЫЕ сущности.
+    //  widgetOff      — виджет чата выключен на сайте (demo_chat_active, тумблер «Чат на сайте»): вкладка «Чат» скрывается;
+    //  assistantDown  — виджет включён, но бот недоступен (выключен тумблером или нет пульса): вкладка ОСТАЁТСЯ, внутри чата — уведомление.
+    var widgetOff = !!cfg && cfg.demo_chat_active === false;
+    var assistantDown = !widgetOff && (botOnline === false || botAlive === false);
+    var chatOff = widgetOff || assistantDown;
     var newsOff = !!cfg && cfg.news_active === false;
 
     Array.prototype.forEach.call(document.querySelectorAll('a[href="#chat"]'), function (n) {
-      n.classList.toggle('amoore-hidden', chatOff);
+      n.classList.toggle('amoore-hidden', widgetOff);
     });
     Array.prototype.forEach.call(document.querySelectorAll('a[href="#news"]'), function (n) {
       n.classList.toggle('amoore-hidden', newsOff);
@@ -465,27 +471,29 @@
     var chatRoot = document.getElementById('chat') || document.querySelector('[data-amoore-chat]');
     if (chatRoot) {
       chatRoot.classList.toggle('amoore-chat-offline', chatOff);
-      chatRoot.setAttribute('data-amoore-chat-enabled', chatOff ? '0' : '1');
+      chatRoot.setAttribute('data-amoore-chat-enabled', widgetOff ? '0' : '1');
+      chatRoot.setAttribute('data-amoore-assistant', assistantDown ? 'down' : 'up');
       var chatInput = document.getElementById('chat-input');
       var chatSend = document.getElementById('chat-send');
       var chatLog = document.getElementById('chat-log');
       if (chatOff) {
-        if (chatInput) { chatInput.disabled = true; chatInput.setAttribute('aria-disabled', 'true'); chatInput.placeholder = 'Чат на паузе'; }
+        if (chatInput) { chatInput.disabled = true; chatInput.setAttribute('aria-disabled', 'true'); chatInput.placeholder = assistantDown ? 'Ассистент недоступен' : 'Чат на паузе'; }
         if (chatSend) { chatSend.disabled = true; chatSend.setAttribute('aria-disabled', 'true'); }
+        if (chatLog) { var oldOff = chatLog.querySelector('[data-amoore-off]'); if (oldOff && oldOff.getAttribute('data-amoore-off') !== (assistantDown ? 'down' : 'paused')) oldOff.remove(); }
         if (chatLog && !chatLog.querySelector('[data-amoore-off]')) {
           var row = document.createElement('div');
           row.className = 'chat-bubble chat-bot';
-          row.setAttribute('data-amoore-off', '1');
+          row.setAttribute('data-amoore-off', assistantDown ? 'down' : 'paused');
           var name = document.createElement('span'); name.className = 'chat-name'; name.textContent = 'amoore';
           var p = document.createElement('p');
-          p.textContent = 'Я ушел на перезагрузку. Скоро вернусь!';
+          p.textContent = assistantDown ? 'Ассистент временно недоступен, попробуйте позже' : 'Я ушел на перезагрузку. Скоро вернусь!';
           row.appendChild(name); row.appendChild(p);
           chatLog.appendChild(row);
           try { chatLog.scrollTop = chatLog.scrollHeight; } catch (e) {}
         }
       } else {
         try { if (window.amooreDemoChat && typeof window.amooreDemoChat.rebind === 'function') window.amooreDemoChat.rebind(); } catch (e) {}
-        if (chatInput) { chatInput.disabled = false; chatInput.removeAttribute('aria-disabled'); if (chatInput.placeholder === 'Чат на паузе') chatInput.placeholder = 'Напишите сообщение…'; }
+        if (chatInput) { chatInput.disabled = false; chatInput.removeAttribute('aria-disabled'); if (chatInput.placeholder === 'Чат на паузе' || chatInput.placeholder === 'Ассистент недоступен') chatInput.placeholder = 'Напишите сообщение…'; }
         if (chatSend) { chatSend.disabled = false; chatSend.removeAttribute('aria-disabled'); }
         if (chatLog) {
           var off = chatLog.querySelector('[data-amoore-off]');
@@ -508,7 +516,7 @@
   //  2) параллельно спрашиваем supabase-js И чистый REST — берём первый успешный ответ;
   //  3) загрузка новостей НЕ ждёт конфиг/статус бота/список сайтов (раньше boot() был цепочкой await);
   //  4) запрос идёт только по опубликованным (is_published=true) — под частичный индекс news_pub_idx.
-  var TYPE_LABEL = { news: 'Новость', patch: 'Патч', soon: 'Скоро', digest: 'Дайджест' };
+  var TYPE_LABEL = { news: 'Новость', patch: 'Патч', soon: 'Скоро', digest: 'Дайджест' };   // soon = вкладка «Планы»
   var NEWS_CACHE_KEY = 'amoore_news_v3';
   var NEWS_COLS = 'id,title,body,type,display_date,published_at';
   var newsSeq = 0;           // номер запроса: устаревший ответ не перетирает свежий
@@ -518,18 +526,37 @@
     try { var d = JSON.parse(ls('get', NEWS_CACHE_KEY) || 'null'); return d && d.items instanceof Array ? d.items : null; }
     catch (e) { return null; }
   }
-  function writeNewsCache(items) { ls('set', NEWS_CACHE_KEY, JSON.stringify({ t: Date.now(), items: items.slice(0, 20) })); }
+  function writeNewsCache(items) { ls('set', NEWS_CACHE_KEY, JSON.stringify({ t: Date.now(), items: items.slice(0, 40) })); }
 
+  // v5.5: «Планы = 0». Раньше грузились только 20 последних записей по published_at — ежедневные дайджесты вытесняли оттуда записи type=soon
+  // (у них старая дата), и счётчик «Планы» показывал 0. Теперь тянем два набора: свежие 40 + отдельно все «Скоро» (до 30), и склеиваем без дублей.
+  function normNewsType(t) {
+    t = String(t || 'news').trim().toLowerCase();
+    if (t === 'plan' || t === 'plans' || t === 'планы' || t === 'скоро') return 'soon';
+    return t;
+  }
+  function mergeNews(a, b) {
+    var seen = {}, out = [];
+    (a || []).concat(b || []).forEach(function (n) {
+      if (!n) return; var k = n.id != null ? String(n.id) : (n.title + '|' + n.published_at);
+      if (seen[k]) return; seen[k] = 1; n.type = normNewsType(n.type); out.push(n);
+    });
+    return out;
+  }
   function fetchNewsViaClient() {
     if (!client) return Promise.reject(new Error('no-client'));
-    return withTimeout(client.from('news').select(NEWS_COLS)
-      .eq('is_published', true).order('published_at', { ascending: false }).limit(20)
-      .then(function (res) { if (res.error) throw res.error; return res.data || []; }), 7000);
+    var latest = client.from('news').select(NEWS_COLS).eq('is_published', true).order('published_at', { ascending: false }).limit(40)
+      .then(function (res) { if (res.error) throw res.error; return res.data || []; });
+    var soon = client.from('news').select(NEWS_COLS).eq('is_published', true).eq('type', 'soon').order('published_at', { ascending: false }).limit(30)
+      .then(function (res) { return res.error ? [] : (res.data || []); }, function () { return []; });
+    return withTimeout(Promise.all([latest, soon]).then(function (r) { return mergeNews(r[0], r[1]); }), 7000);
   }
   function fetchNewsViaRest() {
-    return withTimeout(fetch(restUrl('news?select=' + NEWS_COLS + '&is_published=eq.true&order=published_at.desc&limit=20'),
-      { method: 'GET', headers: restHeaders() })
-      .then(function (r) { if (!r.ok) throw new Error('http-' + r.status); return r.json(); }), 7000);
+    function get(q) { return fetch(restUrl('news?select=' + NEWS_COLS + '&is_published=eq.true' + q), { method: 'GET', headers: restHeaders() })
+      .then(function (r) { if (!r.ok) throw new Error('http-' + r.status); return r.json(); }); }
+    var latest = get('&order=published_at.desc&limit=40');
+    var soon = get('&type=eq.soon&order=published_at.desc&limit=30').catch(function () { return []; });
+    return withTimeout(Promise.all([latest, soon]).then(function (r) { return mergeNews(r[0], r[1]); }), 7000);
   }
 
   function newsTarget() { return document.querySelector('#news-list, [data-amoore-news]'); }
@@ -609,7 +636,7 @@
       var items = await firstOk(list);
       if (seq !== newsSeq) return;
       newsCache = items || [];
-      writeNewsCache(newsCache);
+      writeNewsCache(newsCache.slice().sort(function (x, y) { return (y.type === 'soon') - (x.type === 'soon'); }).slice(0, 40));
       publishState();
       paintNews(target, newsCache);
       applySeo();
@@ -695,7 +722,7 @@
       var local = await fetchChangelog('changelog.json');
       if (local && local.length) list = sortVersions(local);
     }
-    changelogList = list && list.length ? list : [{ version: '5.4.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.5.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }
@@ -718,7 +745,7 @@
     return sec;
   }
   function paintUpdates(box, list) {
-    // группы по major.minor: «v5.4» → подверсии 5.4.0, 5.4.1 …; единственная версия в группе показывается сразу
+    // группы по major.minor: «v5.4» → подверсии 5.5.0, 5.4.1 …; единственная версия в группе показывается сразу
     var groups = [], map = {};
     asc(list).forEach(function (v) { var k = verKey(v.version), g = k[0] + '.' + k[1]; if (!map[g]) { map[g] = { key: g, items: [] }; groups.push(map[g]); } map[g].items.push(v); });
     groups.forEach(function (g, gi) {
@@ -867,14 +894,35 @@
     } catch (e) { return null; }
   }
   async function fetchBotStatus() {
+    // v5.5: bot_health() — is_online (тумблер) + alive (пульс свежее 15 минут, считается на сервере). Если RPC ещё не создан (нет миграции 004) — читаем таблицу.
     try {
-      if (client) {
-        var r = await withTimeout(client.from('bot_status').select('is_online').eq('id', 'main').maybeSingle(), 6000);
-        if (r && !r.error && r.data) { botOnline = r.data.is_online !== false; return botOnline; }
+      var h = await withTimeout(fetch(SB_URL.replace(/\/$/, '') + '/rest/v1/rpc/bot_health', {
+        method: 'POST', headers: restHeaders({ 'Content-Type': 'application/json' }), body: '{}',
+        signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined }), 8000);
+      if (h.ok) {
+        var j = await h.json();
+        if (j && typeof j === 'object') {
+          botOnline = j.is_online !== false;
+          botAlive = j.last_heartbeat ? j.alive === true : null;      // пульса ещё не было — не считаем бота упавшим
+          return botOnline;
+        }
       }
-      var url = SB_URL.replace(/\/$/, '') + '/rest/v1/bot_status?select=is_online&id=eq.main';
-      var res = await fetch(url, { headers: restHeaders(), signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined });
-      if (res.ok) { var rows = await res.json(); if (rows && rows[0]) botOnline = rows[0].is_online !== false; }
+    } catch (e) { /* пробуем таблицу */ }
+    try {
+      var rows = null;
+      if (client) {
+        var r = await withTimeout(client.from('bot_status').select('is_online,last_heartbeat').eq('id', 'main').maybeSingle(), 6000);
+        if (r && !r.error && r.data) rows = [r.data];
+      }
+      if (!rows) {
+        var res = await fetch(SB_URL.replace(/\/$/, '') + '/rest/v1/bot_status?select=is_online,last_heartbeat&id=eq.main', { headers: restHeaders(), signal: AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined });
+        if (res.ok) rows = await res.json();
+      }
+      if (rows && rows[0]) {
+        botOnline = rows[0].is_online !== false;
+        var hb = rows[0].last_heartbeat ? Date.parse(rows[0].last_heartbeat) : 0;
+        botAlive = hb ? (Date.now() - hb) < 15 * 60e3 : null;
+      }
     } catch (e) { /* Keep last known status; do not falsely mark the bot offline on transient network loss. */ }
     return botOnline;
   }
@@ -966,7 +1014,8 @@
     getRoleLabels: getRoleLabels,
     fetchGlobalSetting: fetchGlobalSetting,
     getConfig: function () { return cfg ? Object.assign({}, cfg) : null; },
-    isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false) && botOnline !== false; },
+    isChatEnabled: function () { return !(cfg && cfg.demo_chat_active === false); },        // v5.5: только тумблер виджета; недоступность бота виджет не прячет
+    isAssistantAvailable: function () { return botOnline !== false && botAlive !== false; },
     isNewsEnabled: function () { return !(cfg && cfg.news_active === false); },
     refresh: async function () {
       var c = await fetchConfig();

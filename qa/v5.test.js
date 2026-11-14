@@ -41,9 +41,9 @@ check('токен SSO и ссылки стираются из адресной �
 check('нет innerHTML в amoore-id.js (XSS)', !/innerHTML/.test(idCode));
 
 // ---- версии
-const v = '5.4.0';
-check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.4.0'/.test(read('amoore-ru/amoore-core.js')));
-check('версия в bot.py', /AMOORE_VERSION = "5.4.0"/.test(read('amoore-ai/bot.py')));
+const v = '5.5.0';
+check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.5.0'/.test(read('amoore-ru/amoore-core.js')));
+check('версия в bot.py', /AMOORE_VERSION = "5.5.0"/.test(read('amoore-ai/bot.py')));
 for (const d of ['amoore-dev', 'amoore-ru', 'amoore-studio', 'amoore-ai']) check(`changelog ${d}`, JSON.parse(read(`${d}/changelog.json`)).current === v);
 
 // ---- PWA
@@ -66,8 +66,8 @@ check('бот: код привязки из secrets, не random', /import secre
 
 // ======================================================================= v5.1 «MASTER»
 const sqlDir = path.join(ROOT, 'amoore-dev/shared/sql');
-check('SQL: в shared/sql ровно три миграции — 001 (заморожена), 002_v53_updates.sql и 003_v54_titan.sql (кроме cleanup.sql)', fs.readdirSync(sqlDir).filter((f) => /^\d+_.*\.sql$/.test(f)).join() === '001_init_database.sql,002_v53_updates.sql,003_v54_titan.sql', fs.readdirSync(sqlDir).join());
-check('SQL: других миграций (004–010) нет ни в shared/sql, ни в корне', !fs.readdirSync(sqlDir).some((f) => /^0(0[4-9]|10)_/.test(f)) && !fs.readdirSync(ROOT).some((f) => /^0\d\d_.*\.sql$/.test(f)));
+check('SQL: в shared/sql ровно четыре миграции — 001 (заморожена), 002, 003 и 004_v55_stability.sql (кроме cleanup.sql)', fs.readdirSync(sqlDir).filter((f) => /^\d+_.*\.sql$/.test(f)).join() === '001_init_database.sql,002_v53_updates.sql,003_v54_titan.sql,004_v55_stability.sql', fs.readdirSync(sqlDir).join());
+check('SQL: других миграций (005–010) нет ни в shared/sql, ни в корне', !fs.readdirSync(sqlDir).some((f) => /^0(0[5-9]|10)_/.test(f)) && !fs.readdirSync(ROOT).some((f) => /^0\d\d_.*\.sql$/.test(f)));
 for (const t of ['admins', 'profiles', 'business_automations', 'changelog_versions', 'leads', 'news', 'audit_logs', 'user_sessions', 'push_subscriptions', 'user_sites', 'rewards_log']) check(`SQL: таблица ${t} создаётся в едином файле`, new RegExp(`create table if not exists public\\.${t}\\b`).test(sql));
 check('SQL: Storage bucket media и политики', /storage\.buckets/.test(sql) && /'media'/.test(sql));
 check('SQL: идемпотентность — у каждой политики есть DROP POLICY IF EXISTS', [...sql.matchAll(/^create policy (\w+) on ([\w.]+)/gm)].every((m) => new RegExp(`drop policy if exists ${m[1]} on ${m[2].replace('.', '\\.')}`).test(sql)));
@@ -100,9 +100,9 @@ check('CSS: .lead-card / .news-card — column, gap 12px, без space-between',
 check('админка: рассылка полностью удалена (v5.2)', !/telegram-broadcast-btn|broadcast-card/.test(read('amoore-dev/app.js') + read('amoore-dev/index.html')));
 check('админка: теги заявок, CSV, фильтр журнала, Realtime-графики', /Экспорт в CSV/.test(read('amoore-dev/amoore-admin-v5.js')) && /amoore-live-activity/.test(read('amoore-dev/amoore-admin-v5.js')) && /id="logs-filter"/.test(read('amoore-dev/index.html')));
 const cl = JSON.parse(read('amoore-ru/changelog.json')).versions[0];
-check('changelog: v5.4 TITAN от 2026-11-14', cl.version === '5.4.0' && cl.title === 'TITAN' && cl.date === '2026-11-14' && cl.items.length >= 6);
+check('changelog: v5.5 STABILITY от 2026-11-14', cl.version === '5.5.0' && cl.title === 'STABILITY' && cl.date === '2026-11-14' && cl.items.length >= 4);
 const cl2 = JSON.parse(read('amoore-ru/changelog.json')).versions[1];
-check('changelog: предыдущая запись 5.3.0 сохранена', cl2.version === '5.3.0');
+check('changelog: предыдущая запись 5.4.0 сохранена', cl2.version === '5.4.0');
 
 // ---- v5.3 SMART AUTH & PRE-RUST
 check('вход: подзаголовок про 6-значный код', /Введите Email, и мы пришлём 6-значный код/.test(idCode));
@@ -128,10 +128,10 @@ check('SQL 003: tg_link_codes + RLS без доступа клиентам', /cr
 check('SQL 003: online_now 90 с, leaderboard_top10, revoke_all_sessions', /interval '90 seconds'/.test(sql3) && /leaderboard_top10/.test(sql3) && /revoke_all_sessions/.test(sql3));
 check('SQL 003: security definer с search_path', (sql3.split(/create or replace function/i).slice(1)).every((b) => !/security definer/i.test(b.split('$$')[0]) || /search_path/i.test(b.split('$$')[0])));
 check('админка: вход без кода из письма и без «Зарегистрироваться»', !/otp-group|send-code-btn|verifyCode/.test(read('amoore-dev/app.js') + read('amoore-dev/index.html')));
-check('админка: кнопки бота «Выключить», «Тест», «Логи», «Вебхук»', /id="bot-test-btn">Тест</.test(read('amoore-dev/index.html')) && /id="bot-logs-csv"[^>]*>Логи</.test(read('amoore-dev/index.html')) && /reconnect-webhook/.test(read('amoore-dev/app.js')));
+check('админка: кнопки бота «Выключить», «Тест», «Логи», «Вебхук»', /id="bot-test-btn">Тест</.test(read('amoore-dev/index.html')) && /id="bot-logs-btn"[^>]*>Логи</.test(read('amoore-dev/index.html')) && /reconnect-webhook/.test(read('amoore-dev/app.js')));
 check('Edge Function reconnect-webhook: только Основатель', /super_admin/.test(read('supabase/functions/reconnect-webhook/index.ts')));
 check('geo: ip-api.com + запасной ipwho.is', /ip-api\.com/.test(read('supabase/functions/geo/index.ts')) && /ipwho\.is/.test(read('supabase/functions/geo/index.ts')));
-check('плавающая «A» убрана, вкладки профиля скроллятся', /return;\s*var p = await getProfile/.test(idCode) && /#aid-chip \{ display: none !important/.test(read('amoore-ru/amoore-theme.css')) && /\.aid-tabs \{ flex-wrap: nowrap !important; overflow-x: auto !important/.test(read('amoore-ru/amoore-theme.css')));
+check('плавающая «A» убрана, вкладки профиля скроллятся', /return;\s*var p = await getProfile/.test(idCode) && /#aid-chip \{ display: none !important/.test(read('amoore-ru/amoore-theme.css')) && /v5\.5 «STABILITY»[\s\S]*flex-flow: row nowrap[\s\S]*overflow-x: auto/.test(read('amoore-ru/amoore-theme.css')));
 check('роли по-русски: founder/moder/user нормализуются', /ROLE_EN2RU/.test(idCode) && /ROLE_EN2RU/.test(read('amoore-dev/app.js')) && /EN2RU/.test(read('amoore-ru/amoore-core.js')));
 check('лендинг: лидерборд и «Завершить все сессии»', /id="board-list"/.test(read('amoore-ru/index.html')) && /leaderboard_top10/.test(read('amoore-ru/amoore-board.js')) && /revoke_all_sessions/.test(idCode));
 check('Changelog 2.0: вкладки «Обновления» и «Эры», Эра I/II', /Эра I: Истоки/.test(read('amoore-ru/amoore-core.js')) && /Эра II: Синтез/.test(read('amoore-ru/amoore-core.js')) && /'Обновления'/.test(read('amoore-ru/amoore-core.js')));
