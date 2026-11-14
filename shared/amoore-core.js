@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v5.7.0 «SMART AUTH & PRE-RUST»
+ * amoore-core.js — v5.7.1 «SMART AUTH & PRE-RUST»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '5.7.0';
+  var AMOORE_VERSION = '5.7.1';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -596,7 +596,7 @@
   function paintNews(target, items) {
     target.textContent = '';
     items = sortNews(items);
-    if (!items.length) { setNewsPlaceholder(target, 'Здесь пока пусто. Новости появятся из панели amoore Dev.', false); try { document.dispatchEvent(new CustomEvent('amoore:news', { detail: { count: 0 } })); } catch (e) {} return; }
+    if (!items.length) { setNewsPlaceholder(target, 'Здесь пока пусто. Новости появятся из панели amoore dev.', false); try { document.dispatchEvent(new CustomEvent('amoore:news', { detail: { count: 0 } })); } catch (e) {} return; }
     var frag = document.createDocumentFragment();
     items.forEach(function (n) {
       var item = document.createElement('div');
@@ -725,55 +725,49 @@
       var extra = local.filter(function (v) { return v && v.version && !have[v.version]; });
       list = sortVersions((list || []).concat(extra));
     }
-    changelogList = list && list.length ? list : [{ version: '5.7.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.7.1', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }
   // ---- Changelog 2.0 (v5.4): вкладки «Обновления» (с подверсиями) и «Эры»; старые версии сверху
+  // v5.7.1: только крупные релизы (x.y.0). Подверсии (5.4.1, 5.5.1, 5.7.1) остаются в данных, но не показываются.
   var ERAS = [
-    { id: 'I', title: 'Эра I: Истоки', range: 'v1–v5.9', from: 1, to: 5 },
-    { id: 'II', title: 'Эра II: Синтез', range: 'v6–v12', from: 6, to: 12 }
+    { id: 'I', title: 'Эра I: Истоки', range: 'v1–v5.3', min: 0, max: 5.03 },
+    { id: 'II', title: 'Эра II: Синтез', range: 'v5.4 и далее', min: 5.04, max: 99 }
   ];
   function asc(list) { return (list || []).slice().sort(function (a, b) { return -verCmp(a.version, b.version); }); }
-  function entryNode(v) {
-    var sec = el('section', 'nx-cl-entry');
+  function isMajor(v) { var k = verKey(v.version); return !k[2]; }
+  function majorLabel(v) { var k = verKey(v.version); return 'v' + k[0] + '.' + k[1]; }
+  function eraScore(v) { var k = verKey(v.version); return k[0] + k[1] / 100; }
+  function majorsOnly(list) { return asc(list).filter(isMajor); }
+  function cardNode(v, cls) {
+    var card = el('article', cls || 'nx-cl-card');
     var h = document.createElement('h3');
-    h.appendChild(document.createTextNode('v' + v.version));
+    h.appendChild(document.createTextNode(majorLabel(v)));
     if (v.title) { var sm = document.createElement('small'); sm.textContent = v.title; h.appendChild(sm); }
     if (v.date) { var dt = document.createElement('time'); dt.textContent = String(v.date).split('-').reverse().join('.'); h.appendChild(dt); }
-    sec.appendChild(h);
+    card.appendChild(h);
     var ul = document.createElement('ul');
     (v.items || []).forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
-    sec.appendChild(ul);
-    return sec;
+    card.appendChild(ul);
+    return card;
   }
   function paintUpdates(box, list) {
-    // группы по major.minor: «v5.4» → подверсии 5.7.0, 5.4.1 …; единственная версия в группе показывается сразу
-    var groups = [], map = {};
-    asc(list).forEach(function (v) { var k = verKey(v.version), g = k[0] + '.' + k[1]; if (!map[g]) { map[g] = { key: g, items: [] }; groups.push(map[g]); } map[g].items.push(v); });
-    groups.forEach(function (g, gi) {
-      if (g.items.length === 1) { box.appendChild(entryNode(g.items[0])); return; }
-      var d = document.createElement('details'); d.className = 'nx-cl-group'; if (gi === groups.length - 1) d.open = true;
-      var sm = document.createElement('summary'); sm.textContent = 'v' + g.key + ' · подверсий: ' + g.items.length; d.appendChild(sm);
-      g.items.forEach(function (v) { d.appendChild(entryNode(v)); });
-      box.appendChild(d);
-    });
+    var rows = majorsOnly(list).reverse();                      // свежие сверху
+    var wrap = el('div', 'nx-cl-cards');
+    rows.forEach(function (v) { wrap.appendChild(cardNode(v)); });
+    box.appendChild(wrap);
   }
   function paintEras(box, list) {
-    ERAS.forEach(function (era) {
-      var inEra = asc(list).filter(function (v) { var m = verKey(v.version)[0]; return m >= era.from && m <= era.to; }).reverse();
+    var all = majorsOnly(list);
+    ERAS.slice().reverse().forEach(function (era) {
+      var inEra = all.filter(function (v) { var s = eraScore(v); return s >= era.min && s <= era.max; }).reverse();
       var sec = el('section', 'nx-cl-era');
       var h = document.createElement('h3'); h.textContent = era.title; var sm = document.createElement('small'); sm.textContent = era.range; h.appendChild(sm); sec.appendChild(h);
       if (!inEra.length) { var p = document.createElement('p'); p.className = 'nx-cl-empty'; p.textContent = 'Скоро.'; sec.appendChild(p); }
       else {
         var tl = el('ol', 'nx-cl-timeline');
-        inEra.forEach(function (v) {
-          var li = el('li', 'nx-cl-node'), card = el('div', 'nx-cl-nodecard');
-          var t = document.createElement('b'); t.textContent = 'v' + v.version + (v.title ? ' · ' + v.title : ''); card.appendChild(t);
-          if (v.date) { var d = document.createElement('time'); d.textContent = String(v.date).split('-').reverse().join('.'); card.appendChild(d); }
-          var first = (v.items || [])[0]; if (first) { var q = document.createElement('p'); q.textContent = first; card.appendChild(q); }
-          li.appendChild(card); tl.appendChild(li);
-        });
+        inEra.forEach(function (v) { var li = el('li', 'nx-cl-node'); li.appendChild(cardNode(v, 'nx-cl-nodecard')); tl.appendChild(li); });
         sec.appendChild(tl);
       }
       box.appendChild(sec);

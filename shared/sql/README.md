@@ -21,3 +21,6 @@ insert into public.admins (email, name, nickname, role, access_token)
 values ('admin@example.com', 'Имя', 'Ник', 'super_admin', 'ЗАМЕНИТЬ_НА_СЛУЧАЙНЫЙ_ТОКЕН');
 ```
 Токен не храните в репозитории.
+
+## v5.7.1
+`007_v571_global_polish.sql` — выполнить после 006 (идемпотентна): фикс активации промокодов (`activate_promocode`), потолок 100 баллов, правка/удаление кодов, «Режим Бога» (`admin_*`), `profiles.telegram_username`, автогенерация username.

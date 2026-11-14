@@ -1,4 +1,4 @@
-/* amoore-admin-v5.js — v5.7.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
+/* amoore-admin-v5.js — v5.7.1 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
    Классический скрипт после app.js: использует его глобальные sb, $, esc, toast, friendlyError, me, isSuper, fmtDate. */
 (function () {
   'use strict';
@@ -28,7 +28,7 @@
     box.innerHTML = rows.map(p => `<div class="admin-card glass" data-uid="${esc(p.id)}"><div class="admin-card-info">
       <h4>${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="" width="28" height="28" loading="lazy" style="border-radius:50%;vertical-align:middle;margin-right:8px">` : ''}${esc(p.username ? '@' + p.username : 'без username')}
         <span class="role-badge ${p.role === 'user' ? 'moderator' : 'admin'}">${esc(ROLE_LABEL[p.role] || p.role)}</span>${p.is_banned ? ' <span class="role-badge" style="background:#c0392b;color:#fff">бан</span>' : ''}</h4>
-      <dl class="pp-grid"><dt>Email</dt><dd>${esc(p.email || '—')}</dd><dt>Регистрация</dt><dd>${esc(fmtDate(p.created_at))}</dd>${p.last_sign_in_at ? `<dt>Вход</dt><dd>${esc(fmtDate(p.last_sign_in_at))}</dd>` : ''}${p.telegram_id ? `<dt>Telegram</dt><dd>${esc(p.telegram_id)}</dd>` : ''}</dl>
+      <dl class="pp-grid"><dt>Email</dt><dd class="cell-ellipsis" title="${esc(p.email || '')}">${esc(p.email || '—')}</dd><dt>Регистрация</dt><dd>${esc(fmtDate(p.created_at))}</dd>${p.last_sign_in_at ? `<dt>Вход</dt><dd>${esc(fmtDate(p.last_sign_in_at))}</dd>` : ''}${p.telegram_id ? `<dt>Telegram</dt><dd>${esc(p.telegram_id)}</dd>` : ''}</dl>
       ${p.is_banned && p.ban_reason ? `<p class="muted" style="font-size:12px">Причина: ${esc(p.ban_reason)}</p>` : ''}</div>
       ${p.role === 'super_admin' ? '' : `<div class="v5-row">
         <select class="v5-sel" data-role="${esc(p.id)}" aria-label="Роль"><option value="user"${p.role === 'user' ? ' selected' : ''}>Пользователь</option><option value="moderator"${p.role === 'moderator' ? ' selected' : ''}>Модератор</option><option value="admin"${p.role === 'admin' ? ' selected' : ''}>Админ</option></select>
@@ -201,15 +201,30 @@
   }
 
   // =========================================================== Промокоды (админ и Основатель; лимиты проверяет БД)
+  let promoRows = [];
+  const toLocalDt = iso => { if (!iso) return ''; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   function paintPromoList(rows) {
-    const box = $('pm-list'); if (!box) return;
+    const box = $('pm-list'); if (!box) return; promoRows = rows;
     if (!rows.length) { box.innerHTML = '<div class="loading-state">Промокодов пока нет</div>'; return; }
     box.innerHTML = rows.map(r => {
       const exp = r.expires_at ? fmtDate(r.expires_at) : 'бессрочно';
       const left = r.max_uses == null ? `${r.uses} / ∞` : `${r.uses} / ${r.max_uses}`;
-      return `<div class="promo-row"><div class="promo-main"><b>${esc(r.code)}</b><small>+${esc(r.points)} · активаций ${esc(left)} · ${esc(exp)}</small></div>
-        <button type="button" class="btn btn-ghost btn-sm" data-pm-toggle="${esc(r.id)}" data-active="${r.active ? '1' : '0'}">${r.active ? 'Выключить' : 'Включить'}</button></div>`;
+      return `<div class="promo-row" data-pm-row="${esc(r.id)}"><div class="promo-main"><b>${esc(r.code)}</b><small>+${esc(r.points)} · активаций ${esc(left)} · ${esc(exp)}</small></div>
+        <div class="promo-actions"><button type="button" class="btn btn-ghost btn-sm" data-pm-toggle="${esc(r.id)}" data-active="${r.active ? '1' : '0'}">${r.active ? 'Выключить' : 'Включить'}</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-pm-edit="${esc(r.id)}">Редактировать</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-pm-del="${esc(r.id)}">Удалить</button></div></div>`;
     }).join('');
+  }
+  function openPromoEdit(id) {
+    const r = promoRows.find(x => x.id === id); const row = document.querySelector(`[data-pm-row="${CSS.escape(id)}"]`); if (!r || !row) return;
+    row.innerHTML = `<div class="promo-main"><b>${esc(r.code)}</b><small>код менять нельзя — создайте новый</small></div>
+      <div class="promo-edit">
+        <input class="pe-points" type="number" min="1" ${me.role !== 'super_admin' ? 'max="100"' : ''} inputmode="numeric" value="${esc(r.points)}" aria-label="Номинал">
+        <input class="pe-max" type="number" min="1" inputmode="numeric" value="${r.max_uses == null ? '' : esc(r.max_uses)}" placeholder="Лимит (пусто — без лимита)" aria-label="Лимит активаций">
+        <input class="pe-exp" type="datetime-local" value="${esc(toLocalDt(r.expires_at))}" ${r.expires_at ? '' : 'disabled'} aria-label="Срок действия">
+        <label class="promo-chk"><input class="pe-forever" type="checkbox" ${r.expires_at ? '' : 'checked'}> Бессрочно</label>
+        <div class="promo-actions"><button type="button" class="btn btn-primary btn-sm" data-pm-save="${esc(id)}">Сохранить</button><button type="button" class="btn btn-ghost btn-sm" data-pm-cancel="1">Отмена</button></div>
+      </div>`;
   }
   async function loadPromo() {
     const card = $('set-promo'); if (!card) return;
@@ -231,6 +246,26 @@
       ['pm-code', 'pm-points', 'pm-max'].forEach(i => { $(i).value = ''; });
       toast('Промокод создан'); loadPromo();
     }
+    const ed = e.target.closest('[data-pm-edit]'); if (ed) return openPromoEdit(ed.dataset.pmEdit);
+    if (e.target.closest('[data-pm-cancel]')) return paintPromoList(promoRows);
+    const sv = e.target.closest('[data-pm-save]');
+    if (sv) {
+      const row = sv.closest('[data-pm-row]'), pts = parseInt(row.querySelector('.pe-points').value, 10), mx = parseInt(row.querySelector('.pe-max').value, 10);
+      const forever = row.querySelector('.pe-forever').checked, expv = row.querySelector('.pe-exp').value;
+      if (!pts || pts < 1) return toast('Укажите номинал', 'error');
+      if (me.role !== 'super_admin' && pts > 100) return toast('Админ может создавать коды до 100 баллов', 'error');
+      const r = await sb.rpc('admin_update_promocode', { p_id: sv.dataset.pmSave, p_points: pts, p_max_uses: Number.isFinite(mx) ? mx : null, p_expires: forever || !expv ? null : new Date(expv).toISOString() });
+      if (r.error) return toast(friendlyError(r.error), 'error');
+      toast('Промокод обновлён'); return loadPromo();
+    }
+    const dl = e.target.closest('[data-pm-del]');
+    if (dl) {
+      const r0 = promoRows.find(x => x.id === dl.dataset.pmDel);
+      if (!window.confirm(`Удалить промокод ${r0 ? r0.code : ''}? Уже начисленные баллы останутся у пользователей.`)) return;
+      const r = await sb.rpc('admin_delete_promocode', { p_id: dl.dataset.pmDel });
+      if (r.error) return toast(friendlyError(r.error), 'error');
+      toast('Промокод удалён'); return loadPromo();
+    }
     const t = e.target.closest('[data-pm-toggle]');
     if (t) {
       const r = await sb.rpc('admin_toggle_promocode', { p_id: t.dataset.pmToggle, p_active: t.dataset.active !== '1' });
@@ -238,7 +273,7 @@
       loadPromo();
     }
   });
-  document.addEventListener('change', e => { if (e.target.id === 'pm-forever') $('pm-exp').disabled = e.target.checked; });
+  document.addEventListener('change', e => { if (e.target.id === 'pm-forever') $('pm-exp').disabled = e.target.checked; if (e.target.classList && e.target.classList.contains('pe-forever')) e.target.closest('.promo-edit').querySelector('.pe-exp').disabled = e.target.checked; });
 
   window.amooreV5 = { onView(name) { if (name === 'settings') loadPromo(); if (name === 'people') loadPeople(); if (name === 'dashboard') loadAnalytics(); } };
 })();

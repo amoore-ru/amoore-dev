@@ -76,7 +76,7 @@
   function each(sel, fn) { var n = document.querySelectorAll(sel); for (var i = 0; i < n.length; i++) fn(n[i]); }
   function setUser(u) {
     var on = !!u;
-    var pc = window.amooreProfileCache;      // v5.2: ник и роль — из единого профиля amoore ID
+    var pc = window.amooreProfileCache;      // v5.2: ник и роль — из единого профиля amoore id
     var name = on ? String((pc && pc.display_name) || u.nickname || u.name || u.email || 'Пользователь') : '';
     var isAdmin = on && (u.role === 'super_admin' || u.role === 'admin' || (pc && pc.role === 'super_admin'));
     each('[data-ux-user]', function (n) { n.hidden = !on; });

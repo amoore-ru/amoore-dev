@@ -1,5 +1,5 @@
 /**
- * amoore-cmdk.js — v5.7.0 · Command Palette (Cmd/Ctrl+K). Побайтно одинаков во всех сайтах.
+ * amoore-cmdk.js — v5.7.1 · Command Palette (Cmd/Ctrl+K). Побайтно одинаков во всех сайтах.
  * Команды: переход между сайтами (с SSO, если вы вошли), смена темы, поиск новостей из AMOORE_STATE.news.
  * Расширение: amooreCmdk.register({ title, hint, run }).
  */

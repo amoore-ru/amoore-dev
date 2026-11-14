@@ -1,4 +1,4 @@
-// amoore Dev — Mission Control (Clean Build v1.0)
+// amoore dev — Mission Control (Clean Build v1.0)
 // Единый скрипт: авторизация (Supabase Auth + токен, сессия 6 ч), дашборд, новости, медиа, команда, логи, настройки.
 const SUPABASE_URL  = 'https://wogouiecoigzmxqccnsk.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_iGhPrxcxzUuop_bKdy-k7g_zWPzTT8Q';
@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '5.7.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '5.7.1';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -101,6 +101,12 @@ function fmtDateTime(iso, short) {
   return new Date(iso).toLocaleString('ru-RU', short
     ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }
     : { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+// v5.7.1: supabase-js на любой не-2xx ответ Edge Function пишет «Edge Function returned a non-2xx status code» — достаём настоящий текст из тела ответа
+async function fnError(error) {
+  try { const c = error && error.context; if (c && typeof c.json === 'function') { const b = await c.clone().json(); if (b && (b.error || b.message)) return String(b.error || b.message); } } catch (_) {}
+  const m = String(error?.message || error || '');
+  return /non-2xx/i.test(m) ? 'Функция сервера вернула ошибку. Проверьте секреты и логи Edge Function в Supabase' : friendlyError(error);
 }
 function friendlyError(err) {
   const msg = String(err?.message || err || '');
@@ -860,7 +866,7 @@ async function reconnectWebhook() {
   const btn = $('bot-webhook-btn'); if (btn) btn.disabled = true;
   try {
     const { data, error } = await sb.functions.invoke('reconnect-webhook', { body: {} });
-    if (error || !data || !data.ok) return toast((data && data.error) || friendlyError(error), 'error');
+    if (error || !data || !data.ok) return toast((data && data.error) || await fnError(error), 'error');
     toast('Telegram переподключён' + (data.pending ? ' · в очереди: ' + data.pending : '') + (data.last_error ? ' · последняя ошибка: ' + data.last_error : ''));
   } catch (e) { toast('Edge Function reconnect-webhook недоступна', 'error'); }
   finally { if (btn) btn.disabled = false; }
@@ -869,8 +875,8 @@ async function reconnectWebhook() {
 async function sendBotTest() {
   if (!isSuper()) return toast('Только основатель', 'error');
   try {
-    const { error } = await sb.functions.invoke('send-telegram', { body: { message: '✅ Тест из amoore Dev — бот на связи.' } });
-    if (error) return toast(friendlyError(error), 'error');
+    const { error } = await sb.functions.invoke('send-telegram', { body: { message: '✅ Тест из amoore dev — бот на связи.' } });
+    if (error) return toast(await fnError(error), 'error');
     toast('Тестовое сообщение отправлено');
   } catch (e) {
     toast('Edge Function send-telegram недоступна', 'error');
@@ -1432,13 +1438,13 @@ function paintThemeChoice() {
 document.querySelectorAll('[data-theme-choice]').forEach(b => b.addEventListener('click', () => window.amooreUX?.setTheme(b.dataset.themeChoice)));
 document.addEventListener('amoore:theme', paintThemeChoice);
 
-// v5.2: профиль в настройках — тот самый amoore ID, что и на сайте (одни и те же поля, одна таблица profiles)
+// v5.2: профиль в настройках — тот самый amoore id, что и на сайте (одни и те же поля, одна таблица profiles)
 async function mountProfileHost() {
   const host = $('set-profile-host'); if (!host) return;
   try {
     amooreID.init({ site: 'dev', sb });
     const card = await amooreID.renderProfile(host, 'profile');
-    if (!card) host.innerHTML = '<div class="loading-state">Войдите через amoore ID, чтобы редактировать профиль.</div>';
+    if (!card) host.innerHTML = '<div class="loading-state">Войдите через amoore id, чтобы редактировать профиль.</div>';
   } catch (e) { host.innerHTML = `<div class="loading-state">${esc(friendlyError(e))}</div>`; }
 }
 document.addEventListener('amoore:profile', async (e) => {          // ник/аватар/роль изменились в профиле → шапка админки обновляется сразу

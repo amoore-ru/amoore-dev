@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
-  <title>amoore Dev — Mission Control</title>
+  <title>amoore dev — Mission Control</title>
   <meta name="theme-color" content="#070b16">
   <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <script src="amoore-ux.js?v=5.7.0"></script>
-  <link rel="stylesheet" href="style.css?v=5.7.0">
-  <link rel="stylesheet" href="amoore-theme.css?v=5.7.0">
-  <link rel="stylesheet" href="dev-theme.css?v=5.7.0">
+  <script src="amoore-ux.js?v=5.7.1"></script>
+  <link rel="stylesheet" href="style.css?v=5.7.1">
+  <link rel="stylesheet" href="amoore-theme.css?v=5.7.1">
+  <link rel="stylesheet" href="dev-theme.css?v=5.7.1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -20,7 +20,7 @@
     <div class="login-card glass">
       <div class="login-logo">
         <div class="mark">a.</div>
-        <h1>amoore Dev</h1>
+        <h1>amoore dev</h1>
         <p>Центр управления</p>
       </div>
       <form id="login-form" autocomplete="off">
@@ -47,9 +47,9 @@
     <header class="ux-topbar" id="ux-topbar">
     <div class="ux-bar">
       <div class="ux-left">
-        <a class="ux-logo" href="#" aria-label="amoore Dev">
+        <a class="ux-logo" href="#" aria-label="amoore dev">
           <span class="ux-mark">a.</span>
-          <span class="ux-name"><strong>amoore Dev</strong><small>Mission Control</small></span>
+          <span class="ux-name"><strong>amoore dev</strong><small>Mission Control</small></span>
         </a>
         <button type="button" class="ux-chip nx-version-chip" id="version-chip" data-ux-chip aria-haspopup="dialog" aria-label="История обновлений">v4.4</button>
       </div>
@@ -226,11 +226,6 @@
             </div>
           </section>
 
-          <section class="settings-card glass" id="set-profile" aria-labelledby="set-profile-h">
-            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">☺</span><div><h3 id="set-profile-h">Профиль</h3><p>Единый профиль amoore ID — такой же, как на сайте: аватарка, никнейм, привязка Телеграма.</p></div></header>
-            <div id="set-profile-host" class="aid-host"><div class="skeleton-stack" aria-label="Профиль загружается"><i></i><i></i><i></i></div></div>
-          </section>
-
           <section class="settings-card glass" id="set-promo" aria-labelledby="set-promo-h" hidden>
             <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">✦</span><div><h3 id="set-promo-h">Промокоды</h3><p>Баллы за код начисляются на сайте и в боте (/promo). Основатель — любой номинал, админы — до 100 баллов.</p></div></header>
             <div class="promo-form">
@@ -242,6 +237,11 @@
               <button type="button" class="btn btn-primary" id="pm-create">Создать промокод</button>
             </div>
             <div id="pm-list" class="promo-list"></div>
+          </section>
+
+          <section class="settings-card glass" id="set-profile" aria-labelledby="set-profile-h">
+            <header class="settings-card-head"><span class="settings-ico" aria-hidden="true">☺</span><div><h3 id="set-profile-h">Профиль</h3><p>Единый профиль amoore id — такой же, как на сайте: аватарка, никнейм, привязка Телеграма.</p></div></header>
+            <div id="set-profile-host" class="aid-host"><div class="skeleton-stack" aria-label="Профиль загружается"><i></i><i></i><i></i></div></div>
           </section>
 
           
@@ -322,7 +322,7 @@
       </div>
 
       <div class="view" id="view-people">
-        <h2>Люди</h2><p class="muted">Все аккаунты amoore ID. Доступно только основателю.</p>
+        <h2>Люди</h2><p class="muted">Все аккаунты amoore id. Доступно только основателю.</p>
         <input type="search" id="people-search" placeholder="Поиск по email или username" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid rgba(212,175,55,.25);background:rgba(255,255,255,.05);color:inherit;font-size:16px;margin-top:12px">
         <div id="people-list" class="stack" style="margin-top:16px"></div>
       </div>
@@ -404,7 +404,7 @@
         </div>
         <div class="form-group">
           <label for="site-new-name">Название</label>
-          <input id="site-new-name" required maxlength="60" placeholder="amoore Studio">
+          <input id="site-new-name" required maxlength="60" placeholder="amoore studio">
         </div>
         <div class="form-group">
           <label for="site-new-url">URL</label>
@@ -481,11 +481,11 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="amoore-id.js?v=5.7.0"></script>
-<script src="amoore-pwa.js?v=5.7.0" defer></script>
-<script src="amoore-cmdk.js?v=5.7.0" defer></script>
-  <script src="digest.js?v=5.7.0"></script>
-  <script src="app.js?v=5.7.0"></script>
-  <script src="amoore-admin-v5.js?v=5.7.0"></script>
+  <script src="amoore-id.js?v=5.7.1"></script>
+<script src="amoore-pwa.js?v=5.7.1" defer></script>
+<script src="amoore-cmdk.js?v=5.7.1" defer></script>
+  <script src="digest.js?v=5.7.1"></script>
+  <script src="app.js?v=5.7.1"></script>
+  <script src="amoore-admin-v5.js?v=5.7.1"></script>
 </body>
 </html>

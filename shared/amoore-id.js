@@ -1,5 +1,5 @@
 /**
- * amoore-id.js — v5.7.0 «SMART AUTH & PRE-RUST» · amoore ID (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
+ * amoore-id.js — v5.7.1 «SMART AUTH & PRE-RUST» · amoore id (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
  * Подключение (после supabase-js):  <script src="amoore-id.js"></script>
  *   amooreID.init({ site: 'dev'|'studio'|'landing', sb: <существующий клиент, необязательно> })
  * API: signIn(email,pw) · sendCode(email, create)/verifyCode (вход ТОЛЬКО по 6-значному коду из письма) · consumeUrl() (SSO) · ensureOnboarded()
@@ -32,7 +32,7 @@
     if (p && p.avatar_url) return el('img', { class: cls, alt: '', src: p.avatar_url });
     return el('div', { class: cls + ' aid-av-ph', 'aria-hidden': 'true', text: initial(p), style: 'background:' + ((p && p.avatar_color) || AVATAR_COLORS[0]) });
   }
-  // v5.2: Студия сообщает о публикации — проект появляется в «Мои сайты» профиля amoore ID (уникально по адресу)
+  // v5.2: Студия сообщает о публикации — проект появляется в «Мои сайты» профиля amoore id (уникально по адресу)
   async function registerSite(title, url) {
     var u = await user(); if (!u || !/^https:\/\/[^\s]{3,300}$/i.test(String(url || ''))) return false;
     var r = await sb.from('user_sites').upsert({ user_id: u.id, title: String(title || 'Сайт').slice(0, 80), url: url, is_public: true }, { onConflict: 'user_id,url' });
@@ -451,10 +451,11 @@
     async function go() {
       var code = inp.value.trim(); if (!code) { say(msg, 'Введите промокод'); return; }
       btn.disabled = true; say(msg, '');
-      var r = await sb.rpc('redeem_promocode', { p_code: code });
+      var r = await sb.rpc('activate_promocode', { p_code: code });
       btn.disabled = false;
       if (r.error) { say(msg, err(r.error)); return; }
-      shut(); promoToast('+' + r.data + ' баллов'); if (onDone) onDone(r.data);
+      var got = (r.data && typeof r.data === 'object') ? r.data : { points: r.data };
+      shut(); promoToast('+' + got.points + ' баллов'); if (onDone) onDone(got.points, got.balance);
     }
     btn.addEventListener('click', go);
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
@@ -473,7 +474,7 @@
     box.appendChild(inp);
     box.appendChild(el('div', { class: 'aid-btnrow' }, [
       el('button', { class: 'aid-btn aid-sm', type: 'button', text: 'Скопировать ссылку', onclick: function () { copy(link, msg, 'Ссылка скопирована'); } }),
-      el('button', { class: 'aid-pill', type: 'button', text: 'Ввести промокод', onclick: function () { openPromo(function (n) { p.rewards_balance = (p.rewards_balance || 0) + n; var b = document.getElementById('rw-balance'); if (b) b.textContent = p.rewards_balance + ' баллов'; paintHistory(); }); } })]));
+      el('button', { class: 'aid-pill', type: 'button', text: 'Ввести промокод', onclick: function () { openPromo(function (n, bal) { p.rewards_balance = (bal != null ? bal : (p.rewards_balance || 0) + n); var b = document.getElementById('rw-balance'); if (b) b.textContent = p.rewards_balance + ' баллов'; paintHistory(); }); } })]));
     box.appendChild(msg);
     var h = el('div'); box.appendChild(el('h2', { text: 'История', style: 'font-size:16px;margin-top:16px' })); box.appendChild(h);
     var RS = { referral: 'приглашение', promocode: 'промокод' };
@@ -528,7 +529,7 @@
       if (pw1.value.length < 8) return say(msg, 'Пароль — от 8 символов');
       if (pw1.value !== pw2.value) return say(msg, 'Пароли не совпадают');
       pwBtn.disabled = true; var r2 = await sb.auth.updateUser({ password: pw1.value }); pwBtn.disabled = false;
-      if (r2.error) return say(msg, err(r2.error)); pw1.value = ''; pw2.value = ''; say(msg, 'Пароль изменён', true);
+      if (r2.error) return say(msg, err(r2.error)); pw1.value = ''; pw2.value = ''; sb.rpc('log_event', { p_action: 'password_change' }).then(function () {}); say(msg, 'Пароль изменён', true);
     });
     box.appendChild(el('h2', { text: 'Смена email', style: 'font-size:16px' })); box.appendChild(newEmail); box.appendChild(emailCode); box.appendChild(emailBtn);
     box.appendChild(el('h2', { text: 'Смена пароля', style: 'font-size:16px;margin-top:14px' })); box.appendChild(pw1); box.appendChild(pw2); box.appendChild(pwBtn);
@@ -538,11 +539,6 @@
     box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', id: 'revoke-all', text: 'Завершить все сессии', onclick: function () {
       if (!window.confirm('Выйти на всех устройствах, включая это?')) return;
       sb.rpc('revoke_all_sessions').then(function (r) { if (r.error) throw r.error; return sb.auth.signOut({ scope: 'global' }); }).then(function () { location.reload(); }).catch(function (e) { say(msg, err(e)); }); } }));
-    var pw = el('input', { type: 'password', autocomplete: 'new-password', minlength: '8', placeholder: 'Новый пароль (от 8 символов)' });
-    box.appendChild(el('h2', { text: 'Смена пароля', style: 'font-size:16px;margin-top:16px' })); box.appendChild(pw);
-    box.appendChild(el('button', { class: 'aid-btn aid-ghost', type: 'button', text: 'Сменить пароль', onclick: function () {
-      if (pw.value.length < 8) return say(msg, 'Пароль — минимум 8 символов');
-      sb.auth.updateUser({ password: pw.value }).then(function (r) { if (r.error) return say(msg, err(r.error)); pw.value = ''; sb.rpc('log_event', { p_action: 'password_change' }).then(function () {}); say(msg, 'Пароль изменён', true); }); } }));
     box.appendChild(msg);
     paint().catch(function (e) { say(msg, err(e)); });
   }
@@ -659,7 +655,7 @@
         .then(function () { ov.remove(); document.dispatchEvent(new CustomEvent('amoore:login')); })
         .catch(function (e) { say(err(e)); go.disabled = false; });
     });
-    var kids = [el('h2', { text: 'Вход в amoore ID' }),
+    var kids = [el('h2', { text: 'Вход в amoore id' }),
       el('p', { text: reason || 'Введите Email, и мы пришлём 6-значный код' }),
       inp, el('button', { class: 'aid-link', type: 'button', id: 'aid-nomail', text: 'Нет доступа к почте?', onclick: function () { openSupport(inp.value.trim()); } }), send, codeBox, msg, go, reg];
     var ov = overlay(el('div', { class: 'aid-card' }, kids.concat([
@@ -667,7 +663,56 @@
     setTimeout(function () { try { inp.focus(); } catch (e) {} }, 30);
   }
 
-  var api = { openLogin: openLogin, openSupport: openSupport, peopleSearch: peopleSearch, renderProfile: renderProfile, pendingRef: pendingRef, claimRef: claimRef, shareUrl: shareUrl, boot: boot, mountChip: mountChip,  init: init, signIn: signIn, sendCode: sendCode, verifyCode: verifyCode, signOut: signOut, consumeUrl: consumeUrl, ssoOpen: ssoOpen,
+
+  // ---- v5.7.1 «Режим Бога»: «Действия администратора» внизу любого профиля. Видно только Основателю; права проверяет БД (RPC admin_*).
+  function godPanel(username, onChange) {
+    var box = el('details', { class: 'god-box', id: 'god-box' }, [el('summary', { text: 'Действия администратора' })]);
+    var msg = el('div', { class: 'aid-err', role: 'status' }), info = null, loaded = false;
+    var bal = el('div', { class: 'aid-big', id: 'god-balance', text: '…' });
+    var amount = el('input', { type: 'number', inputmode: 'numeric', min: '1', max: '1000000', placeholder: 'Сумма баллов', id: 'god-amount' });
+    var nick = el('input', { type: 'text', maxlength: '40', placeholder: 'Никнейм', id: 'god-nick' });
+    var uname = el('input', { type: 'text', maxlength: '24', placeholder: 'username', autocapitalize: 'none', id: 'god-username' });
+    var rank = el('input', { type: 'text', maxlength: '24', placeholder: 'Бейдж ранга (например, Ангел)', id: 'god-rank' });
+    function need() { if (!info) { say(msg, 'Профиль ещё загружается'); return false; } return true; }
+    async function adjust(sign) {
+      if (!need()) return; var n = parseInt(amount.value, 10);
+      if (!n || n < 1) return say(msg, 'Введите сумму больше нуля');
+      var r = await sb.rpc('admin_adjust_points', { p_user: info.id, p_delta: sign * n, p_reason: sign > 0 ? 'начисление' : 'списание' });
+      if (r.error) return say(msg, err(r.error));
+      info.rewards_balance = r.data; bal.textContent = r.data + ' баллов'; amount.value = ''; say(msg, (sign > 0 ? 'Начислено: +' : 'Списано: −') + n, true);
+      if (onChange) onChange({ points: r.data });
+    }
+    var plus = el('button', { class: 'aid-btn aid-sm', type: 'button', text: '+ Начислить', onclick: function () { adjust(1); } });
+    var minus = el('button', { class: 'aid-btn aid-ghost aid-sm', type: 'button', text: '− Списать', onclick: function () { adjust(-1); } });
+    var saveData = el('button', { class: 'aid-btn aid-ghost aid-sm', type: 'button', text: 'Сохранить данные', onclick: async function () {
+      if (!need()) return;
+      var r = await sb.rpc('admin_edit_profile', { p_user: info.id, p_display_name: nick.value, p_username: uname.value });
+      if (r.error) return say(msg, err(r.error));
+      info.username = r.data.username; say(msg, 'Сохранено. Новая ссылка: /u/' + r.data.username, true);
+      if (onChange) onChange({ username: r.data.username, display_name: r.data.display_name });
+    } });
+    var saveRank = el('button', { class: 'aid-btn aid-ghost aid-sm', type: 'button', text: 'Сохранить бейдж', onclick: async function () {
+      if (!need()) return;
+      var r = await sb.rpc('admin_set_rank_label', { p_user: info.id, p_label: rank.value });
+      if (r.error) return say(msg, err(r.error));
+      say(msg, r.data ? 'Бейдж: ' + r.data : 'Бейдж сброшен', true); if (onChange) onChange({ rank_label: r.data });
+    } });
+    box.appendChild(el('div', { class: 'god-row' }, [bal]));
+    box.appendChild(el('h3', { text: 'Баллы', style: 'font-size:15px;margin:12px 0 0' })); box.appendChild(el('div', { class: 'god-row' }, [amount, plus, minus]));
+    box.appendChild(el('h3', { text: 'Данные', style: 'font-size:15px;margin:12px 0 0' })); box.appendChild(el('div', { class: 'god-row' }, [nick, uname, saveData]));
+    box.appendChild(el('h3', { text: 'Ранг', style: 'font-size:15px;margin:12px 0 0' })); box.appendChild(el('div', { class: 'god-row' }, [rank, saveRank]));
+    box.appendChild(el('p', { class: 'god-note', text: 'Бейдж — только подпись. Системная роль и права пользователя не меняются. Пустое поле сбрасывает бейдж.' }));
+    box.appendChild(msg);
+    box.addEventListener('toggle', async function () {
+      if (!box.open || loaded) return; loaded = true;
+      var r = await sb.rpc('admin_profile_info', { p_username: username });
+      if (r.error) { loaded = false; return say(msg, err(r.error)); }
+      info = r.data; bal.textContent = info.rewards_balance + ' баллов'; nick.value = info.display_name || ''; uname.value = info.username || ''; rank.value = info.rank_label || '';
+    });
+    return box;
+  }
+
+  var api = { godPanel: godPanel, openLogin: openLogin, openSupport: openSupport, peopleSearch: peopleSearch, renderProfile: renderProfile, pendingRef: pendingRef, claimRef: claimRef, shareUrl: shareUrl, boot: boot, mountChip: mountChip,  init: init, signIn: signIn, sendCode: sendCode, verifyCode: verifyCode, signOut: signOut, consumeUrl: consumeUrl, ssoOpen: ssoOpen,
     getProfile: getProfile, saveProfile: saveProfile, ensureOnboarded: ensureOnboarded, isOnboarded: isOnboarded, openProfile: openProfile, listSessions: listSessions, revokeOthers: revokeOthers,
     linkTelegram: linkTelegram, roleRu: roleRu, registerSite: registerSite, avatarEl: avatarEl, AVATAR_COLORS: AVATAR_COLORS, lockLeft: lockLeft, people: people, friendlyError: err, USERNAME_RE: USERNAME_RE, sb: null };
   window.amooreID = api;

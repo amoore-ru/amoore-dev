@@ -41,9 +41,9 @@ check('токен SSO и ссылки стираются из адресной �
 check('нет innerHTML в amoore-id.js (XSS)', !/innerHTML/.test(idCode));
 
 // ---- версии
-const v = '5.7.0';
-check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.7.0'/.test(read('amoore-ru/amoore-core.js')));
-check('версия в bot.py', /AMOORE_VERSION = "5.7.0"/.test(read('amoore-ai/bot.py')));
+const v = '5.7.1';
+check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.7.1'/.test(read('amoore-ru/amoore-core.js')));
+check('версия в bot.py', /AMOORE_VERSION = "5.7.1"/.test(read('amoore-ai/bot.py')));
 for (const d of ['amoore-dev', 'amoore-ru', 'amoore-studio', 'amoore-ai']) check(`changelog ${d}`, JSON.parse(read(`${d}/changelog.json`)).current === v);
 
 // ---- PWA
@@ -66,8 +66,8 @@ check('бот: код привязки из secrets, не random', /import secre
 
 // ======================================================================= v5.1 «MASTER»
 const sqlDir = path.join(ROOT, 'amoore-dev/shared/sql');
-check('SQL: в shared/sql ровно шесть миграций — 001 (заморожена), 002–004, 005_v56_promocodes.sql и 006_v57_social.sql (кроме cleanup.sql)', fs.readdirSync(sqlDir).filter((f) => /^\d+_.*\.sql$/.test(f)).join() === '001_init_database.sql,002_v53_updates.sql,003_v54_titan.sql,004_v55_stability.sql,005_v56_promocodes.sql,006_v57_social.sql', fs.readdirSync(sqlDir).join());
-check('SQL: других миграций (007–010) нет ни в shared/sql, ни в корне', !fs.readdirSync(sqlDir).some((f) => /^0(0[7-9]|10)_/.test(f)) && !fs.readdirSync(ROOT).some((f) => /^0\d\d_.*\.sql$/.test(f)));
+check('SQL: в shared/sql ровно семь миграций — 001 (заморожена), 002–004, 005_v56_promocodes.sql, 006_v57_social.sql и 007_v571_global_polish.sql (кроме cleanup.sql)', fs.readdirSync(sqlDir).filter((f) => /^\d+_.*\.sql$/.test(f)).join() === '001_init_database.sql,002_v53_updates.sql,003_v54_titan.sql,004_v55_stability.sql,005_v56_promocodes.sql,006_v57_social.sql,007_v571_global_polish.sql', fs.readdirSync(sqlDir).join());
+check('SQL: других миграций (008–010) нет ни в shared/sql, ни в корне', !fs.readdirSync(sqlDir).some((f) => /^0(0[8-9]|10)_/.test(f)) && !fs.readdirSync(ROOT).some((f) => /^0\d\d_.*\.sql$/.test(f)));
 for (const t of ['admins', 'profiles', 'business_automations', 'changelog_versions', 'leads', 'news', 'audit_logs', 'user_sessions', 'push_subscriptions', 'user_sites', 'rewards_log']) check(`SQL: таблица ${t} создаётся в едином файле`, new RegExp(`create table if not exists public\\.${t}\\b`).test(sql));
 check('SQL: Storage bucket media и политики', /storage\.buckets/.test(sql) && /'media'/.test(sql));
 check('SQL: идемпотентность — у каждой политики есть DROP POLICY IF EXISTS', [...sql.matchAll(/^create policy (\w+) on ([\w.]+)/gm)].every((m) => new RegExp(`drop policy if exists ${m[1]} on ${m[2].replace('.', '\\.')}`).test(sql)));
@@ -99,8 +99,8 @@ const css = read('amoore-dev/style.css');
 check('CSS: .lead-card / .news-card — column, gap 12px, без space-between', /\.lead-card, \.news-card \{[^}]*flex-direction: column;[^}]*gap: 12px/.test(css) && !/\.lead-card[^{]*\{[^}]*space-between/.test(css));
 check('админка: рассылка полностью удалена (v5.2)', !/telegram-broadcast-btn|broadcast-card/.test(read('amoore-dev/app.js') + read('amoore-dev/index.html')));
 check('админка: теги заявок, CSV, фильтр журнала, Realtime-графики', /Экспорт в CSV/.test(read('amoore-dev/amoore-admin-v5.js')) && /amoore-live-activity/.test(read('amoore-dev/amoore-admin-v5.js')) && /id="logs-filter"/.test(read('amoore-dev/index.html')));
-const cl = JSON.parse(read('amoore-ru/changelog.json')).versions[0];
-check('changelog: v5.7 SOCIAL от 2026-11-14', cl.version === '5.7.0' && cl.title === 'SOCIAL' && cl.date === '2026-11-14' && cl.items.length >= 4);
+const cl = JSON.parse(read('amoore-ru/changelog.json')).versions.find((x) => x.version === '5.7.0');
+check('changelog: v5.7 SOCIAL от 2026-11-14', cl && cl.title === 'SOCIAL' && cl.date === '2026-11-14' && cl.items.length >= 4);
 const cl2 = JSON.parse(read('amoore-ru/changelog.json')).versions.find((x) => x.version === '5.4.0');
 check('v5.7: соцслой (миграция 006, поиск, подписки, обложка, поддержка)', /follow_user/.test(read('amoore-dev/shared/sql/006_v57_social.sql')) && /show_telegram/.test(read('amoore-dev/shared/sql/006_v57_social.sql')) && /peopleSearch/.test(read('amoore-ru/amoore-id.js')) && /uploadBanner/.test(read('amoore-ru/amoore-id.js')) && /tags: \['access'\]/.test(read('amoore-ru/amoore-id.js')) && /bento/.test(read('amoore-ru/index.html')));
 check('changelog: запись 5.4.0 заполнена (13 пунктов)', !!cl2 && cl2.items.length === 13);
@@ -142,3 +142,18 @@ check('бот: ai_logic / db_bridge / tg_handlers + Google AI + upsert пуль�
 
 console.log(`v5: ${pass}/${pass + fail} проверок пройдено`);
 process.exit(fail ? 1 : 0);
+
+// ---- v5.7.1 GLOBAL POLISH
+const sql7 = read('amoore-dev/shared/sql/007_v571_global_polish.sql');
+check('v5.7.1: activate_promocode выставляет amoore.bypass (фикс RLS)', /function public\.activate_promocode/.test(sql7) && /set_config\('amoore\.bypass', '1', true\);\s+-- баланс/.test(sql7));
+check('v5.7.1: потолок 100 баллов в БД (триггер)', /trg_promocodes_cap/.test(sql7) && /points > 100/.test(sql7));
+check('v5.7.1: admin_update/delete_promocode', /admin_update_promocode/.test(sql7) && /admin_delete_promocode/.test(sql7));
+check('v5.7.1: Режим Бога — RPC только для super_admin', /admin_adjust_points/.test(sql7) && /admin_edit_profile/.test(sql7) && /admin_set_rank_label/.test(sql7) && /_require_owner/.test(sql7));
+check('v5.7.1: клиент зовёт activate_promocode', /activate_promocode/.test(read('amoore-ru/amoore-id.js')));
+check('v5.7.1: godPanel в amoore-id.js и вызов на публичном профиле', /function godPanel/.test(read('amoore-ru/amoore-id.js')) && /godPanel/.test(read('amoore-ru/landing.js')));
+check('v5.7.1: ссылка Telegram — https://t.me/, без tg://', /https:\/\/t\.me\//.test(read('amoore-ru/landing.js')) && !/tg:\/\/user/.test(read('amoore-ru/landing.js')));
+check('v5.7.1: Dev-панели нет на публичной главной', !/Dev-панел/.test(read('amoore-ru/index.html')) && !/amoore-dev\.pages\.dev/.test(read('amoore-ru/index.html').split('<main')[1] || ''));
+check('v5.7.1: на странице Безопасность один блок смены пароля', (read('amoore-ru/amoore-id.js').match(/Смена пароля/g) || []).length === 1);
+check('v5.7.1: порядок настроек Внешний вид → Промокоды → Профиль', (() => { const h = read('amoore-dev/index.html'); return h.indexOf('id="set-appearance"') < h.indexOf('id="set-promo"') && h.indexOf('id="set-promo"') < h.indexOf('id="set-profile"'); })());
+check('v5.7.1: changelog — только крупные релизы (x.y.0)', /function isMajor/.test(read('amoore-ru/amoore-core.js')));
+

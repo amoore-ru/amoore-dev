@@ -202,3 +202,11 @@ table, th, td { background-color: transparent; }
 .promo-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; }
 .promo-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; } .promo-main b { overflow: hidden; text-overflow: ellipsis; } .promo-main small { font-size: 12px; opacity: .7; }
 .promo-row .btn { flex: 0 0 auto; white-space: nowrap; }
+
+/* ===== v5.7.1: промокоды (правка/удаление) и компактные кнопки ===== */
+.promo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.promo-main { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.promo-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.promo-actions .btn { width: auto; flex: 0 0 auto; padding: 6px 12px; }
+.promo-edit { flex: 1 1 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; align-items: center; }
+.promo-edit input { min-width: 0; width: 100%; }

@@ -1,4 +1,4 @@
-# amoore Dev — Mission Control v3.0.0 «Singularity»
+# amoore dev — Mission Control v3.0.0 «Singularity»
 
 **Новое в 3.0:** вкладка «Дайджест» (сводка за 7 дней + отправка админам в Telegram через бота), красный счётчик новых заявок,
 окно «Что нового» (`changelog.json`), дизайн Deep Glass 3.0 с плавными переходами между вкладками, Event System (все действия — в журнал и в дайджест).
@@ -16,7 +16,7 @@
 
 ---
 
-# amoore Dev — Mission Control (Clean Build v1.0)
+# amoore dev — Mission Control (Clean Build v1.0)
 
 Админка экосистемы amoore: чистый HTML/CSS/JS + Supabase. Корень репозитория — это сама админка
 (`index.html`, `app.js`, `style.css`), в папке `shared/` — общее для всей экосистемы.
