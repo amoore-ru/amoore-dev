@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v5.7.1 «SMART AUTH & PRE-RUST»
+ * amoore-core.js — v5.8.0 «SMART AUTH & PRE-RUST»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '5.7.1';
+  var AMOORE_VERSION = '5.8.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -725,12 +725,12 @@
       var extra = local.filter(function (v) { return v && v.version && !have[v.version]; });
       list = sortVersions((list || []).concat(extra));
     }
-    changelogList = list && list.length ? list : [{ version: '5.7.1', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.8.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }
   // ---- Changelog 2.0 (v5.4): вкладки «Обновления» (с подверсиями) и «Эры»; старые версии сверху
-  // v5.7.1: только крупные релизы (x.y.0). Подверсии (5.4.1, 5.5.1, 5.7.1) остаются в данных, но не показываются.
+  // v5.8.0: только крупные релизы (x.y.0). Подверсии (5.4.1, 5.5.1, 5.8.0) остаются в данных, но не показываются.
   var ERAS = [
     { id: 'I', title: 'Эра I: Истоки', range: 'v1–v5.3', min: 0, max: 5.03 },
     { id: 'II', title: 'Эра II: Синтез', range: 'v5.4 и далее', min: 5.04, max: 99 }

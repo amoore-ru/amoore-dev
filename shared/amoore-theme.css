@@ -218,7 +218,7 @@ html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
 /* =====================================================================
    v4.3 POLISH — Unified Topbar (.ux-*). Одна и та же шапка на всех сайтах экосистемы.
    Слева: логотип + чип версии · Центр: вкладки · Справа: тема, ⚙ (админам), пользователь, «Выйти».
-   До 1119px всё, кроме темы, прячется в бургер-меню.
+   До 1360px всё, кроме темы, прячется в бургер-меню.
    ===================================================================== */
 .ux-topbar [hidden] { display: none !important; }
 .ux-topbar {
@@ -302,7 +302,7 @@ html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
 .ux-burger { position: relative; }
 .ux-tab:focus-visible, .ux-icon-btn:focus-visible, .ux-burger:focus-visible, .ux-logout:focus-visible, .ux-chip:focus-visible { outline: 2px solid var(--nx-gold); outline-offset: 2px; }
 
-@media (max-width: 1279px) {
+@media (max-width: 1359px) {
   .ux-bar { gap: 10px; min-height: 58px; }
   .ux-burger { display: inline-flex; }
   .ux-name small { display: none; }
@@ -328,7 +328,7 @@ html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
    Раньше шапка (.ux-topbar) оставалась полупрозрачной (rgba .58) и панель была ровно по высоте контента —
    сквозь них виден контент страницы. Теперь при открытии: шапка и панель непрозрачные, панель занимает весь экран под шапкой.
    ===================================================================== */
-@media (max-width: 1119px) {
+@media (max-width: 1359px) {
   .ux-topbar.open {
     background-color: var(--bg, var(--nx-bg, #070b16)) !important; opacity: 1 !important;
     -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
@@ -522,7 +522,7 @@ html body .settings-sidebar { --ink: var(--text, inherit); --muted: var(--text-s
 :root { --lg-bg: rgba(18, 24, 40, .55); --lg-line: rgba(255, 255, 255, .14); --lg-hi: rgba(255, 255, 255, .18); }
 html[data-theme="light"], body.light { --lg-bg: rgba(255, 255, 255, .58); --lg-line: rgba(20, 24, 40, .12); --lg-hi: rgba(255, 255, 255, .8); }
 /* Нижняя панель: полупрозрачное стекло, плавающая «пилюля» как в Telegram */
-@media (max-width: 1119px) {
+@media (max-width: 1359px) {
   html body .spa-tabbar {
     left: max(10px, env(safe-area-inset-left, 0px)); right: max(10px, env(safe-area-inset-right, 0px));
     bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 6px; border-radius: 26px;
@@ -590,7 +590,7 @@ html[data-theme="light"], body.light { --lg-bg: rgba(255, 255, 255, .58); --lg-l
 .user-actions .btn { flex: 0 1 auto; }
 .aid-people { max-width: 560px; margin: 0 auto 16px; }
 
-/* ===== v5.7.1 GLOBAL POLISH: всё стоит «намертво» по сетке =====
+/* ===== v5.8.0 GLOBAL POLISH: всё стоит «намертво» по сетке =====
    Никаких плавающих блоков: карточки лежат в нормальном потоке, анимации появления — только прозрачность.
    Эти правила стоят последними и перекрывают более ранние эффекты (reveal с поворотом, hover-подъём, орнаменты). */
 html body .hero-ornaments, html body .hero-ornaments i { display: none !important; }
@@ -613,7 +613,7 @@ html body .eco-grid { grid-template-columns: minmax(0, 1fr); }
 html body .spa-view { animation: none !important; }
 
 /* Отступ под нижней панелью (Liquid Glass): контент и футер никогда не уходят под неё */
-@media (max-width: 1119px) {
+@media (max-width: 1359px) {
   html body, html body.has-mobile-cta { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)) !important; }
   html body footer, html body .footer { padding-bottom: 20px !important; margin-bottom: 0 !important; }
   html { scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
@@ -631,15 +631,33 @@ html body .spa-view { animation: none !important; }
 /* Админка: длинные Email и компактные кнопки */
 .cell-ellipsis, .people-email { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* «Действия администратора» (Режим Бога) */
-.god-box { margin: 18px 0 0; padding: 14px; border-radius: 18px; border: 1px solid rgba(var(--nx-gold-rgb, 212, 175, 55), .45); }
-.god-box > summary { cursor: pointer; font-weight: 700; list-style: none; }
+/* «Действия администратора» (Режим Бога) — Deep Glass */
+.god-box {
+  margin: 16px 0 0; padding: 16px; border-radius: 20px;
+  border: 1px solid rgba(var(--nx-gold-rgb, 212, 175, 55), .35);
+  background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.02)), rgba(18,24,40,.65);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5); backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 12px 32px rgba(0,0,0,.25);
+}
+.god-box > summary {
+  cursor: pointer; font-weight: 800; font-size: 15px; list-style: none;
+  color: var(--nx-gold, #d4af37); letter-spacing: .02em;
+}
 .god-box > summary::-webkit-details-marker { display: none; }
-.god-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; align-items: center; }
-.god-row input { flex: 1 1 140px; min-width: 0; }
-.god-note { font-size: 13px; opacity: .75; margin: 6px 0 0; }
+.god-box[open] > summary { margin-bottom: 8px; }
+.god-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 0; align-items: center; }
+.god-row input {
+  flex: 1 1 140px; min-width: 0; height: 40px; padding: 0 12px;
+  border-radius: 12px; border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.25); color: inherit; font-size: 14px;
+}
+.god-row input:focus { outline: 2px solid var(--nx-gold); outline-offset: 1px; }
+.god-row .aid-btn { min-height: 40px; padding: 0 14px; border-radius: 12px; }
+.god-note { font-size: 12px; opacity: .7; margin: 8px 0 0; line-height: 1.4; }
+.god-box .aid-big { font-size: 22px; font-weight: 800; color: var(--nx-gold); margin: 4px 0 8px; }
+.god-box h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin: 16px 0 0; font-weight: 700; }
 
-/* v5.7.1: changelog — карточки Deep Glass и таймлайн эр */
+/* v5.8.0: changelog — карточки Deep Glass и таймлайн эр */
 .nx-cl-cards { display: grid; gap: 12px; }
 .nx-cl-card, .nx-cl-nodecard { padding: 14px 16px; border-radius: 18px; border: 1px solid var(--lg-line, rgba(255,255,255,.14));
   background: linear-gradient(145deg, rgba(255,255,255,.07), rgba(255,255,255,.02)), var(--lg-bg, rgba(18,24,40,.55));

@@ -137,7 +137,7 @@
     document.addEventListener('click', function (e) {
       if (b.classList.contains('open') && !e.target.closest('.ux-topbar')) closeMenu();
     });
-    window.addEventListener('resize', function () { if (window.innerWidth > 1119) closeMenu(); });
+    window.addEventListener('resize', function () { if (window.innerWidth > 1360) closeMenu(); });
     setUser(session());
     window.addEventListener('storage', function (e) {
       if (e.key === AUTH_KEY || e.key === THEME_KEY) {

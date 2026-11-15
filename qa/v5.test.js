@@ -41,9 +41,9 @@ check('токен SSO и ссылки стираются из адресной �
 check('нет innerHTML в amoore-id.js (XSS)', !/innerHTML/.test(idCode));
 
 // ---- версии
-const v = '5.7.1';
-check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.7.1'/.test(read('amoore-ru/amoore-core.js')));
-check('версия в bot.py', /AMOORE_VERSION = "5.7.1"/.test(read('amoore-ai/bot.py')));
+const v = '5.8.0';
+check('AMOORE_VERSION в core', /var AMOORE_VERSION = '5.8.0'/.test(read('amoore-ru/amoore-core.js')));
+check('версия в bot.py', /AMOORE_VERSION = "5.8.0"/.test(read('amoore-ai/bot.py')));
 for (const d of ['amoore-dev', 'amoore-ru', 'amoore-studio', 'amoore-ai']) check(`changelog ${d}`, JSON.parse(read(`${d}/changelog.json`)).current === v);
 
 // ---- PWA
@@ -143,17 +143,17 @@ check('бот: ai_logic / db_bridge / tg_handlers + Google AI + upsert пуль�
 console.log(`v5: ${pass}/${pass + fail} проверок пройдено`);
 process.exit(fail ? 1 : 0);
 
-// ---- v5.7.1 GLOBAL POLISH
+// ---- v5.8.0 GLOBAL POLISH
 const sql7 = read('amoore-dev/shared/sql/007_v571_global_polish.sql');
-check('v5.7.1: activate_promocode выставляет amoore.bypass (фикс RLS)', /function public\.activate_promocode/.test(sql7) && /set_config\('amoore\.bypass', '1', true\);\s+-- баланс/.test(sql7));
-check('v5.7.1: потолок 100 баллов в БД (триггер)', /trg_promocodes_cap/.test(sql7) && /points > 100/.test(sql7));
-check('v5.7.1: admin_update/delete_promocode', /admin_update_promocode/.test(sql7) && /admin_delete_promocode/.test(sql7));
-check('v5.7.1: Режим Бога — RPC только для super_admin', /admin_adjust_points/.test(sql7) && /admin_edit_profile/.test(sql7) && /admin_set_rank_label/.test(sql7) && /_require_owner/.test(sql7));
-check('v5.7.1: клиент зовёт activate_promocode', /activate_promocode/.test(read('amoore-ru/amoore-id.js')));
-check('v5.7.1: godPanel в amoore-id.js и вызов на публичном профиле', /function godPanel/.test(read('amoore-ru/amoore-id.js')) && /godPanel/.test(read('amoore-ru/landing.js')));
-check('v5.7.1: ссылка Telegram — https://t.me/, без tg://', /https:\/\/t\.me\//.test(read('amoore-ru/landing.js')) && !/tg:\/\/user/.test(read('amoore-ru/landing.js')));
-check('v5.7.1: Dev-панели нет на публичной главной', !/Dev-панел/.test(read('amoore-ru/index.html')) && !/amoore-dev\.pages\.dev/.test(read('amoore-ru/index.html').split('<main')[1] || ''));
-check('v5.7.1: на странице Безопасность один блок смены пароля', (read('amoore-ru/amoore-id.js').match(/Смена пароля/g) || []).length === 1);
-check('v5.7.1: порядок настроек Внешний вид → Промокоды → Профиль', (() => { const h = read('amoore-dev/index.html'); return h.indexOf('id="set-appearance"') < h.indexOf('id="set-promo"') && h.indexOf('id="set-promo"') < h.indexOf('id="set-profile"'); })());
-check('v5.7.1: changelog — только крупные релизы (x.y.0)', /function isMajor/.test(read('amoore-ru/amoore-core.js')));
+check('v5.8.0: activate_promocode выставляет amoore.bypass (фикс RLS)', /function public\.activate_promocode/.test(sql7) && /set_config\('amoore\.bypass', '1', true\);\s+-- баланс/.test(sql7));
+check('v5.8.0: потолок 100 баллов в БД (триггер)', /trg_promocodes_cap/.test(sql7) && /points > 100/.test(sql7));
+check('v5.8.0: admin_update/delete_promocode', /admin_update_promocode/.test(sql7) && /admin_delete_promocode/.test(sql7));
+check('v5.8.0: Режим Бога — RPC только для super_admin', /admin_adjust_points/.test(sql7) && /admin_edit_profile/.test(sql7) && /admin_set_rank_label/.test(sql7) && /_require_owner/.test(sql7));
+check('v5.8.0: клиент зовёт activate_promocode', /activate_promocode/.test(read('amoore-ru/amoore-id.js')));
+check('v5.8.0: godPanel в amoore-id.js и вызов на публичном профиле', /function godPanel/.test(read('amoore-ru/amoore-id.js')) && /godPanel/.test(read('amoore-ru/landing.js')));
+check('v5.8.0: ссылка Telegram — https://t.me/, без tg://', /https:\/\/t\.me\//.test(read('amoore-ru/landing.js')) && !/tg:\/\/user/.test(read('amoore-ru/landing.js')));
+check('v5.8.0: Dev-панели нет на публичной главной', !/Dev-панел/.test(read('amoore-ru/index.html')) && !/amoore-dev\.pages\.dev/.test(read('amoore-ru/index.html').split('<main')[1] || ''));
+check('v5.8.0: на странице Безопасность один блок смены пароля', (read('amoore-ru/amoore-id.js').match(/Смена пароля/g) || []).length === 1);
+check('v5.8.0: порядок настроек Внешний вид → Промокоды → Профиль', (() => { const h = read('amoore-dev/index.html'); return h.indexOf('id="set-appearance"') < h.indexOf('id="set-promo"') && h.indexOf('id="set-promo"') < h.indexOf('id="set-profile"'); })());
+check('v5.8.0: changelog — только крупные релизы (x.y.0)', /function isMajor/.test(read('amoore-ru/amoore-core.js')));
 

@@ -1,5 +1,5 @@
 /**
- * amoore-id.js — v5.7.1 «SMART AUTH & PRE-RUST» · amoore id (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
+ * amoore-id.js — v5.8.0 «SMART AUTH & PRE-RUST» · amoore id (единый аккаунт). Побайтно одинаков во всех трёх сайтах.
  * Подключение (после supabase-js):  <script src="amoore-id.js"></script>
  *   amooreID.init({ site: 'dev'|'studio'|'landing', sb: <существующий клиент, необязательно> })
  * API: signIn(email,pw) · sendCode(email, create)/verifyCode (вход ТОЛЬКО по 6-значному коду из письма) · consumeUrl() (SSO) · ensureOnboarded()
@@ -664,7 +664,7 @@
   }
 
 
-  // ---- v5.7.1 «Режим Бога»: «Действия администратора» внизу любого профиля. Видно только Основателю; права проверяет БД (RPC admin_*).
+  // ---- v5.8.0 «Режим Бога»: «Действия администратора» внизу любого профиля. Видно только Основателю; права проверяет БД (RPC admin_*).
   function godPanel(username, onChange) {
     var box = el('details', { class: 'god-box', id: 'god-box' }, [el('summary', { text: 'Действия администратора' })]);
     var msg = el('div', { class: 'aid-err', role: 'status' }), info = null, loaded = false;
