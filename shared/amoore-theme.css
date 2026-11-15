@@ -13,9 +13,9 @@
   --nx-gold: #D4AF37;
   --nx-gold-soft: #E8C96A;
   --nx-gold-rgb: 212, 175, 55;
-  --nx-purple: #2B1B3D;
-  --nx-purple-deep: #1E1230;
-  --nx-purple-hover: #3A2552;
+  --nx-purple: #1A1A1A;
+  --nx-purple-deep: #111111;
+  --nx-purple-hover: #2A2A2A;
   --nx-ink: #FFFFFF;
   --nx-muted: #A0A0A8;
   --nx-dim: #6B6B75;
@@ -33,8 +33,8 @@
   /* — кнопки (тёмно-фиолетовые пилюли) — */
   --nx-btn-radius: 999px;
   --nx-btn-font: "Manrope", "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --nx-btn-bg: var(--nx-purple);
-  --nx-btn-bg-hover: var(--nx-purple-hover);
+  --nx-btn-bg: #1A1A1A;
+  --nx-btn-bg-hover: #2A2A2A;
   --nx-btn-gradient: linear-gradient(135deg, #E8C96A 0%, #D4AF37 55%, #B8932A 100%);
 
   /* — шрифты — */
@@ -889,4 +889,485 @@ html body .spa-view { animation: none !important; }
     -webkit-backdrop-filter: blur(12px) saturate(1.2) !important;
     backdrop-filter: blur(12px) saturate(1.2) !important;
   }
+}
+
+
+/* ===== AURUM buttons — NO purple, gold premium ===== */
+.btn, .btn-primary, .nx-btn, .aid-btn, button.btn {
+  background: #141414 !important;
+  color: #fff !important;
+  border: 1px solid rgba(212, 175, 55, 0.45) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25) !important;
+  font-weight: 700 !important;
+}
+.btn:hover:not(:disabled), .btn-primary:hover:not(:disabled), .nx-btn:hover:not(:disabled), .aid-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #E8C96A 0%, #D4AF37 55%, #B8932A 100%) !important;
+  color: #0A0A0A !important;
+  border-color: transparent !important;
+}
+.btn-ghost, .aid-btn.aid-ghost {
+  background: transparent !important;
+  color: var(--nx-ink) !important;
+  border: 1px solid rgba(212, 175, 55, 0.35) !important;
+  box-shadow: none !important;
+}
+.btn-ghost:hover:not(:disabled), .aid-btn.aid-ghost:hover:not(:disabled) {
+  border-color: #D4AF37 !important;
+  color: #D4AF37 !important;
+  background: rgba(212, 175, 55, 0.08) !important;
+}
+/* Gold primary CTA */
+.btn-gold, .cta .btn, #chat-send, .version-btn, [type="submit"].btn {
+  background: linear-gradient(135deg, #E8C96A 0%, #D4AF37 55%, #B8932A 100%) !important;
+  color: #0A0A0A !important;
+  border: none !important;
+}
+.btn-gold:hover, .cta .btn:hover, #chat-send:hover {
+  filter: brightness(1.06);
+}
+
+/* Text contrast — never blend */
+body, .spa, .section, .hero-lead, p, li {
+  color: var(--nx-ink);
+}
+.muted, .section-lead, .hero-lead, .aid-hint, .god-note {
+  color: var(--nx-muted) !important;
+  opacity: 1 !important;
+}
+h1, h2, h3, h4 { color: var(--nx-ink); font-weight: 800; letter-spacing: -0.02em; }
+
+/* Kill vibe-coder float animations on cards */
+.bento-tile, .eco-card, .glass-card, .cmd-card, .news-item {
+  transform: none !important;
+  animation: none !important;
+}
+@media (hover: hover) {
+  .bento-tile:hover, .eco-card:hover, .glass-card:hover {
+    transform: translateY(-2px) !important;
+  }
+}
+
+/* ===== FULL RESPONSIVE — all devices ===== */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+img, svg, video { max-width: 100%; height: auto; }
+.spa, main, .section, .hero, .bento, .eco-grid {
+  width: 100%;
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+.bento {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.bento-tile {
+  min-width: 0;
+  overflow: hidden;
+  word-break: break-word;
+}
+.eco-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+/* Tablet */
+@media (max-width: 1024px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px; }
+  .eco-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Mobile */
+@media (max-width: 640px) {
+  .bento, .eco-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 12px; }
+  .hero-eco-head h1 { font-size: 26px !important; line-height: 1.2; }
+  .hero-lead { font-size: 15px; }
+  .section { padding-top: 32px; padding-bottom: 32px; }
+  .ux-topbar .ux-nav { display: none; } /* burger handles it */
+  /* profile cards full width */
+  .user-card, .aid-card, .god-box { width: 100% !important; max-width: 100% !important; }
+  /* follows list: stack */
+  .follow-row, .people-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+  .follow-row .avatar, .people-row .avatar { flex: 0 0 44px; }
+  /* forms full width */
+  input, textarea, select, .btn, .aid-btn {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  .god-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .god-row input, .god-row .aid-btn { width: 100% !important; flex: 1 1 auto !important; }
+}
+/* Very small */
+@media (max-width: 360px) {
+  .hero-eco-head h1 { font-size: 22px !important; }
+  .bento-tile { padding: 16px; }
+  .ux-chip, .nx-version-chip { font-size: 11px; padding: 0 8px; }
+}
+/* Landscape phone */
+@media (max-height: 480px) and (orientation: landscape) {
+  .hero { min-height: auto; padding-top: 24px; padding-bottom: 16px; }
+  .page-loader { display: none !important; }
+}
+/* Prevent horizontal scroll everywhere */
+html, body { overflow-x: hidden; max-width: 100vw; }
+.spa-view, .section, .hero, .ux-topbar, .ux-panel {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+/* FAQ / cmd cards — no huge empty right gap */
+.cmd-grid, .faq-list, .feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+  width: 100%;
+}
+/* Profile public card */
+.user-card, .public-profile {
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+.user-card .avatar, .public-profile .avatar {
+  width: 72px; height: 72px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+}
+
+/* God Mode premium */
+.god-box {
+  background: #121212 !important;
+  border: 1px solid rgba(212,175,55,.4) !important;
+  border-radius: 20px !important;
+  padding: 16px !important;
+  color: #fff !important;
+}
+.god-box > summary { color: #D4AF37 !important; font-weight: 800; }
+.god-box .aid-big { color: #D4AF37 !important; }
+.god-box input {
+  background: #0A0A0A !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  color: #fff !important;
+  border-radius: 12px !important;
+  height: 40px;
+  padding: 0 12px;
+}
+.god-box .aid-btn {
+  min-height: 40px;
+}
+
+/* Light theme text never grey-on-grey */
+:root[data-theme="light"] .muted,
+:root[data-theme="light"] .section-lead,
+:root[data-theme="light"] .hero-lead {
+  color: #5C5C66 !important;
+}
+:root[data-theme="light"] h1,
+:root[data-theme="light"] h2,
+:root[data-theme="light"] h3 {
+  color: #0A0A0A !important;
+}
+
+
+/* Follows / people rows — compact single column */
+.aid-person, a.aid-person {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 12px 14px !important;
+  margin: 0 0 8px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(212,175,55,.2) !important;
+  text-decoration: none !important;
+  color: inherit !important;
+  background: rgba(255,255,255,.03);
+}
+.aid-person .aid-av, .aid-person img, .aid-person span:first-child {
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+}
+.aid-person span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.aid-person b { font-size: 14px; font-weight: 700; }
+.aid-person small { font-size: 12px; opacity: .7; }
+.aid-results, .aid-people { width: 100%; }
+.aid-search { width: 100%; box-sizing: border-box; margin-bottom: 12px; }
+
+/* Changelog modal responsive */
+.nx-cl-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgba(0,0,0,.65);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+}
+.nx-cl-overlay.open { opacity: 1; pointer-events: auto; }
+.nx-cl-overlay > .nx-cl-card {
+  width: min(560px, 100%);
+  max-height: min(80vh, 720px);
+  overflow: auto;
+  padding: 20px;
+  border-radius: 20px;
+  background: #121212;
+  border: 1px solid rgba(212,175,55,.35);
+  color: #fff;
+  position: relative;
+}
+.nx-cl-close {
+  position: absolute; top: 12px; right: 12px;
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.15);
+  background: transparent; color: #fff; font-size: 20px; cursor: pointer;
+}
+.nx-cl-body { margin-top: 8px; }
+html.nx-cl-open, html.nx-cl-open body { overflow: hidden; }
+
+/* Version chip clickable */
+.nx-version-chip, #nx-version-chip, #version-btn, .version-btn {
+  cursor: pointer !important;
+}
+
+
+
+/* =====================================================================
+   AURUM CSS GRID SYSTEM — единая адаптивная сетка (8/16)
+   Принципы:
+   - minmax(0, 1fr) — колонки не раздувают контейнер
+   - auto-fit + minmax(min(100%, Xpx), 1fr) — плавный респонс без «дыр»
+   - gap кратен 8px
+   - align-items: stretch — равная высота карточек в ряду
+   ===================================================================== */
+
+/* Контейнер страницы */
+.spa,
+.spa-view,
+main.spa,
+.page-wrap {
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+
+/* ---- Bento (4 продукта) ---- */
+.bento {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  padding-inline: 0;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+.bento-tile {
+  display: grid !important;
+  grid-template-rows: auto auto 1fr;
+  gap: 8px;
+  min-width: 0;          /* критично: не даёт тексту раздуть колонку */
+  min-height: 160px;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+  align-content: start;
+}
+.bento-tile h3,
+.bento-tile p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
+/* ---- Eco / feature / cmd / FAQ grids ---- */
+.eco-grid,
+.feat-grid,
+.feature-grid,
+.cmd-grid,
+.faq-list,
+.digest-tiles,
+.stats-row {
+  display: grid !important;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+.eco-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.feat-grid,
+.feature-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.cmd-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+.faq-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.digest-tiles,
+.stats-row {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+}
+
+/* Карточки внутри сеток — не вылезают */
+.eco-card,
+.feat-card,
+.cmd-card,
+.glass-card,
+.admin-card,
+.site-card,
+.news-item {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Hero: центрированная колонка ---- */
+.hero-eco {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  justify-items: center;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding-block: 32px 24px;
+}
+.hero-eco-head {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  max-width: 640px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---- Профиль / public user card ---- */
+.user-card,
+.public-profile,
+.aid-card {
+  display: grid;
+  gap: 16px;
+  width: min(480px, 100%);
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+.user-head,
+.profile-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: end;
+}
+.user-head .avatar,
+.profile-head .avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* ---- God Mode ---- */
+.god-box .god-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.god-box .god-row:has(input:only-child),
+.god-box .god-row.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ---- Admin digest / settings ---- */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.digest-cols,
+.admin-three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* ---- Breakpoints ---- */
+@media (max-width: 1100px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .eco-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .digest-cols,
+  .admin-three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px; }
+  .eco-grid,
+  .feat-grid,
+  .feature-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .digest-cols,
+  .admin-three { grid-template-columns: minmax(0, 1fr); }
+  .god-box .god-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .god-box .god-row .aid-btn { width: 100%; }
+  .user-head,
+  .profile-head {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+@media (max-width: 520px) {
+  .bento { grid-template-columns: minmax(0, 1fr) !important; }
+  .bento-tile { min-height: 0; padding: 16px; }
+  .cmd-grid { grid-template-columns: minmax(0, 1fr); }
+  .stats-row,
+  .digest-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 360px) {
+  .stats-row,
+  .digest-tiles { grid-template-columns: minmax(0, 1fr); }
+  .spa, .spa-view, main.spa {
+    padding-inline: max(12px, env(safe-area-inset-left, 0px)) max(12px, env(safe-area-inset-right, 0px));
+  }
+}
+
+/* Защита от горизонтального скролла из-за grid-детей */
+.bento > *,
+.eco-grid > *,
+.cmd-grid > *,
+.feat-grid > *,
+.digest-cols > * {
+  min-width: 0;
+  max-width: 100%;
 }

@@ -825,6 +825,7 @@
     // keep simple era timeline using same cards
     paintUpdates(box, list, current);
   }
+
   function renderChangelog(box, list) {
     box.textContent = '';
     if (!list.length) { var e = el('p', 'nx-cl-empty'); e.textContent = 'История пока пуста.'; box.appendChild(e); return; }
@@ -841,17 +842,72 @@
     });
     box.appendChild(tabs); box.appendChild(body); paintUpdates(body, list, current);
   }
-  document.addEventListener('amoore:changelog', openChangelog);
-    if (document.getElementById('nx-version-chip') || document.getElementById('version-chip')) return;
-    var brand = document.querySelector('[data-amoore-brand], .brand, .topbar-brand');
-    if (!brand || !brand.parentNode) return;
-    var chip = el('button', 'nx-version-chip');
-    chip.type = 'button'; chip.id = 'nx-version-chip';
-    chip.setAttribute('aria-haspopup', 'dialog'); chip.setAttribute('aria-label', 'История обновлений');
-    chip.textContent = 'v' + (window.amooreUX ? window.amooreUX.shortVer(AMOORE_VERSION) : AMOORE_VERSION);
-    chip.addEventListener('click', openChangelog);
-    brand.parentNode.insertBefore(chip, brand.nextSibling);
+
+  var clLastFocus = null;
+  async function openChangelog() {
+    try {
+      clLastFocus = document.activeElement;
+      var ov = document.getElementById('nx-changelog');
+      if (!ov) {
+        ov = el('div', 'nx-cl-overlay',
+          '<div class="nx-cl-card" role="dialog" aria-modal="true" aria-labelledby="nx-cl-title">' +
+          '<button type="button" class="nx-cl-close" aria-label="Закрыть">×</button>' +
+          '<h2 id="nx-cl-title">История обновлений</h2><div class="nx-cl-body"><p class="nx-cl-empty">Загрузка…</p></div></div>');
+        ov.id = 'nx-changelog';
+        function shut() {
+          ov.classList.remove('open');
+          document.documentElement.classList.remove('nx-cl-open');
+          if (clLastFocus && clLastFocus.focus) { try { clLastFocus.focus(); } catch (e) {} }
+        }
+        ov.addEventListener('click', function (e) { if (e.target === ov) shut(); });
+        ov.querySelector('.nx-cl-close').addEventListener('click', shut);
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && ov.classList.contains('open')) shut();
+        });
+        document.body.appendChild(ov);
+      }
+      ov.classList.add('open');
+      document.documentElement.classList.add('nx-cl-open');
+      var btn = ov.querySelector('.nx-cl-close'); if (btn) btn.focus();
+      renderChangelog(ov.querySelector('.nx-cl-body'), await loadChangelogList());
+    } catch (err) {
+      console.error('changelog', err);
+      try { alert('Не удалось открыть историю обновлений'); } catch (e) {}
+    }
   }
+
+  function bindChangelogTriggers() {
+    document.addEventListener('amoore:changelog', openChangelog);
+    // chip near logo
+    var chips = document.querySelectorAll('#nx-version-chip, #version-chip, .nx-version-chip, [data-ux-chip]');
+    Array.prototype.forEach.call(chips, function (chip) {
+      if (chip.__clBound) return;
+      chip.__clBound = true;
+      chip.addEventListener('click', function (e) { e.preventDefault(); openChangelog(); });
+    });
+    // footer version button
+    var footerBtn = document.getElementById('version-btn');
+    if (footerBtn && !footerBtn.__clBound) {
+      footerBtn.__clBound = true;
+      footerBtn.addEventListener('click', function (e) { e.preventDefault(); openChangelog(); });
+    }
+    // inject chip if missing
+    if (!document.getElementById('nx-version-chip') && !document.getElementById('version-chip')) {
+      var brand = document.querySelector('[data-amoore-brand], .brand, .topbar-brand, .ux-brand');
+      if (brand && brand.parentNode) {
+        var chip = el('button', 'nx-version-chip');
+        chip.type = 'button'; chip.id = 'nx-version-chip';
+        chip.setAttribute('aria-haspopup', 'dialog');
+        chip.setAttribute('aria-label', 'История обновлений');
+        chip.textContent = 'v' + AMOORE_VERSION;
+        chip.addEventListener('click', openChangelog);
+        brand.parentNode.insertBefore(chip, brand.nextSibling);
+      }
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindChangelogTriggers);
+  else bindChangelogTriggers();
+
 
   // ------------------------------------------------------------------ analytics
   function trackVisit() {
