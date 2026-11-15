@@ -38,7 +38,7 @@
 
 /* ---------- Тёмная тема (по умолчанию): плотное тёмное стекло без белых пятен ---------- */
 :root:not([data-theme="light"]) { color-scheme: dark; }
-:root:not([data-theme="light"]), :root:not([data-theme="light"]) body { background-color: #070b16; color: #eef0f7; }
+:root:not([data-theme="light"]), :root:not([data-theme="light"]) body { background-color: #0A0A0A; color: #eef0f7; }
 :root:not([data-theme="light"]) .glass,
 :root:not([data-theme="light"]) .site-card,
 :root:not([data-theme="light"]) .widget,
@@ -60,7 +60,7 @@
   background-color: rgba(255, 255, 255, 0.05) !important; color: #eef0f7 !important; border: 1px solid rgba(212, 175, 55, 0.25) !important;
 }
 :root:not([data-theme="light"]) input::placeholder, :root:not([data-theme="light"]) textarea::placeholder { color: #8b90a5; }
-:root:not([data-theme="light"]) input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px #0d1220 inset !important; -webkit-text-fill-color: #eef0f7 !important; }
+:root:not([data-theme="light"]) input:-webkit-autofill { -webkit-box-shadow: 0 0 0 40px #121212 inset !important; -webkit-text-fill-color: #eef0f7 !important; }
 table, th, td { background-color: transparent; }
 
 /* золотые кнопки (обе темы) */
@@ -172,7 +172,7 @@ table, th, td { background-color: transparent; }
 .logs-modal-scroll { overflow: auto; min-height: 0; border: 1px solid var(--border); border-radius: 12px; -webkit-overflow-scrolling: touch; }
 .logs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .logs-table th, .logs-table td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
-.logs-table th { position: sticky; top: 0; background: var(--surface, #0d1220); z-index: 1; font-size: 12px; white-space: nowrap; }
+.logs-table th { position: sticky; top: 0; background: var(--surface, #121212); z-index: 1; font-size: 12px; white-space: nowrap; }
 .logs-table td.nowrap { white-space: nowrap; }
 .logs-table td.msg { overflow-wrap: anywhere; min-width: 220px; }
 .lvl-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 700 11px/1.4 inherit; background: rgba(125,206,160,.18); color: #7dcea0; }
@@ -203,7 +203,7 @@ table, th, td { background-color: transparent; }
 .promo-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; } .promo-main b { overflow: hidden; text-overflow: ellipsis; } .promo-main small { font-size: 12px; opacity: .7; }
 .promo-row .btn { flex: 0 0 auto; white-space: nowrap; }
 
-/* ===== v5.8.0: промокоды (правка/удаление) и компактные кнопки ===== */
+/* ===== v5.9.0: промокоды (правка/удаление) и компактные кнопки ===== */
 .promo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
 .promo-main { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
 .promo-actions { display: flex; flex-wrap: wrap; gap: 6px; }

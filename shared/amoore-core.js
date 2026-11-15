@@ -1,5 +1,5 @@
 /**
- * amoore-core.js — v5.8.0 «SMART AUTH & PRE-RUST»
+ * amoore-core.js — v5.9.0 «SMART AUTH & PRE-RUST»
  * Единая версия экосистемы: window.AMOORE_VERSION (см. константу ниже). Файл ОБЯЗАН быть
  * побайтно одинаковым в amoore-ru, amoore-studio и amoore-dev/shared (проверяет run_qa.sh).
  *
@@ -20,7 +20,7 @@
   // Глобальная версия экосистемы: админка, лендинг и студия сверяются по ней.
   // Версия из кода — ФОЛЛБЭК. Живая версия тянется из БД (global_settings.changelog, последняя запись):
   // так версиями управляют из админки, не трогая код. База недоступна → остаётся v4.0.0.
-  var AMOORE_VERSION = '5.8.0';
+  var AMOORE_VERSION = '5.9.0';
   window.AMOORE_VERSION = AMOORE_VERSION;
   var DEV_URL = 'https://amoore-dev.pages.dev/';
   var STUDIO_URL = 'https://amoore-studio.pages.dev/';
@@ -725,12 +725,12 @@
       var extra = local.filter(function (v) { return v && v.version && !have[v.version]; });
       list = sortVersions((list || []).concat(extra));
     }
-    changelogList = list && list.length ? list : [{ version: '5.8.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
+    changelogList = list && list.length ? list : [{ version: '5.9.0', title: 'TITAN', items: ['Мобильные фиксы, вход, пульс бота, Changelog 2.0.'] }];
     applyVersion(changelogList[0].version);
     return changelogList;
   }
   // ---- Changelog 2.0 (v5.4): вкладки «Обновления» (с подверсиями) и «Эры»; старые версии сверху
-  // v5.8.0: только крупные релизы (x.y.0). Подверсии (5.4.1, 5.5.1, 5.8.0) остаются в данных, но не показываются.
+  // v5.9.0: только крупные релизы (x.y.0). Подверсии (5.4.1, 5.5.1, 5.9.0) остаются в данных, но не показываются.
   var ERAS = [
     { id: 'I', title: 'Эра I: Истоки', range: 'v1–v5.3', min: 0, max: 5.03 },
     { id: 'II', title: 'Эра II: Синтез', range: 'v5.4 и далее', min: 5.04, max: 99 }
@@ -739,78 +739,109 @@
   function isMajor(v) { var k = verKey(v.version); return !k[2]; }
   function majorLabel(v) { var k = verKey(v.version); return 'v' + k[0] + '.' + k[1]; }
   function eraScore(v) { var k = verKey(v.version); return k[0] + k[1] / 100; }
-  function majorsOnly(list) { return asc(list).filter(isMajor); }
-  function cardNode(v, cls) {
+  function isMajor(v) {
+    var k = verKey(v.version);
+    // major = x.y.0 (patch 0) OR explicit x.y without patch
+    return !k[2] || k[2] === 0;
+  }
+  function majorKey(v) {
+    var k = verKey(v.version);
+    return k[0] + '.' + k[1];
+  }
+  function majorLabel(v) { return 'v' + majorKey(v); }
+  function asc(list) { return (list || []).slice().sort(function (a, b) { return verCmp(a.version, b.version); }); }
+  function desc(list) { return (list || []).slice().sort(function (a, b) { return -verCmp(a.version, b.version); }); }
+  function groupByMajor(list) {
+    var map = {}, order = [];
+    desc(list).forEach(function (v) {
+      var key = majorKey(v);
+      if (!map[key]) { map[key] = []; order.push(key); }
+      map[key].push(v);
+    });
+    return order.map(function (key) {
+      var group = map[key];
+      // pick representative: prefer exact x.y.0, else highest
+      var major = group.find(function (v) { var k = verKey(v.version); return !k[2]; }) || group[0];
+      var subs = asc(group.filter(function (v) { return v !== major; }));
+      // if only patches exist, major is the highest and subs are the rest sorted old→new
+      if (!group.find(function (v) { var k = verKey(v.version); return !k[2]; })) {
+        major = desc(group)[0];
+        subs = asc(group.filter(function (v) { return v.version !== major.version; }));
+      }
+      return { key: key, major: major, subs: subs };
+    });
+  }
+  function badgeFor(v, current) {
+    var ver = String(v.version || '');
+    if (ver.indexOf('6.0') === 0 || (v.title && /скоро|soon|vitesite/i.test(v.title))) {
+      var b = document.createElement('span'); b.className = 'nx-cl-badge soon'; b.textContent = 'Скоро'; return b;
+    }
+    if (current && ver === String(current)) {
+      var b2 = document.createElement('span'); b2.className = 'nx-cl-badge new'; b2.textContent = 'NEW'; return b2;
+    }
+    return null;
+  }
+  function cardNode(v, cls, current, showDate) {
     var card = el('article', cls || 'nx-cl-card');
     var h = document.createElement('h3');
     h.appendChild(document.createTextNode(majorLabel(v)));
     if (v.title) { var sm = document.createElement('small'); sm.textContent = v.title; h.appendChild(sm); }
-    if (v.date) { var dt = document.createElement('time'); dt.textContent = String(v.date).split('-').reverse().join('.'); h.appendChild(dt); }
+    var badge = badgeFor(v, current);
+    if (badge) h.appendChild(badge);
+    if (showDate && v.date) {
+      var dt = document.createElement('time');
+      dt.textContent = String(v.date).split('-').reverse().join('.');
+      h.appendChild(dt);
+    }
     card.appendChild(h);
     var ul = document.createElement('ul');
     (v.items || []).forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
     card.appendChild(ul);
     return card;
   }
-  function paintUpdates(box, list) {
-    var rows = majorsOnly(list).reverse();                      // свежие сверху
+  function paintUpdates(box, list, current) {
+    var groups = groupByMajor(list);
     var wrap = el('div', 'nx-cl-cards');
-    rows.forEach(function (v) { wrap.appendChild(cardNode(v)); });
+    groups.forEach(function (g) {
+      var card = cardNode(g.major, 'nx-cl-card', current, false);
+      if (g.subs.length) {
+        var details = document.createElement('details');
+        details.className = 'nx-cl-subs';
+        var sum = document.createElement('summary');
+        sum.textContent = '▼ Подверсии (' + g.subs.length + ')';
+        details.appendChild(sum);
+        var subWrap = el('div', 'nx-cl-sublist');
+        g.subs.forEach(function (sv) {
+          subWrap.appendChild(cardNode(sv, 'nx-cl-nodecard', current, true));
+        });
+        details.appendChild(subWrap);
+        card.appendChild(details);
+      }
+      wrap.appendChild(card);
+    });
     box.appendChild(wrap);
   }
-  function paintEras(box, list) {
-    var all = majorsOnly(list);
-    ERAS.slice().reverse().forEach(function (era) {
-      var inEra = all.filter(function (v) { var s = eraScore(v); return s >= era.min && s <= era.max; }).reverse();
-      var sec = el('section', 'nx-cl-era');
-      var h = document.createElement('h3'); h.textContent = era.title; var sm = document.createElement('small'); sm.textContent = era.range; h.appendChild(sm); sec.appendChild(h);
-      if (!inEra.length) { var p = document.createElement('p'); p.className = 'nx-cl-empty'; p.textContent = 'Скоро.'; sec.appendChild(p); }
-      else {
-        var tl = el('ol', 'nx-cl-timeline');
-        inEra.forEach(function (v) { var li = el('li', 'nx-cl-node'); li.appendChild(cardNode(v, 'nx-cl-nodecard')); tl.appendChild(li); });
-        sec.appendChild(tl);
-      }
-      box.appendChild(sec);
-    });
+  function paintEras(box, list, current) {
+    // keep simple era timeline using same cards
+    paintUpdates(box, list, current);
   }
   function renderChangelog(box, list) {
     box.textContent = '';
     if (!list.length) { var e = el('p', 'nx-cl-empty'); e.textContent = 'История пока пуста.'; box.appendChild(e); return; }
+    var current = (list[0] && list[0].version) || '';
     var tabs = el('div', 'nx-cl-tabs'), body = el('div', 'nx-cl-pane');
     tabs.setAttribute('role', 'tablist');
     [['updates', 'Обновления'], ['eras', 'Эры']].forEach(function (t, i) {
       var b = el('button', 'nx-cl-tab' + (i === 0 ? ' on' : '')); b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = t[1];
       b.addEventListener('click', function () {
         Array.prototype.forEach.call(tabs.children, function (x) { x.classList.remove('on'); }); b.classList.add('on');
-        body.textContent = ''; (t[0] === 'eras' ? paintEras : paintUpdates)(body, list);
+        body.textContent = ''; (t[0] === 'eras' ? paintEras : paintUpdates)(body, list, current);
       });
       tabs.appendChild(b);
     });
-    box.appendChild(tabs); box.appendChild(body); paintUpdates(body, list);
+    box.appendChild(tabs); box.appendChild(body); paintUpdates(body, list, current);
   }
-  var clLastFocus = null;
-  async function openChangelog() {
-    var ov = document.getElementById('nx-changelog');
-    if (!ov) {
-      ov = el('div', 'nx-cl-overlay',
-        '<div class="nx-cl-card" role="dialog" aria-modal="true" aria-labelledby="nx-cl-title">' +
-        '<button type="button" class="nx-cl-close" aria-label="Закрыть">×</button>' +
-        '<h2 id="nx-cl-title">История обновлений</h2><div class="nx-cl-body"><p class="nx-cl-empty">Загрузка…</p></div></div>');
-      ov.id = 'nx-changelog';
-      function shut() { ov.classList.remove('open'); document.documentElement.classList.remove('nx-cl-open'); if (clLastFocus && clLastFocus.focus) { try { clLastFocus.focus(); } catch (e) {} } }
-      ov.addEventListener('click', function (e) { if (e.target === ov) shut(); });
-      ov.querySelector('.nx-cl-close').addEventListener('click', shut);
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov.classList.contains('open')) shut(); });
-      document.body.appendChild(ov);
-    }
-    clLastFocus = document.activeElement;
-    ov.classList.add('open');
-    document.documentElement.classList.add('nx-cl-open');
-    var btn = ov.querySelector('.nx-cl-close'); if (btn) btn.focus();
-    renderChangelog(ov.querySelector('.nx-cl-body'), await loadChangelogList());
-  }
-  function mountVersionChip() {
-    document.addEventListener('amoore:changelog', openChangelog);
+  document.addEventListener('amoore:changelog', openChangelog);
     if (document.getElementById('nx-version-chip') || document.getElementById('version-chip')) return;
     var brand = document.querySelector('[data-amoore-brand], .brand, .topbar-brand');
     if (!brand || !brand.parentNode) return;

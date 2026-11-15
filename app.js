@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '5.8.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '5.9.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -102,7 +102,7 @@ function fmtDateTime(iso, short) {
     ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }
     : { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
-// v5.8.0: supabase-js на любой не-2xx ответ Edge Function пишет «Edge Function returned a non-2xx status code» — достаём настоящий текст из тела ответа
+// v5.9.0: supabase-js на любой не-2xx ответ Edge Function пишет «Edge Function returned a non-2xx status code» — достаём настоящий текст из тела ответа
 async function fnError(error) {
   try { const c = error && error.context; if (c && typeof c.json === 'function') { const b = await c.clone().json(); if (b && (b.error || b.message)) return String(b.error || b.message); } } catch (_) {}
   const m = String(error?.message || error || '');
@@ -1515,7 +1515,7 @@ $('cl-save').addEventListener('click', async () => {
   const list = readClEditor().filter(v => v.version).map((v, i) => ({ ...v, order: i }));   // порядок — как расставлен перетаскиванием
   if (!list.length) return toast('Добавьте хотя бы одну версию', 'error');
   if (new Set(list.map(v => v.version)).size !== list.length) return toast('Версии не должны повторяться', 'error');
-  if (list.some(v => !/^\d+\.\d+\.\d+$/.test(v.version))) return toast('Версия — в формате 5.3.0', 'error');
+  if (list.some(v => !/^\d+\.\d+(\.\d+)?$/.test(String(v.version||'')))) return toast('Версия — формат X.Y или X.Y.Z', 'error');
   const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: list[0].version, versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return toast(friendlyError(error), 'error');
   wnList = list; liveVersion = String(list[0].version); paintVersionChip();
