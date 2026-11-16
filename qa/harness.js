@@ -21,9 +21,12 @@ function serve(root, port) {
 
 /* Открывает страницу с подменённым Supabase. seed — начальные таблицы, opts.admin — запись админа. */
 async function openPage(browser, url, seed, opts = {}) {
-  const ctx = await browser.newContext({ viewport: opts.viewport || { width: 1280, height: 800 }, deviceScaleFactor: opts.dpr || 1,
+  const ctx = await browser.newContext({ viewport: opts.viewport || { width: 1440, height: 900 }, deviceScaleFactor: opts.dpr || 1,
     isMobile: !!opts.mobile, hasTouch: !!opts.mobile, acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'], reducedMotion: opts.reducedMotion || 'no-preference' });
   const page = await ctx.newPage();
+  // v5.7.2: тест может закрыть страницу, пока мок-роут ещё отвечает — это не ошибка приложения (раньше падал весь прогон: TargetClosedError)
+  const _route = page.route.bind(page);
+  page.route = (u, h, o) => _route(u, async (r, q) => { try { await h(r, q); } catch (e) { if (!/closed|Target page|disposed|Route is already handled/i.test(String((e && e.message) || e))) throw e; } }, o);
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_FAILED|net::/.test(m.text())) errors.push('console: ' + m.text()); });

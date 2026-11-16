@@ -28,35 +28,49 @@
     try { if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light'; } catch (e) {}
     return 'dark';
   }
-  function readTheme() {
+  // три режима: 'light' | 'dark' | 'system' (нет записи = «системная»). data-theme всегда light|dark (итог), data-theme-pref — выбор человека
+  function themePref() {
     var t = lsGet(THEME_KEY) || lsGet(LEGACY_THEME_KEY);
-    return t === 'light' || t === 'dark' ? t : systemTheme();
+    return t === 'light' || t === 'dark' ? t : 'system';
   }
+  function readTheme() { var p = themePref(); return p === 'system' ? systemTheme() : p; }
+  var THEME_LABEL = { system: 'Тема: системная', light: 'Тема: светлая', dark: 'Тема: тёмная' };
+  var AUTO_ICO = '<svg class="ux-ico-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
   function paintTheme(t) {
     root.setAttribute('data-theme', t);
+    root.setAttribute('data-theme-pref', themePref());
     root.style.colorScheme = t;
     var metas = document.querySelectorAll('meta[name="theme-color"]');
     for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', BAR_COLOR[t]);
     var btns = document.querySelectorAll('[data-ux-theme]');
     for (var j = 0; j < btns.length; j++) {
-      btns[j].setAttribute('aria-label', t === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему');
+      if (!btns[j].querySelector('.ux-ico-auto')) btns[j].insertAdjacentHTML('beforeend', AUTO_ICO);
+      var pref = themePref(), nextName = pref === 'system' ? 'светлая' : pref === 'light' ? 'тёмная' : 'системная';
+      btns[j].setAttribute('aria-label', THEME_LABEL[pref] + '. Нажмите — ' + nextName);
+      btns[j].setAttribute('title', THEME_LABEL[pref]);
       btns[j].setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
     }
   }
-  function setTheme(t) {
-    t = t === 'light' ? 'light' : 'dark';
-    lsSet(THEME_KEY, t);
+  function setTheme(p) {
+    p = p === 'light' || p === 'dark' ? p : 'system';
+    if (p === 'system') { try { localStorage.removeItem(THEME_KEY); localStorage.removeItem(LEGACY_THEME_KEY); } catch (e) {} } else lsSet(THEME_KEY, p);
+    var t = readTheme();
     paintTheme(t);
-    try { document.dispatchEvent(new CustomEvent('amoore:theme', { detail: { theme: t } })); } catch (e) {}
+    try { document.dispatchEvent(new CustomEvent('amoore:theme', { detail: { theme: t, pref: p } })); } catch (e) {}
     return t;
   }
   function getTheme() { return root.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
-  function toggleTheme() { return setTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
+  function toggleTheme() { var p = themePref(); return setTheme(p === 'system' ? 'light' : p === 'light' ? 'dark' : 'system'); }
+  try {   // «системная» тема следует за ОС «на лету»
+    var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)');
+    var onMq = function () { if (themePref() === 'system') paintTheme(readTheme()); };
+    if (mq) { if (mq.addEventListener) mq.addEventListener('change', onMq); else if (mq.addListener) mq.addListener(onMq); }
+  } catch (e) {}
 
   paintTheme(readTheme());     // до первой отрисовки: скрипт подключается в <head>
 
   // ------------------------------------------------------------------ версия
-  function shortVer(v) { return String(v == null ? '' : v).replace(/^(\d+\.\d+)\.0$/, '$1'); }
+  function shortVer(v) { return String(v == null ? '' : v); }   // v5.8: полная версия везде (v5.8.0)
   function setVersion(v) {
     var chips = document.querySelectorAll('[data-ux-chip]');
     for (var i = 0; i < chips.length; i++) chips[i].textContent = 'v' + shortVer(v);
@@ -137,7 +151,7 @@
     document.addEventListener('click', function (e) {
       if (b.classList.contains('open') && !e.target.closest('.ux-topbar')) closeMenu();
     });
-    window.addEventListener('resize', function () { if (window.innerWidth > 1360) closeMenu(); });
+    window.addEventListener('resize', function () { if (window.innerWidth > 1359) closeMenu(); });
     setUser(session());
     window.addEventListener('storage', function (e) {
       if (e.key === AUTH_KEY || e.key === THEME_KEY) {
@@ -149,7 +163,7 @@
 
   window.amooreUX = {
     version: '4.4',
-    getTheme: getTheme, setTheme: setTheme, toggleTheme: toggleTheme,
+    getTheme: getTheme, getThemePref: themePref, setTheme: setTheme, toggleTheme: toggleTheme,
     setUser: setUser, clearUser: clearUser, session: session,
     setVersion: setVersion, shortVer: shortVer, closeMenu: closeMenu
   };

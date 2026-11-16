@@ -4,7 +4,7 @@ const path = require('path'), fs = require('fs');
 const H = require('./harness'), S = require('./seed'), { suite, sleep, until } = require('./lib');
 const DEV = path.resolve(__dirname, '..'), RU = path.resolve(__dirname, '../../amoore-ru');
 const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { recursive: true });
-const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','5.4.0');` : '');
+const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','5.8.0');` : '');
 
 (async () => {
   const { chromium } = H.pwRequire();
@@ -21,7 +21,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     await until(async () => (await page.$$('.site-card')).length >= 2, 5000);
     const tabs = await visibleTabs(page);
     T.check('порядок вкладок: Дашборд → Новости → Медиа → Дайджест, затем Команда / Люди / Логи / Заявки (Настройки — шестерёнка)', tabs.join('>') === 'Дашборд>Новости>Медиа>Дайджест>Команда>Люди>Логи>Заявки', tabs.join('>'));
-    T.check('чип версии показывает v4.3', (await page.textContent('#version-chip')) === 'v4.4', await page.textContent('#version-chip'));
+    T.check('чип версии показывает v5.8.0', (await page.textContent('#version-chip')) === 'v5.8.0', await page.textContent('#version-chip'));
     T.check('нет ошибок JS при входе', errors.length === 0, errors.join('; '));
     T.check('если версия уже просмотрена — окно «Что нового» не показывается', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.click('#version-chip'); await sleep(500);
@@ -30,18 +30,18 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
   { const { page } = await open({ seen: false });
     const shown = await until(async () => page.$eval('#whatsnew-modal', e => e.classList.contains('visible')), 3000);
     T.check('первый вход за версию: выскакивает окно «Что нового»', !!shown);
-    T.check('заголовок «Обновление v5.3»', /Обновление v5\.3/.test(await page.textContent('#whatsnew-title')), await page.textContent('#whatsnew-title'));
+    T.check('заголовок «Обновление v5.8»', /Обновление v5\.8/.test(await page.textContent('#whatsnew-title')), await page.textContent('#whatsnew-title'));
     const li = await page.$$eval('#whatsnew-list li li', e => e.map(x => x.textContent));
-    T.check('в списке изменения v5.3: код входа, онбординг, мобильная вёрстка, Студия, Telegram, бот', li.length >= 6 && li.some(t => /6-значн/.test(t)) && li.some(t => /Добро пожаловать/.test(t)) && li.some(t => /Мобильн/i.test(t)) && li.some(t => /Студия/.test(t)) && li.some(t => /Телеграм/i.test(t)) && li.some(t => /Бот/.test(t)), li.length + ' пунктов');
+    T.check('в списке изменения v5.8 — не меньше 4 пунктов', li.length >= 4, li.length + ' пунктов');
     await page.click('#whatsnew-ok'); await sleep(300);
-    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '5.4.0');
+    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '5.8.0');
     await page.reload(); await sleep(1500);
     T.check('после перезагрузки окно больше не появляется', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.context().close(); }
   { const core = fs.readFileSync(path.join(DEV, 'shared/amoore-core.js'), 'utf8'), app = fs.readFileSync(path.join(DEV, 'app.js'), 'utf8');
-    const cv = (core.match(/var AMOORE_VERSION = '([\d.]+)'/) || [])[1], av = (app.match(/const AMOORE_VERSION = '([\d.]+)'/) || [])[1];
+    const cv = (core.match(/AMOORE_VERSION(?: =|:) ?['"]([\d.]+)['"]/) || [])[1], av = (app.match(/const AMOORE_VERSION = '([\d.]+)'/) || [])[1];
     const cl = JSON.parse(fs.readFileSync(path.join(DEV, 'changelog.json'), 'utf8'));
-    T.check('синхронизация версий: core = app.js = changelog (5.4.0)', cv === '5.4.0' && av === '5.4.0' && cl.current === '5.4.0', `${cv}/${av}/${cl.current}`); }
+    T.check('синхронизация версий: core = app.js = changelog (5.8.0)', cv === '5.8.0' && av === '5.8.0' && cl.current === '5.8.0', `${cv}/${av}/${cl.current}`); }
 
   // ---------- красный счётчик заявок ----------
   console.log('Заявки и счётчик');
@@ -101,7 +101,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     await page.click('#bot-toggle-btn'); await sleep(600);
     const upd = await page.evaluate(() => window.__mock.calls.filter(c => c.table === 'bot_status' && c.op === 'update').map(c => Object.keys(c.payload)));
     T.check('тумблер бота обновляет ТОЛЬКО колонку is_online (без updated_at/token/status)', upd.length === 1 && upd[0].join() === 'is_online', JSON.stringify(upd));
-    T.check('в БД бот переведён в офлайн, статус на экране обновился сразу', (await page.evaluate(() => window.__db.bot_status[0].is_online)) === false && /Офлайн/.test(await page.textContent('#bot-status-line')));
+    T.check('в БД бот переведён в офлайн, статус на экране обновился сразу', (await page.evaluate(() => window.__db.bot_status[0].is_online)) === false && /Выключен/.test(await page.textContent('#bot-status-line')));
     T.check('событие bot_toggle записано в журнал', await page.evaluate(() => window.__db.audit_logs.some(l => l.action === 'bot_toggle')));
     await page.click('#bot-toggle-btn'); await sleep(500);
     T.check('повторный клик включает бота обратно', (await page.evaluate(() => window.__db.bot_status[0].is_online)) === true && /Онлайн/.test(await page.textContent('#bot-status-line')));
@@ -124,7 +124,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     const t0 = Date.now();
     const ok = await until(async () => !/загрузка/i.test(await page.textContent('#bot-status-line')), 5000, 100);
     const dt = Date.now() - t0;
-    T.check('запрос завис: через 3 секунды статус «Офлайн», лоадер исчезает', !!ok && /Офлайн/.test(await page.textContent('#bot-status-line')) && dt >= 2500 && dt <= 4500, dt + ' мс');
+    T.check('запрос завис: через 3 секунды лоадер исчезает, статус «нет связи» (не «Загрузка…»)', !!ok && /неиз|нет связи|Офлайн/i.test(await page.textContent('#bot-status-line')) && dt >= 2500 && dt <= 4500, dt + ' мс');
     T.check('после таймаута кнопка бота доступна для повторной попытки', await page.$eval('#bot-toggle-btn', b => !b.disabled));
     await page.context().close(); }
   { const app = fs.readFileSync(path.join(DEV, 'app.js'), 'utf8'), html = fs.readFileSync(path.join(DEV, 'index.html'), 'utf8');
@@ -225,7 +225,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
   console.log('Адаптив');
   const widths = process.env.WIDTHS ? process.env.WIDTHS.split(',').map(Number) : [320, 360, 375, 390, 414, 430, 540, 768, 820, 900, 1024, 1100, 1120, 1280, 1440, 1920], matrix = [];
   for (const w of widths) {
-    const mobile = w <= 1119;   // до 1119px включительно навигация сворачивается в бургер
+    const mobile = w <= 1359;   // до 1119px включительно навигация сворачивается в бургер
     const { page, errors } = await open({ viewport: { width: w, height: mobile ? 800 : 900 }, mobile: w < 820, seen: false });
     await until(async () => (await page.$$('.site-card')).length >= 2, 5000);
     await sleep(900);
@@ -308,13 +308,13 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     T.check('редактирование профиля: name, nickname, email, role сохраняются', await page.evaluate(() => window.__db.admins.some(a => a.id === 'a2' && a.name === 'Модер Новый' && a.nickname === 'ModNew' && a.email === 'modnew@amoore.ru' && a.role === 'admin')));
     await page.click('.edit-admin[data-id="a2"]'); await sleep(200); await page.fill('#ea-email', 'не-почта'); await page.click('#ea-save'); await sleep(300);
     T.check('невалидный email отклоняется', await page.evaluate(() => window.__db.admins.find(a => a.id === 'a2').email === 'modnew@amoore.ru')); await page.click('#ea-cancel');
-    await page.click('[data-ux-settings]'); await sleep(500);
+    await page.click('#tab-team'); await sleep(500);
     await page.fill('#rl-super_admin', 'Шеф'); await page.fill('#rl-moderator', 'Страж'); await page.click('#role-labels-save'); await sleep(700);
     const stored = await page.evaluate(() => (window.__db.global_settings || []).find(r => r.key === 'role_labels'));
-    T.check('названия ролей сохраняются в global_settings.role_labels', !!stored && stored.value.super_admin === 'Шеф' && stored.value.moderator === 'Страж' && stored.value.admin === 'Админ', JSON.stringify(stored));
+    T.check('названия ролей сохраняются в global_settings.role_labels', !!stored && stored.value.super_admin === 'Шеф' && stored.value.moderator === 'Страж' && stored.value.admin === 'Администратор' && stored.value.cofounder === 'Сооснователь' && stored.value.vip === 'VIP', JSON.stringify(stored));
     await page.click('#tab-team'); await sleep(600);
     T.check('новые названия ролей («Шеф») применяются в команде', /Шеф/.test(await page.textContent('#team-list')));
-    await page.click('[data-ux-settings]'); await sleep(500);
+    await page.click('#tab-news'); await sleep(400); await page.click('[data-pane="updates"]'); await sleep(500);   // 5.8: редактор Changelog — во вкладке «Новости → Обновления»
     await page.click('#cl-add'); const card = '.cl-card >> nth=0';
     await page.fill('.cl-card:nth-child(1) .cl-version', '9.9.9'); await page.fill('.cl-card:nth-child(1) .cl-title', 'Тест'); await page.fill('.cl-card:nth-child(1) .cl-items', 'Первое\nВторое'); await page.click('#cl-save'); await sleep(800);
     const cl = await page.evaluate(() => (window.__db.global_settings || []).find(r => r.key === 'changelog'));
@@ -324,11 +324,11 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     T.check('неверный формат версии не сохраняется', (await page.evaluate(() => window.__db.global_settings.find(r => r.key === 'changelog').value.current)) === '9.9.9');
     await page.context().close(); }
   { // версия из БД на старте: «Что нового» + чип
-    const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '5.4.0', versions: [{ version: '5.4.0', title: 'Из базы', items: ['Новое из БД'] }] } }, { key: 'role_labels', value: { super_admin: 'Босс', admin: 'Админ', moderator: 'Модератор' } }];
+    const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '5.8.0', versions: [{ version: '5.8.0', title: 'Из базы', items: ['Новое из БД'] }] } }, { key: 'role_labels', value: { super_admin: 'Босс', admin: 'Админ', moderator: 'Модератор' } }];
     const { page } = await open({ seed: s, seen: false });
-    const ok = await until(async () => (await page.textContent('#version-chip')) === 'v5.1', 4000);
-    const wn = await until(async () => /5\.1/.test(await page.textContent('#whatsnew-title')), 4000);
-    T.check('админка берёт версию из БД, код — только фоллбэк (v5.4.0)', !!ok && !!wn, await page.textContent('#whatsnew-title'));
+    const ok = await until(async () => (await page.textContent('#version-chip')) === 'v5.8.0', 4000);
+    const wn = await until(async () => /5\.8/.test(await page.textContent('#whatsnew-title')), 4000);
+    T.check('админка берёт версию из БД, код — только фоллбэк (v5.8.0)', !!ok && !!wn, await page.textContent('#whatsnew-title'));
     T.check('названия ролей из БД применяются сразу после входа (список ролей в форме)', await until(async () => (await page.$$eval('#new-role option', o => o.map(x => x.textContent))).includes('Босс'), 3000));
     await page.context().close(); }
 

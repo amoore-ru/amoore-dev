@@ -142,7 +142,7 @@ begin
   update public.global_settings set updated_at = now(), value = jsonb_build_object(
     'current', '5.3.0',
     'versions', jsonb_build_array(jsonb_build_object(
-      'version', '5.3.0', 'date', '2026-11-15', 'title', 'v5.3 SMART AUTH & PRE-RUST', 'order', 0,
+      'version', '5.3.0', 'date', '2026-11-10', 'title', 'v5.3 SMART AUTH & PRE-RUST', 'order', 0,
       'items', $i$["Вход по 6-значному коду: Email → «Выслать код» → «Войти»; ссылки из писем убраны, добавлена кнопка «Зарегистрироваться»", "Окно «Добро пожаловать» больше не появляется при каждой перезагрузке, если никнейм уже выбран", "Мобильная вёрстка: вкладки и кнопки переносятся, тумблеры не растягиваются, карточки заявок и новостей без пустот", "Студия: кнопка «Войти» в профиле — вход нужен для синхронизации сайтов и профиля", "Привязка Телеграма: код живёт 15 минут, защита от перебора (claim_telegram_code)", "Бот: несколько ключей ИИ с автопереключением (Groq 1 → Groq 2 → OpenRouter), экономия токенов на запасных ключах, расширенный /status", "Бот разделён на модули; ARCHITECTURE.md и amoore_identity.txt — подготовка к переходу на Rust (v6.0)"]$i$::jsonb
     )) || coalesce((select jsonb_agg(jsonb_set(x, '{order}', to_jsonb(coalesce((x->>'order')::int, 0) + 1)))
                      from jsonb_array_elements(v->'versions') x), '[]'::jsonb))
@@ -151,7 +151,7 @@ end $$;
 update public.changelog_versions set sort_order = sort_order + 1
  where not exists (select 1 from public.changelog_versions where version = '5.3.0');
 insert into public.changelog_versions (version, title, released, items, sort_order)
-values ('5.3.0', 'v5.3 SMART AUTH & PRE-RUST', '2026-11-15',
+values ('5.3.0', 'v5.3 SMART AUTH & PRE-RUST', '2026-11-10',
   $i$["Вход по 6-значному коду: Email → «Выслать код» → «Войти»; ссылки из писем убраны, добавлена кнопка «Зарегистрироваться»", "Окно «Добро пожаловать» больше не появляется при каждой перезагрузке, если никнейм уже выбран", "Мобильная вёрстка: вкладки и кнопки переносятся, тумблеры не растягиваются, карточки заявок и новостей без пустот", "Студия: кнопка «Войти» в профиле — вход нужен для синхронизации сайтов и профиля", "Привязка Телеграма: код живёт 15 минут, защита от перебора (claim_telegram_code)", "Бот: несколько ключей ИИ с автопереключением (Groq 1 → Groq 2 → OpenRouter), экономия токенов на запасных ключах, расширенный /status", "Бот разделён на модули; ARCHITECTURE.md и amoore_identity.txt — подготовка к переходу на Rust (v6.0)"]$i$::jsonb, 0)
 on conflict (version) do nothing;
 

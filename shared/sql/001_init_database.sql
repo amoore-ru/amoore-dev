@@ -1393,7 +1393,7 @@ grant execute on function public.prune_v50() to service_role;
 update public.changelog_versions set sort_order = sort_order + 1
  where not exists (select 1 from public.changelog_versions where version = '5.0.0');
 insert into public.changelog_versions (version, title, released, items, sort_order)
-values ('5.0.0', 'APEX', '2026-11-13',
+values ('5.0.0', 'APEX', '2026-11-01',
   $i$["Amoore ID: единый профиль, онбординг, Magic Link.", "Безопасность: блокировка после 5 неверных паролей, аудит с IP, список устройств.", "God Mode: бан, роли, управление людьми.", "SSO между админкой, студией и лендингом.", "CRM заявок, заметки, онлайн и география посетителей.", "Привязка Telegram через /link."]$i$::jsonb, 0)
 on conflict (version) do nothing;
 
@@ -1635,7 +1635,7 @@ end $$;
 update public.changelog_versions set sort_order = sort_order + 1
  where not exists (select 1 from public.changelog_versions where version = '5.1.0');
 insert into public.changelog_versions (version, title, released, items, sort_order)
-values ('5.1.0', 'v5.1 MASTER', '2026-11-26',
+values ('5.1.0', 'v5.1 MASTER', '2026-11-05',
   $i$["Великая чистка БД: единый файл 001_init_database.sql", "Web App Лендинг: вкладки без перезагрузки и хэш-навигация", "AI Бизнес-ассистент для Телеграм Business", "Баллы amoore: реферальные ссылки и баллы", "CRM с тегами, экспорт заявок в CSV", "Push-уведомления (PWA) о новостях", "Публичные профили amoore.ru/u/username"]$i$::jsonb, 0)
 on conflict (version) do nothing;
 
@@ -1774,7 +1774,7 @@ end $$;
 update public.changelog_versions set sort_order = sort_order + 1
  where not exists (select 1 from public.changelog_versions where version = '5.2.0');
 insert into public.changelog_versions (version, title, released, items, sort_order)
-values ('5.2.0', 'v5.2 POLISH & SYNC', '2026-11-27',
+values ('5.2.0', 'v5.2 POLISH & SYNC', '2026-11-07',
   $i$["Единый профиль amoore ID: ник, аватарка (фото или цвет) и роль одинаковы в админке, студии и на сайте", "Полная русификация интерфейса; amoore пишется строчными", "Админка: вход в стиле Liquid Glass, настройки только «Внешний вид» и «Профиль», Changelog переехал в «Новости → Обновления»", "Удалена Телеграм-рассылка из админки", "Починена привязка Телеграма: код /link создаётся, причина сбоя видна основателю", "Единый UI-кит: вкладки-чипсы, тумблеры и кнопки; поля ввода больше не вылезают за экран на телефоне", "Скелетоны вместо «Загрузка…»; карта посетителей по городам на дашборде", "Защита основателя на уровне базы данных", "Студия: профиль в настройках, проекты в профиле amoore ID, сжатие картинок в WebP", "Колокольчик уведомлений на лендинге"]$i$::jsonb, 0)
 on conflict (version) do nothing;
 

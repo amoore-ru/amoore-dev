@@ -1,4 +1,4 @@
-/* amoore-admin-v5.js — v5.9.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
+/* amoore-admin-v5.js — v5.8.0 «APEX»: «Люди» (Boss), CRM заявок, аналитика (Chart.js), карта, онлайн.
    Классический скрипт после app.js: использует его глобальные sb, $, esc, toast, friendlyError, me, isSuper, fmtDate. */
 (function () {
   'use strict';
@@ -276,4 +276,64 @@
   document.addEventListener('change', e => { if (e.target.id === 'pm-forever') $('pm-exp').disabled = e.target.checked; if (e.target.classList && e.target.classList.contains('pe-forever')) e.target.closest('.promo-edit').querySelector('.pe-exp').disabled = e.target.checked; });
 
   window.amooreV5 = { onView(name) { if (name === 'settings') loadPromo(); if (name === 'people') loadPeople(); if (name === 'dashboard') loadAnalytics(); } };
+})();
+
+// ===================================================================== v5.8: лупа в шапке + колокольчик с Realtime-уведомлениями
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const tgl = $('search-toggle'), wrap = $('main-search'), bellBtn = $('bell-btn'), panel = $('bell-panel');
+  if (!tgl || !bellBtn || !panel) return;
+  const closePanels = (except) => {
+    if (except !== 'search') { wrap.hidden = true; tgl.setAttribute('aria-expanded', 'false'); }
+    if (except !== 'bell') { panel.hidden = true; bellBtn.setAttribute('aria-expanded', 'false'); }
+  };
+  tgl.addEventListener('click', (e) => {
+    e.stopPropagation(); const open = wrap.hidden; closePanels(open ? 'search' : ''); wrap.hidden = !open; tgl.setAttribute('aria-expanded', String(open));
+    if (open) setTimeout(() => { const i = $('global-search'); if (i) i.focus(); }, 30);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanels(''); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.bell-wrap') && !e.target.closest('#main-search') && !e.target.closest('#search-toggle')) closePanels(''); });
+  $('global-search-results')?.addEventListener('click', () => { wrap.hidden = true; tgl.setAttribute('aria-expanded', 'false'); });
+
+  // --- уведомления: новые заявки, новые люди (для Основателя), важные действия в журнале (для тех, кто видит логи)
+  let items = [], started = false;
+  const seenKey = () => 'amoore_bell_seen_' + (me?.admin_id || 'x');
+  const seen = () => Number(localStorage.getItem(seenKey()) || 0);
+  const KIND = { lead: ['✉', 'Новая заявка'], person: ['👤', 'Новый пользователь'], log: ['⚙', 'Действие'] };
+  const IMPORTANT = new Set(['ban', 'unban', 'set_role', 'role_change', 'sessions_revoked', 'promo_create', 'promo_delete', 'god_points', 'changelog_edit']);
+  function paint() {
+    const list = $('bell-list'), unread = items.filter(i => i.t > seen()).length, cnt = $('bell-count');
+    cnt.hidden = !unread; cnt.textContent = unread > 9 ? '9+' : String(unread);
+    bellBtn.setAttribute('aria-label', unread ? 'Уведомления: ' + unread + ' новых' : 'Уведомления');
+    if (!items.length) { list.innerHTML = '<p class="bell-empty">Пока тихо.</p>'; return; }
+    list.innerHTML = items.slice(0, 30).map(i => `<button type="button" class="bell-item${i.t > seen() ? ' new' : ''}" data-view="${i.view}"><span class="bell-ico" aria-hidden="true">${KIND[i.kind][0]}</span><span class="bell-text"><b>${esc(i.title)}</b><small>${esc(i.text)}</small></span><time>${esc(new Date(i.t).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</time></button>`).join('');
+  }
+  const push = (it, silent) => { if (items.some(x => x.id === it.id)) return; items.push(it); items.sort((a, b) => b.t - a.t); items = items.slice(0, 40); paint(); };
+  async function boot() {
+    if (started || typeof me === 'undefined' || !me || typeof sb === 'undefined' || !sb) return;
+    started = true;
+    try {
+      const jobs = [sb.from('leads').select('id,name,created_at').order('created_at', { ascending: false }).limit(10)];
+      if (isSuper()) jobs.push(sb.from('profiles').select('id,username,created_at').order('created_at', { ascending: false }).limit(10));
+      if (can('view_logs')) jobs.push(sb.from('audit_logs').select('id,action,details,created_at').in('action', [...IMPORTANT]).order('created_at', { ascending: false }).limit(10));
+      const res = await Promise.all(jobs.map(j => j.then(r => r, () => ({ data: [] }))));
+      (res[0].data || []).forEach(l => push({ id: 'l' + l.id, kind: 'lead', title: KIND.lead[1], text: l.name || 'Без имени', t: Date.parse(l.created_at) || 0, view: 'leads' }));
+      let k = 1;
+      if (isSuper()) { (res[k++]?.data || []).forEach(p => push({ id: 'p' + p.id, kind: 'person', title: KIND.person[1], text: '@' + (p.username || '—'), t: Date.parse(p.created_at) || 0, view: 'people' })); }
+      if (can('view_logs')) (res[k]?.data || []).forEach(g => push({ id: 'g' + g.id, kind: 'log', title: KIND.log[1], text: (typeof ACTION_LABELS !== 'undefined' && ACTION_LABELS[g.action]) || g.action, t: Date.parse(g.created_at) || 0, view: 'logs' }));
+    } catch (_) {}
+    paint();
+    try {
+      const ch = sb.channel('amoore-dev-bell');
+      ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads' }, (m) => { const l = m.new || {}; push({ id: 'l' + l.id, kind: 'lead', title: KIND.lead[1], text: l.name || 'Без имени', t: Date.now(), view: 'leads' }); toast('Новая заявка: ' + (l.name || 'без имени')); });
+      if (isSuper()) ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, (m) => { const p = m.new || {}; push({ id: 'p' + p.id, kind: 'person', title: KIND.person[1], text: '@' + (p.username || '—'), t: Date.now(), view: 'people' }); });
+      if (can('view_logs')) ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_logs' }, (m) => { const g = m.new || {}; if (!IMPORTANT.has(g.action)) return; push({ id: 'g' + g.id, kind: 'log', title: KIND.log[1], text: (typeof ACTION_LABELS !== 'undefined' && ACTION_LABELS[g.action]) || g.action, t: Date.now(), view: 'logs' }); });
+      ch.subscribe();
+    } catch (_) {}
+  }
+  bellBtn.addEventListener('click', (e) => { e.stopPropagation(); const open = panel.hidden; closePanels(open ? 'bell' : ''); panel.hidden = !open; bellBtn.setAttribute('aria-expanded', String(open)); });
+  $('bell-readall').addEventListener('click', () => { localStorage.setItem(seenKey(), String(Date.now())); paint(); });
+  $('bell-list').addEventListener('click', (e) => { const b = e.target.closest('.bell-item'); if (!b) return; panel.hidden = true; bellBtn.setAttribute('aria-expanded', 'false'); const tab = document.getElementById('tab-' + b.dataset.view); if (tab) tab.click(); });
+  const iv = setInterval(() => { if (started) return clearInterval(iv); boot(); }, 800);
 })();

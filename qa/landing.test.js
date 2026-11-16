@@ -96,37 +96,38 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   { const { page } = await open();
     await sleep(800);
     const info = await page.evaluate(() => ({ v: window.AMOORE_VERSION, api: window.amooreCore && window.amooreCore.version, st: window.AMOORE_STATE && window.AMOORE_STATE.version, ftr: document.querySelector('.version-btn [data-amoore-version]').textContent }));
-    T.check('AMOORE_VERSION = 5.4.0 (core, state, API)', info.v === '5.4.0' && info.api === '5.4.0' && info.st === '5.4.0', JSON.stringify(info));
-    T.check('в подвале показана «Версия 5.4.0»', info.ftr === '5.4.0');
+    T.check('AMOORE_VERSION = 5.8.0 (core, state, API)', info.v === '5.8.0' && info.api === '5.8.0' && info.st === '5.8.0', JSON.stringify(info));
+    T.check('в подвале показана «Версия 5.8.0»', info.ftr === '5.8.0');
     await page.click('#version-btn');
     await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     const n = (await page.$$('#nx-changelog .nx-cl-entry')).length;
     T.check('модалка истории обновлений (ядро) загружает changelog.json, если БД пуста', n >= 3, n + ' версий');
     const first = await page.$eval('#nx-changelog .nx-cl-entry h3', e => e.textContent);
-    T.check('первая запись — v5.4.0', /v5.4.0/.test(first), first);
+    T.check('первая запись — v6.0.0 с бейджем «Скоро»', /6\.0\.0/.test(first) && /Скоро/.test(first), first);
     await page.keyboard.press('Escape'); await sleep(350);
     T.check('Esc закрывает модалку', !(await page.$eval('#nx-changelog', e => e.classList.contains('open'))));
     const cl = JSON.parse(fs.readFileSync(path.join(ROOT, 'changelog.json'), 'utf8'));
-    T.check('changelog.json: current совпадает с версией core', cl.current === info.v && cl.versions[0].version === info.v);
+    T.check('changelog.json: current совпадает с версией core', cl.current === info.v && cl.versions.some(v => v.version === info.v));
     await page.context().close(); }
 
   // ---------- NEXUS v4.0: чип версии, версия из БД, 🔒-вход, Quick Admin, дайджесты ----------
   TAB = 'news'; console.log('NEXUS: чип версии, вход, дайджесты');
   { const { page } = await open();
     const chip = await until(async () => page.$('#nx-version-chip'), 4000);
-    T.check('чип версии v5.3 стоит рядом с логотипом', !!chip && (await page.textContent('#nx-version-chip')) === 'v5.3' && await page.$eval('#nx-version-chip', c => c.previousElementSibling && c.previousElementSibling.classList.contains('ux-logo')));
+    T.check('чип версии v5.8.0 стоит рядом с логотипом', !!chip && (await page.textContent('#nx-version-chip')) === 'v5.8.0' && await page.$eval('#nx-version-chip', c => c.previousElementSibling && c.previousElementSibling.classList.contains('ux-logo')));
     await page.click('#nx-version-chip');
     const opened = await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     T.check('клик по чипу открывает историю обновлений', !!opened);
     await page.context().close(); }
-  { const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '4.1.0', versions: [{ version: '4.1.0', title: 'Из базы', date: '2026-11-09', items: ['Версия пришла из БД'] }, { version: '4.0.0', title: 'NEXUS', items: ['x'] }] } }];
+  { const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '5.8.0', versions: [{ version: '5.8.0', title: 'Из базы', date: '2026-11-15', items: ['Версия пришла из БД'] }, { version: '4.0.0', title: 'NEXUS', items: ['x'] }] } }];
     const { page } = await open(s);
-    const ok = await until(async () => (await page.textContent('#nx-version-chip')) === 'v4.1', 4000);
-    T.check('версия в чипе тянется из БД (global_settings.changelog), а не из кода', !!ok && (await page.evaluate(() => window.AMOORE_VERSION)) === '4.1.0');
-    T.check('подвал лендинга показывает ту же версию из БД', (await page.textContent('.version-btn [data-amoore-version]')) === '4.1.0');
+    const ok = await until(async () => (await page.textContent('#nx-version-chip')) === 'v5.8.0', 4000);
+    T.check('версия в чипе тянется из БД (global_settings.changelog), а не из кода', !!ok && (await page.evaluate(() => window.AMOORE_VERSION)) === '5.8.0');
+    T.check('подвал лендинга показывает ту же версию из БД', (await page.textContent('.version-btn [data-amoore-version]')) === '5.8.0');
     await page.click('#version-btn');
-    await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length === 2, 3000);
-    T.check('модалка показывает историю из БД (2 версии, первая 4.1.0)', /4\.1\.0/.test(await page.$eval('#nx-changelog .nx-cl-entry h3', e => e.textContent)));
+    await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 2, 3000);
+    await page.evaluate(() => document.querySelectorAll('#nx-changelog .nx-cl-subtoggle').forEach(b => b.click()));
+    T.check('модалка: запись из БД побеждает локальную при той же версии (подверсия внутри аккордеона)', /Из базы/.test(await page.$eval('#nx-changelog', e => e.textContent)));
     await page.context().close(); }
   { const s = S.seed(); Object.assign(s.ecosystem_sites[0], { status: 'closed', overlay_type: 'private' });
     const { page } = await open(s);
@@ -299,7 +300,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     T.check('viewport-fit=cover включён', /viewport-fit=cover/.test(html));
     T.check('v4.4 плавающей кнопки #mobile-cta в разметке нет, а в CSS она display:none !important', !/id="mobile-cta"/.test(html) && /\.mobile-cta[^{]*\{\s*display:\s*none\s*!important/.test(css));
     T.check('safe-area-inset-* применён к шапке, меню, нижней панели, подвалу и модалке', ['.ux-topbar', '.ux-panel', 'footer'].every(sel => new RegExp(sel.replace('.', '\\.') + '[^{]*\\{[^}]*safe-area-inset', 's').test(css + fs.readFileSync(path.join(ROOT, 'amoore-theme.css'), 'utf8'))));
-    T.check('кэш: CSS/JS подключены с версией ?v=5.4.0', /style\.css\?v=5.4.0/.test(html) && /amoore-core\.js\?v=5.4.0/.test(html) && /landing\.js\?v=5.4.0/.test(html));
+    T.check('кэш: CSS/JS подключены с версией ?v=5.8.0', /style\.css\?v=5.8.0/.test(html) && /amoore-core\.js\?v=5.8.0/.test(html) && /landing\.js\?v=5.8.0/.test(html));
     const hdr = fs.readFileSync(path.join(ROOT, '_headers'), 'utf8');
     T.check('_headers: CSS больше не «immutable на год»', !/\/\*\.css\s*\n\s*Cache-Control:[^\n]*immutable/.test(hdr)); }
 

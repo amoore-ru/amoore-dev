@@ -12,7 +12,7 @@ const EMAIL_KEY = 'amoore_dev_email';
 const SESSION_TTL_MS = 6 * 60 * 60 * 1000;
 const LANDING_ID = 'landing';
 // Единая версия экосистемы. Должна совпадать с AMOORE_VERSION в amoore-core.js (это проверяет run_qa.sh).
-const AMOORE_VERSION = '5.9.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
+const AMOORE_VERSION = '5.8.0';          // фоллбэк: живая версия берётся из БД (global_settings.changelog)
 let liveVersion = null;
 const curVersion = () => liveVersion || AMOORE_VERSION;
 
@@ -32,10 +32,16 @@ const PERMS = [
 const PERM_KEYS = PERMS.map(p => p[0]);
 const MODERATOR_DEFAULT = ['view_logs'];
 const ADMIN_DEFAULT = ['toggle_status', 'toggle_banner', 'toggle_chat', 'toggle_news', 'manage_news', 'manage_media', 'view_logs'];
-const roleDefault = (role, key) => role === 'super_admin' ? true : role === 'admin' ? ADMIN_DEFAULT.includes(key) : role === 'moderator' ? MODERATOR_DEFAULT.includes(key) : false;
+// v5.8: 5 ролей. В базе: super_admin (в интерфейсе «Основатель»), cofounder, admin («Администратор»), vip, moderator. Иерархия — ROLE_RANK.
+const COFOUNDER_DEFAULT = PERM_KEYS.filter(k => k !== 'manage_admins');      // всё, кроме управления командой (её защищает RLS: только Основатель)
+const VIP_DEFAULT = ['view_logs'];
+const ROLE_LIST = ['moderator', 'vip', 'admin', 'cofounder', 'super_admin'];
+const ROLE_RANK = { moderator: 1, vip: 2, admin: 3, cofounder: 4, super_admin: 5 };
+const roleDefault = (role, key) => role === 'super_admin' ? true : role === 'cofounder' ? COFOUNDER_DEFAULT.includes(key) : role === 'admin' ? ADMIN_DEFAULT.includes(key) : role === 'vip' ? VIP_DEFAULT.includes(key) : role === 'moderator' ? MODERATOR_DEFAULT.includes(key) : false;
+const roleOptions = (current) => ROLE_LIST.filter(r => r === current || isSuper() || (me && ROLE_RANK[r] < (ROLE_RANK[me.role] || 0)));
 
 // ---- названия ролей (global_settings.role_labels): ключи ролей неизменны, меняется только подпись ----
-const ROLE_DEFAULT_LABELS = { super_admin: 'Основатель', founder: 'Основатель', admin: 'Администратор', moderator: 'Модератор', user: 'Пользователь' };
+const ROLE_DEFAULT_LABELS = { super_admin: 'Основатель', founder: 'Основатель', cofounder: 'Сооснователь', admin: 'Администратор', vip: 'VIP', moderator: 'Модератор', user: 'Пользователь' };
 const ROLE_EN2RU = { founder: 'Основатель', cofounder: 'Сооснователь', super_admin: 'Основатель', superadmin: 'Основатель', admin: 'Администратор', administrator: 'Администратор', moder: 'Модератор', moderator: 'Модератор', mod: 'Модератор', user: 'Пользователь' };       // v5.4: founder / moder / user в подписи → по-русски
 let roleLabels = { ...ROLE_DEFAULT_LABELS };
 const rl = (role) => { const v = String(roleLabels[role] || '').trim() || ROLE_DEFAULT_LABELS[role] || role; return ROLE_EN2RU[v.toLowerCase()] || v; };
@@ -102,7 +108,7 @@ function fmtDateTime(iso, short) {
     ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }
     : { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
-// v5.9.0: supabase-js на любой не-2xx ответ Edge Function пишет «Edge Function returned a non-2xx status code» — достаём настоящий текст из тела ответа
+// v5.8.0: supabase-js на любой не-2xx ответ Edge Function пишет «Edge Function returned a non-2xx status code» — достаём настоящий текст из тела ответа
 async function fnError(error) {
   try { const c = error && error.context; if (c && typeof c.json === 'function') { const b = await c.clone().json(); if (b && (b.error || b.message)) return String(b.error || b.message); } } catch (_) {}
   const m = String(error?.message || error || '');
@@ -287,7 +293,7 @@ function applyRoleUI() {
   $('add-admin-wrap').style.display = can('manage_admins') ? '' : 'none';
   $('mini-audit-widget').style.display = can('view_logs') ? '' : 'none';
   const sel = $('new-role');
-  sel.innerHTML = ['moderator', 'admin'].concat(isSuper() ? ['super_admin'] : []).map(r => `<option value="${r}">${esc(rl(r))}</option>`).join('');
+  sel.innerHTML = roleOptions().filter(r => r !== 'super_admin' || isSuper()).map(r => `<option value="${r}">${esc(rl(r))}</option>`).join('');
 }
 // v5.2: «Новости» → под-вкладки «Новости | Обновления» (редактор changelog переехал из «Настроек»)
 let newsPane = 'news';
@@ -351,15 +357,17 @@ document.querySelector('[data-ux-settings]')?.addEventListener('click', e => { e
         const jobs = [
           sb.from('news').select('id,title').ilike('title', pattern).limit(6),
           sb.from('ecosystem_sites').select('id,name,url').ilike('name', pattern).limit(6),
-          sb.from('admins').select('id,nickname,email,role').ilike('nickname', pattern).limit(6)
+          sb.from('admins').select('id,nickname,email,role').ilike('nickname', pattern).limit(6),
+          isSuper() && window.amooreID?.people?.list ? window.amooreID.people.list().then(r => ({ data: (Array.isArray(r) ? r : (r?.data || [])).filter(p => ((p.username || '') + ' ' + (p.email || '')).toLowerCase().includes(safeQuery.toLowerCase())).slice(0, 6) })).catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
         ];
         const results = await Promise.all(jobs);
         if (id !== requestId) return;
-        const [news, sites, admins] = results;
+        const [news, sites, admins, people] = results;
         const rows = [];
         if (!news.error) (news.data || []).forEach(x => rows.push({ kind:'news', label:x.title || 'Без заголовка', meta:'Новость', view:'dashboard' }));
         if (!sites.error) (sites.data || []).forEach(x => rows.push({ kind:'site', label:x.name || x.id, meta:'Сайт · ' + x.id, view:'dashboard' }));
         if (!admins.error && isSuper()) (admins.data || []).forEach(x => rows.push({ kind:'admin', label:x.nickname || x.email, meta:'Администратор · ' + rl(x.role), view:'team' }));
+        (people?.data || []).forEach(x => rows.push({ kind:'person', label:'@' + (x.username || x.email), meta:'Человек · ' + (x.email || ''), view:'people' }));
         if (!rows.length) { panel.innerHTML = '<div class="global-search-empty">Ничего не найдено</div>'; return; }
         panel.innerHTML = rows.map((x,i) => `<button type="button" class="global-search-result" data-view="${x.view}" role="option"><span>${esc(x.label)}</span><small>${esc(x.meta)}</small></button>`).join('');
       } catch (err) {
@@ -798,7 +806,7 @@ async function loadBotStatus() {
     // v5.5: состояние считает сервер (bot_health: нет зависимости от часов устройства); если RPC ещё нет — читаем таблицу
     let h = null;
     const rpc = await withTimeout(sb.rpc('bot_health'));
-    if (!rpc.error && rpc.data) h = rpc.data;
+    if (!rpc.error && rpc.data && typeof rpc.data === 'object' && 'last_heartbeat' in rpc.data) h = rpc.data;   // v5.7.2: только настоящий ответ bot_health (объект со статусом); иначе — читаем таблицу
     else {
       const { data, error } = await withTimeout(sb.from('bot_status').select('is_online,last_heartbeat').eq('id', 'main').maybeSingle());
       if (error) throw error;
@@ -1134,13 +1142,19 @@ const sortVersions = list => {
     return 0;
   });
 };
+// Текущая версия = НАИБОЛЬШАЯ в списке (а не list[0]: при ручном порядке `order` первой стоит самая старая запись → чип показывал бы v1.0.0)
+const maxVersion = (list) => (list || []).map(v => String(v.version)).reduce((a, b) => {
+  const x = verKey(a), y = verKey(b);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0) ? a : b;
+  return a;
+}, '0.0.0');
 function paintVersionChip() { window.amooreUX?.setVersion(curVersion()); }
 async function loadChangelog() {
   // 1) БД (global_settings.changelog) → 2) changelog.json → 3) жёсткий фоллбэк из кода
   try {
     const { data, error } = await sb.from('global_settings').select('value').eq('key', 'changelog').maybeSingle();
     const list = !error && data && data.value && Array.isArray(data.value.versions) ? sortVersions(data.value.versions) : [];
-    if (list.length) { liveVersion = String(list[0].version); paintVersionChip(); return list; }
+    if (list.length) { liveVersion = maxVersion(list); paintVersionChip(); return list; }
   } catch (_) {}
   try {
     const r = await fetch('changelog.json?v=' + AMOORE_VERSION, { cache: 'no-cache' });
@@ -1151,15 +1165,48 @@ async function loadChangelog() {
   } catch (_) { return WN_FALLBACK; }
 }
 let wnList = null;
+const isSoonV = v => !!(v && (v.soon === true || (!v.date && /vitesite|скоро|soon/i.test(String(v.title || '')))));
+const verCmpDesc = (a, b) => { const x = verKey(a.version), y = verKey(b.version); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (y[i] || 0) - (x[i] || 0); return 0; };
+const fmtRu = d => d ? String(d).split('-').reverse().join('.') : '';
+// аккордеон: главные версии (по мажору) — от новых к старым; подверсии внутри — от старых к новым и спрятаны под кнопкой
+function wnGroups(list) {
+  const map = new Map();
+  (list || []).forEach(v => { const m = verKey(v.version)[0]; if (!map.has(m)) map.set(m, []); map.get(m).push(v); });
+  return [...map.keys()].sort((a, b) => b - a).map(m => {
+    const g = map.get(m).slice().sort((a, b) => -verCmpDesc(a, b));
+    const head = g.find(v => { const k = verKey(v.version); return !k[1] && !k[2]; }) || g[0];
+    return { head, subs: g.filter(v => v !== head) };
+  });
+}
+function wnHead(v, cur, tag) {
+  const badge = isSoonV(v) ? '<span class="nx-cl-badge soon">Скоро</span>' : (cur && String(v.version) === String(cur) ? '<span class="nx-cl-badge new">NEW</span>' : '');
+  return `<${tag} class="nx-cl-head"><span class="nx-cl-ver">v${esc(v.version)}</span><span class="nx-cl-name">${esc(v.title || '')}</span>${badge}${v.date ? `<time class="nx-cl-date">${esc(fmtRu(v.date))}</time>` : ''}</${tag}>`;
+}
+const wnItems = v => `<ul class="nx-cl-items">${(v.items || []).map(i => `<li>${esc(i)}</li>`).join('')}</ul>`;
 function renderWhatsNew(list, all) {
-  const cur = list[0] || WN_FALLBACK[0];
+  const released = (list || []).filter(v => !isSoonV(v)).sort(verCmpDesc);
+  const cur = released[0] || WN_FALLBACK[0];
   const [maj, min] = String(cur.version).split('.');
   $('whatsnew-title').textContent = all ? 'История обновлений' : `Обновление v${maj}.${min}`;
   $('whatsnew-sub').textContent = all ? `Текущая версия ${curVersion()}` : `${cur.title || ''} — что изменилось`;
-  const shown = all ? list : [cur];
-  $('whatsnew-list').innerHTML = shown.map(v => `<li class="wn-version"><h4>v${esc(v.version)} <small>${esc(v.title || '')}</small></h4><ul>${(v.items || []).map(i => `<li>${esc(i)}</li>`).join('')}</ul></li>`).join('');
-  $('whatsnew-history').style.display = all || list.length < 2 ? 'none' : '';
+  if (!all) {
+    $('whatsnew-list').innerHTML = `<li class="wn-version"><h4>v${esc(cur.version)} <small>${esc(cur.title || '')}</small></h4><ul>${(cur.items || []).map(i => `<li>${esc(i)}</li>`).join('')}</ul></li>`;
+  } else {
+    const cards = wnGroups(list).map(g => {
+      const hasCur = String(g.head.version) === String(cur.version) || g.subs.some(v => String(v.version) === String(cur.version));
+      const headBadgeCur = String(g.head.version) === String(cur.version) ? cur.version : '';
+      const subs = g.subs.length ? `<div class="nx-cl-subs"><button type="button" class="nx-cl-subtoggle" aria-expanded="false" data-n="${g.subs.length}">▼ Подверсии (${g.subs.length})</button><div class="nx-cl-sublist" hidden>${g.subs.map(v => `<section class="nx-cl-sub">${wnHead(v, cur.version, 'h4')}${wnItems(v)}</section>`).join('')}</div></div>` : '';
+      return `<article class="nx-cl-entry${isSoonV(g.head) ? ' is-soon' : ''}">${wnHead(g.head, headBadgeCur, 'h3').replace('</h3>', hasCur && !headBadgeCur ? '<span class="nx-cl-badge new">NEW</span></h3>' : '</h3>')}${hasCur && !headBadgeCur ? `<p class="nx-cl-current">Актуальная версия — v${esc(cur.version)}</p>` : ''}${wnItems(g.head)}${subs}</article>`;
+    }).join('');
+    $('whatsnew-list').innerHTML = `<li class="wn-version wn-dark"><div class="nx-cl-cards">${cards}</div></li>`;
+  }
+  $('whatsnew-history').style.display = all || (list || []).length < 2 ? 'none' : '';
 }
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('#whatsnew-list .nx-cl-subtoggle'); if (!b) return;
+  const panel = b.nextElementSibling, open = panel.hidden; panel.hidden = !open;
+  b.setAttribute('aria-expanded', String(open)); b.textContent = (open ? '▲ Скрыть подверсии (' : '▼ Подверсии (') + b.dataset.n + ')';
+});
 async function openWhatsNew(all) {
   if (!wnList) wnList = await loadChangelog();
   renderWhatsNew(wnList, all);
@@ -1298,7 +1345,7 @@ async function loadTeam() {
       </div>
       <div class="admin-card-actions">
         ${isSuper() ? `<select class="role-select" data-id="${a.id}" aria-label="Роль"${self ? ' disabled' : ''}>
-          ${['moderator', 'admin', 'super_admin'].map(r => `<option value="${r}"${a.role === r ? ' selected' : ''}>${esc(rl(r))}</option>`).join('')}</select>`
+          ${ROLE_LIST.map(r => `<option value="${r}"${a.role === r ? ' selected' : ''}>${esc(rl(r))}</option>`).join('')}</select>`
           : `<span class="role-badge ${esc(a.role)}">${esc(rl(a.role))}</span>`}
         ${isSuper() ? `<button class="btn btn-ghost btn-sm edit-admin" data-id="${a.id}" aria-label="Редактировать" title="Редактировать">✎</button>` : ''}
         ${isSuper() && !self ? `<button class="btn btn-ghost btn-sm perms-btn" data-id="${a.id}">Права</button>` : ''}
@@ -1313,7 +1360,7 @@ function openEditAdmin(id) {
   const a = teamCache.find(x => x.id === id); if (!a) return;
   editAdminId = id;
   $('ea-name').value = a.name || ''; $('ea-nickname').value = a.nickname || ''; $('ea-email').value = a.email || '';
-  $('ea-role').innerHTML = ['moderator', 'admin', 'super_admin'].map(r => `<option value="${r}"${a.role === r ? ' selected' : ''}>${esc(rl(r))}</option>`).join('');
+  $('ea-role').innerHTML = ROLE_LIST.map(r => `<option value="${r}"${a.role === r ? ' selected' : ''}>${esc(rl(r))}</option>`).join('');
   $('ea-role').disabled = id === me.admin_id;
   $('edit-admin-modal').classList.add('visible');
 }
@@ -1460,7 +1507,7 @@ async function renderSettingsBlocks() {
 // роли и changelog вынесены из «Настроек»: роли — во вкладку «Команда», changelog — «Новости → Обновления»
 function fillRolesBlock() {
   if (!isSuper()) return;
-  ['super_admin', 'admin', 'moderator'].forEach(k => { const i = $('rl-' + k); if (i) i.value = roleLabels[k] || ''; });
+  ['super_admin', 'cofounder', 'admin', 'vip', 'moderator'].forEach(k => { const i = $('rl-' + k); if (i) i.value = roleLabels[k] || ''; });
 }
 async function renderUpdatesPane() {
   if (!isSuper()) return;
@@ -1471,7 +1518,7 @@ async function renderUpdatesPane() {
 $('role-labels-save').addEventListener('click', async () => {
   if (!isSuper()) return;
   const value = {};
-  ['super_admin', 'admin', 'moderator'].forEach(k => { value[k] = ($('rl-' + k).value.trim().slice(0, 32)) || ROLE_DEFAULT_LABELS[k]; });
+  ['super_admin', 'cofounder', 'admin', 'vip', 'moderator'].forEach(k => { value[k] = ($('rl-' + k).value.trim().slice(0, 32)) || ROLE_DEFAULT_LABELS[k]; });
   const { error } = await sb.from('global_settings').upsert({ key: 'role_labels', value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return toast(friendlyError(error), 'error');
   roleLabels = { ...ROLE_DEFAULT_LABELS, ...value };
@@ -1516,9 +1563,9 @@ $('cl-save').addEventListener('click', async () => {
   if (!list.length) return toast('Добавьте хотя бы одну версию', 'error');
   if (new Set(list.map(v => v.version)).size !== list.length) return toast('Версии не должны повторяться', 'error');
   if (list.some(v => !/^\d+\.\d+(\.\d+)?$/.test(String(v.version||'')))) return toast('Версия — формат X.Y или X.Y.Z', 'error');
-  const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: list[0].version, versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  const { error } = await sb.from('global_settings').upsert({ key: 'changelog', value: { current: maxVersion(list), versions: list }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   if (error) return toast(friendlyError(error), 'error');
-  wnList = list; liveVersion = String(list[0].version); paintVersionChip();
+  wnList = list; liveVersion = maxVersion(list); paintVersionChip();
   clDraft = list.map(v => ({ ...v })); paintClEditor();
   logAction('changelog_edit', null, null, liveVersion); toast('Changelog сохранён: чипы версий на всех сайтах обновятся');
 });
