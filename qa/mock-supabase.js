@@ -105,6 +105,7 @@
             return Promise.resolve({ data: p ? { username: p.username, avatar_url: p.avatar_url, bio: p.bio || '', sites: table('user_sites').filter(function (z) { return z.user_id === p.id && z.is_public; }).map(function (z) { return { title: z.title, url: z.url }; }) } : null, error: null });
           }
           if (fn === 'claim_referral') { window.__referral = args.p_ref; return Promise.resolve({ data: 10, error: null }); }
+          if (fn === 'admin_list_people') return Promise.resolve({ data: window.__people || [], error: null });
           if (fn === 'quick_admins') return Promise.resolve({ data: [{ nickname: 'Boss', online: true }, { nickname: 'Tester', online: false }], error: null });
           return Promise.resolve({ data: true, error: null });
         },

@@ -1,3 +1,4 @@
+(function(){try{var d=document.documentElement,a=localStorage.getItem('amoore_text_size'),g=localStorage.getItem('amoore_glass'),S=[.82,.88,.92,1,1.08,1.16,1.26];if(a!==null&&S[+a])d.style.setProperty('--fs',S[+a]);if(g!==null&&+g>=0&&+g<=100)d.style.setProperty('--glass-k',+g/100);}catch(e){}})(); // v5.8.1: размер текста и эффект стекла
 /* =====================================================================
    amoore-ux.js — v4.3 POLISH · единая шапка (Unified Topbar) и тема
    ЕДИНЫЙ файл для amoore-dev / amoore-ru / amoore-studio: побайтно одинаков (проверяет run_qa.sh).
@@ -70,7 +71,8 @@
   paintTheme(readTheme());     // до первой отрисовки: скрипт подключается в <head>
 
   // ------------------------------------------------------------------ версия
-  function shortVer(v) { return String(v == null ? '' : v); }   // v5.8: полная версия везде (v5.8.0)
+  // v6.0: чип версии на главном экране — только мажор: 5.8.0 → «v5». Полная запись (v6.1.1) — только внутри Changelog (core: fmtVerFull).
+  function shortVer(v) { var m = /^\s*v?(\d+)/i.exec(String(v == null ? '' : v)); return m ? m[1] : String(v == null ? '' : v); }
   function setVersion(v) {
     var chips = document.querySelectorAll('[data-ux-chip]');
     for (var i = 0; i < chips.length; i++) chips[i].textContent = 'v' + shortVer(v);
@@ -114,14 +116,11 @@
 
   // ------------------------------------------------------------------ меню (бургер)
   function bar() { return document.querySelector('.ux-topbar'); }
+  // v6.0: бургер-меню удалено навсегда (навигация — пилюли). setMenu оставлен только как внутренний сброс состояния.
   function setMenu(open) {
     var b = bar(); if (!b) return;
     b.classList.toggle('open', open);
     root.classList.toggle('ux-menu-open', open);
-    each('[data-ux-burger]', function (n) {
-      n.setAttribute('aria-expanded', open ? 'true' : 'false');
-      n.setAttribute('aria-label', open ? 'Закрыть меню' : 'Открыть меню');
-    });
   }
   function closeMenu() { setMenu(false); }
 
@@ -130,9 +129,6 @@
     paintTheme(getTheme());
     if (!b) return;
     each('[data-ux-theme]', function (n) { n.addEventListener('click', toggleTheme); });
-    each('[data-ux-burger]', function (n) {
-      n.addEventListener('click', function (e) { e.stopPropagation(); setMenu(!b.classList.contains('open')); });
-    });
     each('[data-ux-logout]', function (n) { n.addEventListener('click', logout); });
     each('[data-ux-chip]', function (n) {
       n.addEventListener('click', function () {
@@ -145,7 +141,6 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && b.classList.contains('open')) {
         closeMenu();
-        var burger = b.querySelector('[data-ux-burger]'); if (burger) burger.focus();
       }
     });
     document.addEventListener('click', function (e) {

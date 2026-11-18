@@ -68,4 +68,4 @@ update public.global_settings
                 else e end
               order by ord)
        from jsonb_array_elements(value->'versions') with ordinality as t(e, ord)))
- where key = 'changelog' and jsonb_typeof(value->'versions') = 'array';
+ where key = 'changelog' and jsonb_typeof(value->'versions') = 'array' and jsonb_array_length(value->'versions') > 0;   -- пустой массив дал бы NULL от jsonb_agg

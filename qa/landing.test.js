@@ -96,14 +96,14 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   { const { page } = await open();
     await sleep(800);
     const info = await page.evaluate(() => ({ v: window.AMOORE_VERSION, api: window.amooreCore && window.amooreCore.version, st: window.AMOORE_STATE && window.AMOORE_STATE.version, ftr: document.querySelector('.version-btn [data-amoore-version]').textContent }));
-    T.check('AMOORE_VERSION = 5.8.0 (core, state, API)', info.v === '5.8.0' && info.api === '5.8.0' && info.st === '5.8.0', JSON.stringify(info));
-    T.check('в подвале показана «Версия 5.8.0»', info.ftr === '5.8.0');
+    T.check('AMOORE_VERSION = 6.0.0 (core, state, API)', info.v === '6.0.0' && info.api === '6.0.0' && info.st === '6.0.0', JSON.stringify(info));
+    T.check('в подвале показана «Версия v6» (на главном экране — только мажор, без точек)', info.ftr === 'v6', info.ftr);
     await page.click('#version-btn');
     await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     const n = (await page.$$('#nx-changelog .nx-cl-entry')).length;
     T.check('модалка истории обновлений (ядро) загружает changelog.json, если БД пуста', n >= 3, n + ' версий');
     const first = await page.$eval('#nx-changelog .nx-cl-entry h3', e => e.textContent);
-    T.check('первая запись — v6.0.0 с бейджем «Скоро»', /6\.0\.0/.test(first) && /Скоро/.test(first), first);
+    T.check('первая запись — v7 (7.0.0 без хвостовых нулей) с бейджем «Скоро»', /^v7(?![.\d])/.test(first) && !/7\.0/.test(first) && /Скоро/.test(first), first);
     await page.keyboard.press('Escape'); await sleep(350);
     T.check('Esc закрывает модалку', !(await page.$eval('#nx-changelog', e => e.classList.contains('open'))));
     const cl = JSON.parse(fs.readFileSync(path.join(ROOT, 'changelog.json'), 'utf8'));
@@ -114,16 +114,16 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   TAB = 'news'; console.log('NEXUS: чип версии, вход, дайджесты');
   { const { page } = await open();
     const chip = await until(async () => page.$('#nx-version-chip'), 4000);
-    T.check('чип версии v5.8.0 стоит рядом с логотипом', !!chip && (await page.textContent('#nx-version-chip')) === 'v5.8.0' && await page.$eval('#nx-version-chip', c => c.previousElementSibling && c.previousElementSibling.classList.contains('ux-logo')));
+    T.check('чип версии «v6» (только мажор) стоит рядом с логотипом', !!chip && (await page.textContent('#nx-version-chip')) === 'v6' && await page.$eval('#nx-version-chip', c => c.previousElementSibling && c.previousElementSibling.classList.contains('ux-logo')));
     await page.click('#nx-version-chip');
     const opened = await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
     T.check('клик по чипу открывает историю обновлений', !!opened);
     await page.context().close(); }
-  { const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '5.8.0', versions: [{ version: '5.8.0', title: 'Из базы', date: '2026-11-15', items: ['Версия пришла из БД'] }, { version: '4.0.0', title: 'NEXUS', items: ['x'] }] } }];
+  { const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '7.2.0', versions: [{ version: '7.2.0', title: 'Из базы', date: '2026-11-15', items: ['Версия пришла из БД'] }, { version: '4.0.0', title: 'NEXUS', items: ['x'] }] } }];
     const { page } = await open(s);
-    const ok = await until(async () => (await page.textContent('#nx-version-chip')) === 'v5.8.0', 4000);
-    T.check('версия в чипе тянется из БД (global_settings.changelog), а не из кода', !!ok && (await page.evaluate(() => window.AMOORE_VERSION)) === '5.8.0');
-    T.check('подвал лендинга показывает ту же версию из БД', (await page.textContent('.version-btn [data-amoore-version]')) === '5.8.0');
+    const ok = await until(async () => (await page.textContent('#nx-version-chip')) === 'v7', 4000);
+    T.check('версия в чипе тянется из БД (global_settings.changelog), а не из кода', !!ok && (await page.evaluate(() => window.AMOORE_VERSION)) === '7.2.0');
+    T.check('подвал лендинга показывает ту же версию из БД', (await page.textContent('.version-btn [data-amoore-version]')) === 'v7');
     await page.click('#version-btn');
     await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 2, 3000);
     await page.evaluate(() => document.querySelectorAll('#nx-changelog .nx-cl-subtoggle').forEach(b => b.click()));
@@ -221,13 +221,15 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await page.context().close(); }
   { const { page } = await open(S.seed(), { mobile: true, viewport: { width: 390, height: 844 } });
     await sleep(600);
-    await page.click('#burger'); await sleep(450);
-    const st = await page.evaluate(() => ({ open: document.getElementById('ux-topbar').classList.contains('open'), lock: document.documentElement.classList.contains('ux-menu-open'), ar: document.getElementById('burger').getAttribute('aria-expanded'), links: document.querySelectorAll('.ux-nav a').length, theme: !!document.querySelector('.ux-tools [data-ux-theme]') }));
-    T.check('бургер открывает меню, scroll-lock включён, aria-expanded=true, тема остаётся в шапке', st.open && st.lock && st.ar === 'true' && st.links >= 5 && st.theme, JSON.stringify(st));
-    await page.keyboard.press('Escape'); await sleep(300);
-    T.check('Esc закрывает меню и снимает scroll-lock', !(await page.$eval('#ux-topbar', e => e.classList.contains('open'))) && !(await page.evaluate(() => document.documentElement.classList.contains('ux-menu-open'))));
-    await page.click('#burger'); await sleep(400); await page.click('.ux-nav a[href="#news"]'); await sleep(900);
-    T.check('тап по пункту меню закрывает его и переключает вкладку «Новости»', !(await page.$eval('#ux-topbar', e => e.classList.contains('open'))) && await page.evaluate(() => amooreSPA.current() === 'news' && document.getElementById('view-news').classList.contains('is-active') && location.hash === '#news'));
+    // v6.0.1 (Pill-Style): бургера и выезжающего меню больше нет — сверху одна пилюля, снизу пилюля-док из 3 кнопок
+    const st = await page.evaluate(() => { const vis = e => !!e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0;
+      const bar = document.querySelector('.ux-bar').getBoundingClientRect(), dock = document.getElementById('spa-tabbar').getBoundingClientRect();
+      return { burger: vis(document.getElementById('burger')), top: bar.top < 20 && bar.height <= 64 && bar.width > 300, theme: vis(document.querySelector('.ux-tools [data-ux-theme]')),
+        tabs: [...document.querySelectorAll('#spa-tabbar .spa-tab')].filter(vis).map(e => e.textContent.trim()).join('|'), dockBottom: Math.round(innerHeight - dock.bottom), dockW: Math.round(dock.width), overflow: document.documentElement.scrollWidth > innerWidth }; });
+    T.check('телефон: бургера нет, сверху одна пилюля (лого, тема), без горизонтальной прокрутки', !st.burger && st.top && st.theme && !st.overflow, JSON.stringify(st));
+    T.check('телефон: снизу 3 кнопки-пилюли «Главная | Новости | Настройки», док плавающий (отступы по бокам и снизу)', st.tabs === 'Главная|Новости|Настройки' && st.dockBottom >= 8 && st.dockW <= 390 - 20, JSON.stringify(st));
+    await page.click('#spa-tabbar [data-spa-tab="news"]'); await sleep(900);
+    T.check('тап по «Новости» в нижней пилюле переключает вкладку и хэш', await page.evaluate(() => amooreSPA.current() === 'news' && document.getElementById('view-news').classList.contains('is-active') && location.hash === '#news'));
     await page.context().close(); }
 
 
@@ -300,7 +302,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     T.check('viewport-fit=cover включён', /viewport-fit=cover/.test(html));
     T.check('v4.4 плавающей кнопки #mobile-cta в разметке нет, а в CSS она display:none !important', !/id="mobile-cta"/.test(html) && /\.mobile-cta[^{]*\{\s*display:\s*none\s*!important/.test(css));
     T.check('safe-area-inset-* применён к шапке, меню, нижней панели, подвалу и модалке', ['.ux-topbar', '.ux-panel', 'footer'].every(sel => new RegExp(sel.replace('.', '\\.') + '[^{]*\\{[^}]*safe-area-inset', 's').test(css + fs.readFileSync(path.join(ROOT, 'amoore-theme.css'), 'utf8'))));
-    T.check('кэш: CSS/JS подключены с версией ?v=5.8.0', /style\.css\?v=5.8.0/.test(html) && /amoore-core\.js\?v=5.8.0/.test(html) && /landing\.js\?v=5.8.0/.test(html));
+    T.check('кэш: CSS/JS подключены с версией ?v=6.0.0', /style\.css\?v=6.0.0/.test(html) && /amoore-core\.js\?v=6.0.0/.test(html) && /landing\.js\?v=6.0.0/.test(html));
     const hdr = fs.readFileSync(path.join(ROOT, '_headers'), 'utf8');
     T.check('_headers: CSS больше не «immutable на год»', !/\/\*\.css\s*\n\s*Cache-Control:[^\n]*immutable/.test(hdr)); }
 
@@ -328,6 +330,28 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     await page.context().close();
   }
 
+
+  // ---------- v6: ЯКОРЬ-ЛУПА и сетка пилюль (одинаково на любом экране) ----------
+  console.log('Пилюли: Лупа-якорь и сетка');
+  for (const [vw, vh, mob] of [[390, 844, true], [844, 390, true], [1024, 768, false], [1440, 900, false]]) {
+    const { page } = await open(null, { viewport: { width: vw, height: vh }, mobile: mob }); await sleep(500);
+    const g = await page.evaluate(() => {
+      const R = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; };
+      return { vw: innerWidth, vh: innerHeight, loupe: R('#pill-search'), dock: R('#spa-tabbar'), nav: R('#ux-nav'), bar: R('.ux-bar'), burger: document.querySelectorAll('#burger, .ux-burger, [data-ux-burger]').length, hs: document.documentElement.scrollWidth - innerWidth };
+    });
+    const near = (a, b, e = 1.5) => Math.abs(a - b) <= e, L = g.loupe, tag = `${vw}×${vh}`;
+    T.check(`${tag}: Лупа видна и стоит слева внизу (поле 16px, 64×64)`, !!L && near(L.l, 16) && near(g.vh - L.b, 16) && near(L.w, 64) && near(L.h, 64), JSON.stringify(L));
+    T.check(`${tag}: бургера нет, горизонтальной прокрутки нет`, g.burger === 0 && g.hs <= 1, `${g.burger}/${g.hs}`);
+    if (vw < 900 && vh > vw - 1 || (vw < 640)) {
+      const D = g.dock;
+      T.check(`${tag}: нижний док справа от Лупы — та же линия и высота, зазор 8px, правое поле 16px`, !!D && near(D.b, L.b) && near(D.h, L.h) && near(D.l - L.r, 8) && near(g.vw - D.r, 16), JSON.stringify(D));
+    } else {
+      const N = g.nav, B = g.bar;
+      T.check(`${tag}: правая пилюля: ширина 128, поле 16px, по центру высоты`, !!N && near(N.w, 128) && near(g.vw - N.r, 16) && near(N.cy, g.vh / 2, 2), JSON.stringify(N));
+      T.check(`${tag}: левая пилюля и Лупа на одной оси (ширина 64px)`, !!B && near(B.w, 64) && near(B.cx, L.cx) && near(B.l, 16), `${B && B.cx}/${L.cx}`);
+    }
+    await page.context().close();
+  }
   await b.close(); srv.close();
   process.exit(T.finish({ matrix }) ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });

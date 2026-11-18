@@ -41,9 +41,9 @@ check('токен SSO и ссылки стираются из адресной �
 check('нет innerHTML в amoore-id.js (XSS)', !/innerHTML/.test(idCode));
 
 // ---- версии
-const v = '5.8.0';
-check('AMOORE_VERSION в core', /AMOORE_VERSION(?: =|:) ?['"]5\.8\.0['"]/.test(read('amoore-ru/amoore-core.js')));
-check('версия в bot.py', /AMOORE_VERSION = "5.8.0"/.test(read('amoore-ai/bot.py')));
+const v = '6.0.0';
+check('AMOORE_VERSION в core', /AMOORE_VERSION(?: =|:) ?['"]6\.0\.0['"]/.test(read('amoore-ru/amoore-core.js')));
+check('версия в bot.py', /AMOORE_VERSION = "6.0.0"/.test(read('amoore-ai/bot.py')));
 for (const d of ['amoore-dev', 'amoore-ru', 'amoore-studio', 'amoore-ai']) check(`changelog ${d}`, JSON.parse(read(`${d}/changelog.json`)).current === v);
 
 // ---- PWA
@@ -98,7 +98,7 @@ check('бот: бизнес-ассистент читает business_automations
 const css = read('amoore-dev/style.css');
 check('CSS: .lead-card / .news-card — column, gap 12px, без space-between', /\.lead-card, \.news-card \{[^}]*flex-direction: column;[^}]*gap: 12px/.test(css) && !/\.lead-card[^{]*\{[^}]*space-between/.test(css));
 check('админка: рассылка полностью удалена (v5.2)', !/telegram-broadcast-btn|broadcast-card/.test(read('amoore-dev/app.js') + read('amoore-dev/index.html')));
-check('админка: теги заявок, CSV, фильтр журнала, Realtime-графики', /Экспорт в CSV/.test(read('amoore-dev/amoore-admin-v5.js')) && /amoore-live-activity/.test(read('amoore-dev/amoore-admin-v5.js')) && /id="logs-filter"/.test(read('amoore-dev/index.html')));
+check('админка: теги заявок, CSV, фильтр журнала, Realtime-графики', /Скачать CSV/.test(read('amoore-dev/amoore-admin-v5.js')) && /amoore-live-activity/.test(read('amoore-dev/amoore-admin-v5.js')) && /id="logs-filter"/.test(read('amoore-dev/index.html')));
 const cl = JSON.parse(read('amoore-ru/changelog.json')).versions.find((x) => x.version === '5.7.0');
 check('changelog: v5.7 SOCIAL от 2026-11-14', cl && cl.title === 'SOCIAL' && cl.date === '2026-11-14' && cl.items.length >= 4);
 const cl2 = JSON.parse(read('amoore-ru/changelog.json')).versions.find((x) => x.version === '5.4.0');

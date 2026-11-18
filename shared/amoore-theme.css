@@ -134,7 +134,7 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
   border-color: rgba(var(--nx-gold-rgb), 0.35);
   box-shadow: none;
 }
-.btn-sm, .aid-btn.aid-sm { min-height: 36px; padding: 0 14px; font-size: 13px; }
+.btn-sm, .aid-btn.aid-sm { min-height: 36px; padding: 0 14px; font-size: calc(13px * var(--fs, 1)); }
 @media (hover: hover) {
   .btn:hover:not(:disabled), .btn-primary:hover:not(:disabled), .nx-btn:hover:not(:disabled), .aid-btn:hover:not(:disabled) {
     background: var(--nx-btn-bg-hover);
@@ -148,28 +148,7 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
 }
 .btn:active:not(:disabled), .aid-btn:active:not(:disabled) { transform: scale(0.97); }
 
-/* Тумблеры AURUM: on = зелёный + glow, off = тёмно-серый с красным индикатором */
-.switch, .toggle, .aid-switch, input[type="checkbox"].toggle {
-  appearance: none; -webkit-appearance: none;
-  width: 48px; height: 28px; border-radius: 999px;
-  background: #2A2A30; border: 1px solid rgba(239, 68, 68, 0.45);
-  position: relative; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s;
-  flex-shrink: 0;
-}
-.switch::after, .toggle::after, .aid-switch::after, input[type="checkbox"].toggle::after {
-  content: ""; position: absolute; top: 3px; left: 3px;
-  width: 20px; height: 20px; border-radius: 50%;
-  background: #EF4444; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
-  transition: transform .2s cubic-bezier(.34,1.4,.64,1), background .2s, box-shadow .2s;
-}
-.switch:checked, .toggle:checked, .aid-switch:checked, input[type="checkbox"].toggle:checked {
-  background: rgba(34, 197, 94, 0.22); border-color: #22C55E;
-  box-shadow: 0 0 12px rgba(34, 197, 94, 0.35);
-}
-.switch:checked::after, .toggle:checked::after, .aid-switch:checked::after, input[type="checkbox"].toggle:checked::after {
-  transform: translateX(20px); background: #22C55E;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.55);
-}/* Карточки с золотой окантовкой */
+/* Карточки с золотой окантовкой */
 
 .bento-tile { transition: border-color .2s, transform .2s, box-shadow .2s; }
 @media (hover: hover) {
@@ -181,38 +160,12 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
 }
 
 
-/* ---------- Тумблеры: жёсткие размеры, не растягиваются в Safari/iOS ---------- */
-.toggle {
-  flex-shrink: 0;
-  box-sizing: border-box;
-  min-width: 46px;
-  width: 46px;
-  height: 28px;
-  min-height: 0;
-  max-height: 28px;
-  overflow: hidden;
-  position: relative;
-}
-.toggle .toggle-knob, .toggle-knob {
-  flex-shrink: 0;
-  box-sizing: border-box;
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
-  top: 3px;
-  left: 3px;
-  position: absolute;
-  border-radius: 50%;
-}
-.toggle.open .toggle-knob, .toggle.on .toggle-knob { transform: translateX(18px); }
-.toggle.closed .toggle-knob, .toggle.off .toggle-knob { transform: translateX(0); }
-.toggle-row > .toggle, .perm-row > .toggle { flex: 0 0 46px; }
-
+/* тумблеры перенесены в 29-toggles.css (v6.0.1) */
 /* ---------- Чип версии (рядом с логотипом) ---------- */
 .nx-version-chip {
   display: inline-flex; align-items: center; justify-content: center;
   margin-left: 8px; padding: 0 12px; min-height: 32px; min-width: 44px;
-  font: 700 11px/1 var(--nx-btn-font); letter-spacing: .02em;
+  font: 700 calc(11px * var(--fs, 1))/1 var(--nx-btn-font); letter-spacing: .02em;
   color: var(--nx-gold); background: transparent;
   border: 1px solid rgba(var(--nx-gold-rgb), .35); border-radius: 999px;
   cursor: pointer; vertical-align: middle; white-space: nowrap;
@@ -229,38 +182,22 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
   color: #0a0e18; background: var(--nx-btn-gradient); border: 0; cursor: pointer;
 }
 .nx-btn:disabled { opacity: .6; cursor: default; }
-.nx-field { display: grid; gap: 6px; margin: 0 0 12px; font-size: 13px; color: var(--nx-muted); }
+.nx-field { display: grid; gap: 6px; margin: 0 0 12px; font-size: calc(13px * var(--fs, 1)); color: var(--nx-muted); }
 .nx-field input {
   min-height: 44px; padding: 0 12px; box-sizing: border-box; width: 100%;
   color: var(--nx-ink); background: rgba(255, 255, 255, .05);
   border: 1px solid rgba(var(--nx-gold-rgb), .2); border-radius: 12px;
-  font: 16px var(--nx-font-body);
+  font: calc(16px * var(--fs, 1)) var(--nx-font-body);
 }
 .nx-field input:focus { outline: 2px solid rgba(var(--nx-gold-rgb), .6); outline-offset: 1px; }
-.nx-login-error { margin: 0 0 12px; color: #f87171; font-size: 13px; }
+.nx-login-error { margin: 0 0 12px; color: #f87171; font-size: calc(13px * var(--fs, 1)); }
 .nx-login-error[hidden] { display: none; }
 .nx-login-submit { width: 100%; }
 .nx-login-card { max-width: 400px; }
 /* вход админа должен быть выше заставки закрытого сайта (z-index заставки = 2147483647) */
 .nx-login-overlay { z-index: 2147483647; }
 
-/* =====================================================================
-   v4.2 «NEXUS TOTAL FIX» — тумблеры iOS: жёстко 46×28, кружок 20×20, без min-height
-   Идёт в конце файла и бьёт любые другие правила (в т.ч. общие min-height: 44px для кнопок).
-   ===================================================================== */
-.toggle {
-  width: 46px !important; min-width: 46px !important; max-width: 46px !important;
-  height: 28px !important; min-height: 0 !important; max-height: 28px !important;
-  box-sizing: border-box !important; overflow: hidden !important; position: relative !important;
-  flex: 0 0 46px !important; padding: 0 !important;
-}
-.toggle .toggle-knob, .toggle-knob {
-  width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 0 !important;
-  max-width: 20px !important; max-height: 20px !important;
-  top: 3px !important; left: 3px !important; position: absolute !important; border-radius: 50% !important;
-  box-sizing: border-box !important;
-}
-
+/* тумблеры перенесены в 29-toggles.css (v6.0.1) */
 /* =====================================================================
    v4.3 POLISH — Unified Topbar (.ux-*). Одна и та же шапка на всех сайтах экосистемы.
    Слева: логотип + чип версии · Центр: вкладки · Справа: тема, ⚙ (админам), пользователь, «Выйти».
@@ -284,15 +221,15 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
 .ux-logo { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: inherit; text-decoration: none; }
 .ux-mark {
   flex: 0 0 38px; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px;
-  font: 800 18px/1 var(--nx-font-head); color: #0a0e18; background: var(--nx-btn-gradient);
+  font: 800 calc(18px * var(--fs, 1))/1 var(--nx-font-head); color: #0a0e18; background: var(--nx-btn-gradient);
   box-shadow: 0 0 0 1px rgba(var(--nx-gold-rgb), .4);
 }
 .ux-name { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
-.ux-name strong { font: 800 15px/1.15 var(--nx-font-head); white-space: nowrap; }
-.ux-name small { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--nx-muted); }
+.ux-name strong { font: 800 calc(15px * var(--fs, 1))/1.15 var(--nx-font-head); white-space: nowrap; }
+.ux-name small { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(11px * var(--fs, 1)); color: var(--nx-muted); }
 .ux-chip {
   display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 32px; padding: 0 12px;
-  font: 700 11px/1 var(--nx-btn-font); letter-spacing: .02em; white-space: nowrap; cursor: pointer;
+  font: 700 calc(11px * var(--fs, 1))/1 var(--nx-btn-font); letter-spacing: .02em; white-space: nowrap; cursor: pointer;
   color: var(--nx-gold); background: transparent; border: 1px solid rgba(var(--nx-gold-rgb), .35); border-radius: 999px;
   -webkit-tap-highlight-color: transparent;
 }
@@ -304,7 +241,7 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
 .ux-nav::-webkit-scrollbar { display: none; }
 .ux-tab {
   position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; box-sizing: border-box;
-  font: 600 13.5px/1 var(--nx-btn-font); white-space: nowrap; text-decoration: none; cursor: pointer;
+  font: 600 calc(13.5px * var(--fs, 1))/1 var(--nx-btn-font); white-space: nowrap; text-decoration: none; cursor: pointer;
   color: var(--nx-muted); background: transparent; border: 0; border-radius: var(--nx-btn-radius);
   transition: color .18s ease, background-color .18s ease, box-shadow .18s ease;
   -webkit-tap-highlight-color: transparent;
@@ -313,7 +250,7 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
 .ux-tab.active, .ux-tab[aria-current="page"] { color: var(--nx-gold); background: rgba(var(--nx-gold-rgb), .12); box-shadow: inset 0 0 0 1px rgba(var(--nx-gold-rgb), .38); }
 .ux-count, .ux-badge {
   display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
-  font: 700 11px/1 var(--nx-btn-font); border-radius: 999px; color: var(--nx-muted); background: rgba(var(--nx-gold-rgb), .14);
+  font: 700 calc(11px * var(--fs, 1))/1 var(--nx-btn-font); border-radius: 999px; color: var(--nx-muted); background: rgba(var(--nx-gold-rgb), .14);
 }
 .ux-badge { color: #fff; background: #ef4444; box-shadow: 0 0 0 2px var(--nx-bg); }
 .ux-tools { order: 2; display: flex; align-items: center; gap: 8px; flex: 0 0 auto; margin-left: auto; }
@@ -328,14 +265,14 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
 .ux-icon-btn:hover, .ux-burger:hover { color: var(--nx-gold); border-color: rgba(var(--nx-gold-rgb), .7); }
 .ux-icon-btn svg { width: 20px; height: 20px; display: block; }
 :root[data-theme="light"] .ux-ico-moon, :root:not([data-theme="light"]) .ux-ico-sun { display: none; }
-.ux-user { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 170px; padding: 0 4px; font: 700 13px/1 var(--nx-btn-font); }
+.ux-user { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 170px; padding: 0 4px; font: 700 calc(13px * var(--fs, 1))/1 var(--nx-btn-font); }
 .ux-avatar {
   flex: 0 0 32px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
-  font: 800 14px/1 var(--nx-font-head); color: #0a0e18; background: var(--nx-btn-gradient);
+  font: 800 calc(14px * var(--fs, 1))/1 var(--nx-font-head); color: #0a0e18; background: var(--nx-btn-gradient);
 }
 .ux-user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ux-logout {
-  min-height: 40px; padding: 0 16px; box-sizing: border-box; font: 700 13px/1 var(--nx-btn-font); cursor: pointer;
+  min-height: 40px; padding: 0 16px; box-sizing: border-box; font: 700 calc(13px * var(--fs, 1))/1 var(--nx-btn-font); cursor: pointer;
   color: var(--nx-ink); background: transparent; border: 1px solid rgba(var(--nx-gold-rgb), .3); border-radius: var(--nx-btn-radius);
 }
 .ux-logout:hover { color: #0a0e18; background: var(--nx-btn-gradient); border-color: transparent; }
@@ -360,13 +297,13 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
   }
   .ux-topbar.open .ux-panel { display: flex; }
   .ux-nav { flex-direction: column; align-items: stretch; gap: 4px; overflow: visible; }
-  .ux-tab { min-height: 46px; padding: 0 14px; font-size: 15px; justify-content: space-between; }
+  .ux-tab { min-height: 46px; padding: 0 14px; font-size: calc(15px * var(--fs, 1)); justify-content: space-between; }
   .ux-group { flex-wrap: wrap; padding-top: 12px; border-top: 1px solid rgba(var(--nx-gold-rgb), .16); }
   .ux-user { flex: 1 1 auto; max-width: none; }
   .ux-logout { flex: 1 1 100%; min-height: 46px; }
   html.ux-menu-open, html.ux-menu-open body { overflow: hidden; }
 }
-@media (max-width: 420px) { .ux-name strong { font-size: 14px; } .ux-chip { padding: 0 9px; min-width: 40px; } }
+@media (max-width: 420px) { .ux-name strong { font-size: calc(14px * var(--fs, 1)); } .ux-chip { padding: 0 9px; min-width: 40px; } }
 @media (prefers-reduced-motion: reduce) { .ux-tab, .ux-icon-btn, .ux-burger, .ux-burger span { transition: none !important; } }
 
 /* =====================================================================
@@ -390,13 +327,13 @@ h1, h2, h3, h4, .brand-text strong, .brand-name, .section-title, .modal h2, .mod
   .ux-mobile-extra { order: 2; display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding-top: 14px; border-top: 1px solid rgba(var(--nx-gold-rgb), .16); }
   .ux-extra-tg {
     display: flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; padding: 0 20px; box-sizing: border-box;
-    font: 800 15px/1 var(--nx-btn-font); text-decoration: none; color: #0a0e18; background: var(--nx-btn-gradient);
+    font: 800 calc(15px * var(--fs, 1))/1 var(--nx-btn-font); text-decoration: none; color: #0a0e18; background: var(--nx-btn-gradient);
     border: 0; border-radius: var(--nx-btn-radius); -webkit-tap-highlight-color: transparent;
   }
   .ux-extra-qr { display: flex; align-items: center; gap: 14px; padding: 12px; border: 1px solid rgba(var(--nx-gold-rgb), .2); border-radius: 16px; }
   .ux-extra-qr img { flex: 0 0 96px; width: 96px; height: 96px; border-radius: 10px; background: #fff; padding: 4px; box-sizing: border-box; object-fit: contain; }
-  .ux-extra-qr span { font: 700 14px/1.35 var(--nx-btn-font); color: var(--nx-ink); }
-  .ux-extra-dev { display: block; text-align: center; padding: 10px; font: 700 14px/1.2 var(--nx-btn-font); color: var(--nx-gold); text-decoration: none; }
+  .ux-extra-qr span { font: 700 calc(14px * var(--fs, 1))/1.35 var(--nx-btn-font); color: var(--nx-ink); }
+  .ux-extra-dev { display: block; text-align: center; padding: 10px; font: 700 calc(14px * var(--fs, 1))/1.2 var(--nx-btn-font); color: var(--nx-gold); text-decoration: none; }
 }
 @media (min-width: 1120px) { .ux-mobile-extra { display: none !important; } }
 
@@ -415,7 +352,7 @@ html, body { overflow-x: hidden; max-width: 100%; }
 /* Блок 6.1: вкладки-«чипсы» — как в новостях на лендинге; без эффекта «проваливания» */
 .chip-tabs, .aid-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
 .chip-tab, .aid-nav button, .aid-nav a {
-  appearance: none; font: 600 13px/1 var(--nx-font-body, system-ui); color: var(--nx-ink-soft, var(--text-secondary, inherit));
+  appearance: none; font: 600 calc(13px * var(--fs, 1))/1 var(--nx-font-body, system-ui); color: var(--nx-ink-soft, var(--text-secondary, inherit));
   padding: 9px 16px; min-height: 36px; border-radius: var(--ui-radius-chip); cursor: pointer;
   background: rgba(var(--nx-gold-rgb, 212, 175, 55), .06); border: 1px solid rgba(var(--nx-gold-rgb, 212, 175, 55), .22);
   transition: background .2s var(--ui-ease), border-color .2s var(--ui-ease), color .2s var(--ui-ease);
@@ -426,10 +363,7 @@ html, body { overflow-x: hidden; max-width: 100%; }
   color: var(--nx-gold, #d4af37); background: rgba(var(--nx-gold-rgb, 212, 175, 55), .16); border-color: rgba(var(--nx-gold-rgb, 212, 175, 55), .6);
 }
 
-/* Блок 6.2: тумблеры — один размер и одна анимация везде */
-.toggle, .nx-switch { width: 46px; min-width: 46px; height: 26px; max-height: 26px; border-radius: 999px; transition: background .25s var(--ui-ease), border-color .25s var(--ui-ease); }
-.toggle-knob { top: 2px; left: 2px; width: 20px; height: 20px; transition: transform .25s var(--ui-ease), background .25s var(--ui-ease); }
-.toggle.open .toggle-knob { transform: translateX(20px); }
+/* тумблеры: см. 29-toggles.css */
 
 /* Блок 6.3: кнопки — единый радиус и hover */
 .btn, .aid-btn, .nx-btn, .btn-ghost, .btn-primary, .btn-sm, button.primary { border-radius: var(--ui-radius-btn); transition: transform .18s var(--ui-ease), box-shadow .18s var(--ui-ease), background .18s var(--ui-ease), border-color .18s var(--ui-ease); }
@@ -458,12 +392,7 @@ html, body { overflow-x: hidden; max-width: 100%; }
   .btn, .btn-ghost, .btn-primary, .primary-button, .secondary-button, .ghost-button { white-space: normal; overflow-wrap: anywhere; }
   .modal-actions > *, .digest-actions > * { flex: 1 1 140px; }
 }
-/* тумблеры: никогда не сжимаются и не растягиваются во flex/grid-рядах */
-.toggle, .nx-switch, .aid-sw, input[type="checkbox"][role="switch"] {
-  flex: 0 0 auto !important; flex-shrink: 0 !important; align-self: center;
-  width: 46px !important; min-width: 46px !important; max-width: 46px !important;
-  height: 28px !important; min-height: 28px !important; max-height: 28px !important; box-sizing: border-box;
-}
+/* тумблеры: размеры и поведение во flex-рядах — в 29-toggles.css */
 .toggle-row, .perm-row, .setting-row, .settings-row, .aid-inl { min-width: 0; align-items: center; }
 .toggle-row > :not(.toggle):not(.aid-sw), .perm-row > :not(.toggle):not(.aid-sw) { min-width: 0; }
 /* переключатель темы «Тёмная / Светлая» — кнопки в одну линию без растяжения на весь экран */
@@ -509,7 +438,7 @@ html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs)[
 html body :is(.pill-tabs > button, .aid-tabs > button, .settings-sidebar > .settings-tab, .chip-tabs > .chip-tab, .news-tabs > .tab) {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   min-height: 40px; width: auto; max-width: none; margin: 0; padding: 8px 16px; box-sizing: border-box;
-  font: 600 13px/1.2 var(--font, inherit); letter-spacing: 0; white-space: nowrap; text-align: center; text-decoration: none;
+  font: 600 calc(13px * var(--fs, 1))/1.2 var(--font, inherit); letter-spacing: 0; white-space: nowrap; text-align: center; text-decoration: none;
   color: var(--muted, #8b90a5); background: transparent; border: 0; border-radius: 999px; cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--line, rgba(139, 144, 165, .28)); transform: none; scroll-snap-align: start;
   transition: color .2s ease, background-color .2s ease, box-shadow .2s ease;
@@ -531,7 +460,7 @@ html body :is(.pill-tabs > button.on, .pill-tabs > button.active, .pill-tabs > b
 /* серый кружок-счётчик (как «0/3» в новостях); бейджи в админке получают тот же вид */
 html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs) :is(.news-count, .ux-badge, .pill-count) {
   position: static; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin: 0;
-  font-size: 11px; font-weight: 700; border-radius: 999px; box-sizing: border-box;
+  font-size: calc(11px * var(--fs, 1)); font-weight: 700; border-radius: 999px; box-sizing: border-box;
   background: color-mix(in srgb, var(--ink, #fff) 9%, transparent); color: var(--muted, #8b90a5);
 }
 html body :is(.pill-tabs, .aid-tabs, .settings-sidebar, .chip-tabs, .news-tabs) :is(.news-count, .ux-badge, .pill-count)[hidden] { display: none; }
@@ -545,7 +474,7 @@ html body .settings-sidebar { --ink: var(--text, inherit); --muted: var(--text-s
 @media (min-width: 1280px) {
   html body .ux-nav { gap: 8px; padding: 4px; justify-content: flex-start; scroll-snap-type: x proximity; }
   html body .ux-nav > .ux-tab {
-    flex: 0 0 auto; min-height: 38px; padding: 8px 16px; font: 600 13px/1.2 var(--nx-btn-font, inherit); border-radius: 999px;
+    flex: 0 0 auto; min-height: 38px; padding: 8px 16px; font: 600 calc(13px * var(--fs, 1))/1.2 var(--nx-btn-font, inherit); border-radius: 999px;
     color: var(--nx-muted, #8b90a5); background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--nx-gold-rgb, 212, 175, 55), .28); scroll-snap-align: start;
   }
   html body .ux-nav > .ux-tab:hover { color: var(--nx-ink, inherit); background: transparent; box-shadow: inset 0 0 0 1px rgba(var(--nx-gold-rgb, 212, 175, 55), .55); }
@@ -602,8 +531,8 @@ html[data-theme="light"], body.light { --lg-bg: rgba(255, 255, 255, .58); --lg-l
   border: 1px solid var(--lg-line, rgba(255,255,255,.14)); background: var(--lg-bg, rgba(18,24,40,.55)); -webkit-backdrop-filter: blur(18px) saturate(1.5); backdrop-filter: blur(18px) saturate(1.5);
   box-shadow: inset 0 1px 0 var(--lg-hi, rgba(255,255,255,.18)); transition: transform .25s ease, border-color .25s ease; }
 .bento-tile:hover { transform: translateY(-3px); border-color: rgba(var(--nx-gold-rgb), .6); }
-.bento-tile h3 { margin: 0; font-size: 18px; overflow-wrap: anywhere; } .bento-tile p { margin: 0; font-size: 13px; opacity: .78; overflow-wrap: anywhere; }
-.bento-ico { font-size: 26px; color: var(--nx-gold); }
+.bento-tile h3 { margin: 0; font-size: calc(18px * var(--fs, 1)); overflow-wrap: anywhere; } .bento-tile p { margin: 0; font-size: calc(13px * var(--fs, 1)); opacity: .78; overflow-wrap: anywhere; }
+.bento-ico { font-size: calc(26px * var(--fs, 1)); color: var(--nx-gold); }
 @media (max-width: 899px) { .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bento-tile { min-height: 150px; padding: 16px; } }
 @media (max-width: 480px) { .bento { grid-template-columns: 1fr; } .bento-tile { min-height: 0; } }
 
@@ -612,7 +541,7 @@ html[data-theme="light"], body.light { --lg-bg: rgba(255, 255, 255, .58); --lg-l
 .user-banner { height: 140px; margin: -36px -24px 0; background: center / cover no-repeat; }
 .user-banner-def { background: linear-gradient(120deg, #d4af37 0%, #8a5cf6 55%, #2dd4bf 100%); opacity: .85; }
 .user-public .user-av, .user-public .user-av-ph { margin-top: -52px; position: relative; }
-.user-stats { margin: 0 0 12px; font-size: 14px; opacity: .8; }
+.user-stats { margin: 0 0 12px; font-size: calc(14px * var(--fs, 1)); opacity: .8; }
 .user-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 4px 0 14px; }
 .user-actions .btn { flex: 0 1 auto; }
 .aid-people { max-width: 560px; margin: 0 auto 16px; }
@@ -651,7 +580,7 @@ html body .spa-view { animation: none !important; }
 .user-head { display: flex; align-items: flex-end; gap: 16px; padding: 0 16px 14px; margin-top: -40px; position: relative; flex-wrap: wrap; }
 .user-head .user-av, .user-head .user-av-ph { flex: 0 0 auto; margin: 0 !important; width: 88px; height: 88px; border-radius: 50%; border: 4px solid var(--nx-bg, #0d1220); }
 .user-head-info { flex: 1 1 220px; min-width: 0; padding-top: 44px; text-align: left; }
-.user-head-info h1, .user-head-info h2 { margin: 0 0 2px; font-size: 20px; overflow-wrap: anywhere; }
+.user-head-info h1, .user-head-info h2 { margin: 0 0 2px; font-size: calc(20px * var(--fs, 1)); overflow-wrap: anywhere; }
 .user-head-info .user-actions { justify-content: flex-start; margin: 10px 0 0; }
 .user-public .user-av, .user-public .user-av-ph { margin-top: 0; }
 
@@ -667,7 +596,7 @@ html body .spa-view { animation: none !important; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 12px 32px rgba(0,0,0,.25);
 }
 .god-box > summary {
-  cursor: pointer; font-weight: 800; font-size: 15px; list-style: none;
+  cursor: pointer; font-weight: 800; font-size: calc(15px * var(--fs, 1)); list-style: none;
   color: var(--nx-gold, #d4af37); letter-spacing: .02em;
 }
 .god-box > summary::-webkit-details-marker { display: none; }
@@ -676,13 +605,13 @@ html body .spa-view { animation: none !important; }
 .god-row input {
   flex: 1 1 140px; min-width: 0; height: 40px; padding: 0 12px;
   border-radius: 12px; border: 1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.25); color: inherit; font-size: 14px;
+  background: rgba(0,0,0,.25); color: inherit; font-size: calc(14px * var(--fs, 1));
 }
 .god-row input:focus { outline: 2px solid var(--nx-gold); outline-offset: 1px; }
 .god-row .aid-btn { min-height: 40px; padding: 0 14px; border-radius: 12px; }
-.god-note { font-size: 12px; opacity: .7; margin: 8px 0 0; line-height: 1.4; }
-.god-box .aid-big { font-size: 22px; font-weight: 800; color: var(--nx-gold); margin: 4px 0 8px; }
-.god-box h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin: 16px 0 0; font-weight: 700; }/* v5.8.0: changelog — карточки Deep Glass и таймлайн эр */
+.god-note { font-size: calc(12px * var(--fs, 1)); opacity: .7; margin: 8px 0 0; line-height: 1.4; }
+.god-box .aid-big { font-size: calc(22px * var(--fs, 1)); font-weight: 800; color: var(--nx-gold); margin: 4px 0 8px; }
+.god-box h3 { font-size: calc(13px * var(--fs, 1)); text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin: 16px 0 0; font-weight: 700; }/* v5.8.0: changelog — карточки Deep Glass и таймлайн эр */
 /* ===== AURUM Changelog accordion ===== */
 
 
@@ -690,9 +619,9 @@ html body .spa-view { animation: none !important; }
 .hero-eco-head { text-align: center; max-width: 720px; margin: 0 auto 32px; padding: 0 16px; }
 .hero-eco-head h1 { font-size: clamp(28px, 5vw, 44px); line-height: 1.15; font-weight: 800; margin: 16px 0 12px; letter-spacing: -0.02em; }
 .hero-eco-head h1 em { font-style: normal; color: var(--nx-gold); }
-.hero-lead { font-size: 16px; line-height: 1.55; color: var(--nx-muted); max-width: 560px; margin: 0 auto; }
+.hero-lead { font-size: calc(16px * var(--fs, 1)); line-height: 1.55; color: var(--nx-muted); max-width: 560px; margin: 0 auto; }
 .hero-badge {
-  display: inline-flex; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  display: inline-flex; padding: 6px 14px; border-radius: 999px; font-size: calc(12px * var(--fs, 1)); font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--nx-gold);
   border: 1px solid rgba(var(--nx-gold-rgb), .35); background: rgba(var(--nx-gold-rgb), .08);
 }
@@ -701,9 +630,9 @@ html body .spa-view { animation: none !important; }
   max-width: 1100px; margin: 0 auto; padding: 0 16px 32px;
 }
 .bento-tile { display: flex; flex-direction: column; gap: 8px; padding: 20px; min-height: 160px; text-decoration: none; color: inherit; }
-.bento-tile h3 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
-.bento-tile p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--nx-muted); flex: 1; }
-.bento-ico { font-size: 22px; color: var(--nx-gold); line-height: 1; }
+.bento-tile h3 { margin: 0; font-size: calc(17px * var(--fs, 1)); font-weight: 800; letter-spacing: -0.01em; }
+.bento-tile p { margin: 0; font-size: calc(13px * var(--fs, 1)); line-height: 1.45; color: var(--nx-muted); flex: 1; }
+.bento-ico { font-size: calc(22px * var(--fs, 1)); color: var(--nx-gold); line-height: 1; }
 @media (max-width: 900px) {
   .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 }
@@ -875,8 +804,8 @@ img, svg, video { max-width: 100%; height: auto; }
 /* Mobile */
 @media (max-width: 640px) {
   .bento, .eco-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 12px; }
-  .hero-eco-head h1 { font-size: 26px !important; line-height: 1.2; }
-  .hero-lead { font-size: 15px; }
+  .hero-eco-head h1 { font-size: calc(26px * var(--fs, 1)) !important; line-height: 1.2; }
+  .hero-lead { font-size: calc(15px * var(--fs, 1)); }
   .section { padding-top: 32px; padding-bottom: 32px; }
   /* profile cards full width */
   .user-card, .aid-card, .god-box { width: 100% !important; max-width: 100% !important; }
@@ -902,9 +831,9 @@ img, svg, video { max-width: 100%; height: auto; }
 }
 /* Very small */
 @media (max-width: 360px) {
-  .hero-eco-head h1 { font-size: 22px !important; }
+  .hero-eco-head h1 { font-size: calc(22px * var(--fs, 1)) !important; }
   .bento-tile { padding: 16px; }
-  .ux-chip, .nx-version-chip { font-size: 11px; padding: 0 8px; }
+  .ux-chip, .nx-version-chip { font-size: calc(11px * var(--fs, 1)); padding: 0 8px; }
 }
 /* Landscape phone */
 @media (max-height: 480px) and (orientation: landscape) {
@@ -1001,8 +930,8 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   gap: 2px;
   min-width: 0;
 }
-.aid-person b { font-size: 14px; font-weight: 700; }
-.aid-person small { font-size: 12px; opacity: .7; }
+.aid-person b { font-size: calc(14px * var(--fs, 1)); font-weight: 700; }
+.aid-person small { font-size: calc(12px * var(--fs, 1)); opacity: .7; }
 .aid-results, .aid-people { width: 100%; }
 .aid-search { width: 100%; box-sizing: border-box; margin-bottom: 12px; }/* Changelog modal responsive */
 
@@ -1064,31 +993,7 @@ html body :is(.btn-ghost, .btn.btn-ghost, .aid-ghost):hover:not(:disabled) { bac
 html body :is(.btn-danger, .btn-danger-outline) { border-radius: 14px; }
 html body :is(.btn, .aid-btn):disabled { opacity: .5; filter: saturate(.6); box-shadow: none; }
 
-/* --- тумблеры: зелёный ✓ / красно-графитовый ✕, 46×26, идеально ровные --- */
-html body :is(.toggle, .nx-switch, input.switch, input.aid-switch, input.toggle[type="checkbox"], input.aid-sw[type="checkbox"]) {
-  -webkit-appearance: none; appearance: none; position: relative; display: inline-block; flex: 0 0 46px; box-sizing: border-box;
-  width: 46px; min-width: 46px; height: 26px; max-height: 26px; padding: 0; margin: 0; border-radius: 999px; cursor: pointer; vertical-align: middle;
-  background-color: var(--nx-off); border: 1px solid rgba(239, 68, 68, .45); box-shadow: none; outline-offset: 3px;
-  background-repeat: no-repeat; background-size: 12px 12px; background-position: calc(100% - 8px) 50%;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff8a8a' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
-  transition: background-color .22s ease, border-color .22s ease;
-}
-html body :is(input.switch, input.aid-switch, input.toggle[type="checkbox"], input.aid-sw[type="checkbox"])::after {
-  content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); transition: transform .22s cubic-bezier(.3, .8, .3, 1);
-}
-html body :is(.toggle, .nx-switch) .toggle-knob, html body .toggle-knob {
-  position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; margin: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); transform: translateX(0); transition: transform .22s cubic-bezier(.3, .8, .3, 1);
-}
-html body :is(.toggle.open, .toggle.on, .nx-switch.on, input.switch:checked, input.aid-switch:checked, input.toggle[type="checkbox"]:checked, input.aid-sw[type="checkbox"]:checked, .toggle[aria-checked="true"]) {
-  background-color: var(--nx-ok); border-color: rgba(34, 197, 94, .7); background-position: 9px 50%;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 12.5l5 5 10-11'/%3E%3C/svg%3E");
-}
-html body :is(.toggle.open, .toggle.on, .nx-switch.on, .toggle[aria-checked="true"]) .toggle-knob { transform: translateX(20px); }
-html body :is(input.switch:checked, input.aid-switch:checked, input.toggle[type="checkbox"]:checked, input.aid-sw[type="checkbox"]:checked)::after { transform: translateX(20px); }
-html body :is(.toggle.closed, .toggle.off) .toggle-knob { transform: translateX(0); }
-html body :is(.toggle, input.switch, input.aid-switch, input.aid-sw[type="checkbox"]):focus-visible { box-shadow: 0 0 0 3px rgba(var(--nx-gold-rgb), .45); }
-html body :is(.toggle.disabled, .toggle:disabled, input.switch:disabled, input.aid-sw:disabled) { opacity: .45; cursor: not-allowed; }
-
+/* тумблеры перенесены в 29-toggles.css (v6.0.1) */
 /* --- Changelog: Deep Glass (тёмное стекло в любой теме) --- */
 html body .nx-cl-overlay { position: fixed; inset: 0; z-index: 2147483000; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;
   background: rgba(4, 4, 8, .66); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
@@ -1099,35 +1004,35 @@ html body .nx-cl-overlay .nx-cl-card {
   box-shadow: 0 30px 80px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .06);
   -webkit-backdrop-filter: blur(24px) saturate(140%); backdrop-filter: blur(24px) saturate(140%);
 }
-html body .nx-cl-overlay #nx-cl-title { margin: 0 44px 14px 0; font-size: 21px; line-height: 1.25; color: #fff; font-weight: 750; text-align: left; }
-html body .nx-cl-overlay .nx-cl-close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; display: grid; place-items: center; padding: 0; font-size: 22px; line-height: 1; color: #f3f1ea;
+html body .nx-cl-overlay #nx-cl-title { margin: 0 44px 14px 0; font-size: calc(21px * var(--fs, 1)); line-height: 1.25; color: #fff; font-weight: 750; text-align: left; }
+html body .nx-cl-overlay .nx-cl-close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; display: grid; place-items: center; padding: 0; font-size: calc(22px * var(--fs, 1)); line-height: 1; color: #f3f1ea;
   background: rgba(255, 255, 255, .06); border: 1px solid rgba(212, 175, 55, .35); border-radius: 12px; cursor: pointer; }
 html body .nx-cl-overlay .nx-cl-close:hover { background: rgba(212, 175, 55, .14); }
 html body .nx-cl-overlay .nx-cl-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; scrollbar-width: thin; scrollbar-color: rgba(212, 175, 55, .4) transparent; }
 html body .nx-cl-tabs { display: flex; gap: 8px; margin: 0 0 14px; }
-html body .nx-cl-tab { padding: 8px 16px; font: 600 14px/1.2 var(--nx-font-body); color: #cfccc2; background: transparent; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; cursor: pointer; }
+html body .nx-cl-tab { padding: 8px 16px; font: 600 calc(14px * var(--fs, 1))/1.2 var(--nx-font-body); color: #cfccc2; background: transparent; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; cursor: pointer; }
 html body .nx-cl-tab.on { color: #fff; background: rgba(212, 175, 55, .16); border-color: rgba(212, 175, 55, .6); }
 html body .nx-cl-cards { display: grid; gap: 12px; }
 html body .nx-cl-entry { display: block; min-width: 0; padding: 16px; background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .1); border-radius: 16px; box-shadow: none; }
 html body .nx-cl-entry.is-soon { border-style: dashed; border-color: rgba(212, 175, 55, .38); }
-html body .nx-cl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 10px; font-size: 15px; line-height: 1.3; color: #fff; text-align: left; }
-html body .nx-cl-ver { font: 750 18px/1.2 var(--nx-font-head); color: #fff; }
-html body .nx-cl-name { font-weight: 650; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: #e3c25a; }
-html body .nx-cl-date { margin-left: auto; font-size: 12.5px; color: #a9a69d; white-space: nowrap; }
-html body .nx-cl-badge { display: inline-flex; align-items: center; padding: 2px 9px; font: 800 10.5px/1.5 var(--nx-font-body); letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; }
+html body .nx-cl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 10px; font-size: calc(15px * var(--fs, 1)); line-height: 1.3; color: #fff; text-align: left; }
+html body .nx-cl-ver { font: 750 calc(18px * var(--fs, 1))/1.2 var(--nx-font-head); color: #fff; }
+html body .nx-cl-name { font-weight: 650; font-size: calc(13px * var(--fs, 1)); letter-spacing: .06em; text-transform: uppercase; color: #e3c25a; }
+html body .nx-cl-date { margin-left: auto; font-size: calc(12.5px * var(--fs, 1)); color: #a9a69d; white-space: nowrap; }
+html body .nx-cl-badge { display: inline-flex; align-items: center; padding: 2px 9px; font: 800 calc(10.5px * var(--fs, 1))/1.5 var(--nx-font-body); letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; }
 html body .nx-cl-badge.new { color: #0b0b0d; background: linear-gradient(135deg, #f0d77c, #d4af37); }
 html body .nx-cl-badge.soon { color: #e3c25a; background: rgba(212, 175, 55, .12); border: 1px solid rgba(212, 175, 55, .5); }
-html body .nx-cl-current { margin: -4px 0 10px; font-size: 13px; color: #cfccc2; }
-html body ul.nx-cl-items { margin: 0; padding: 0 0 0 18px; list-style: disc; color: #e6e3da; font-size: 14.5px; line-height: 1.6; text-align: left; }
+html body .nx-cl-current { margin: -4px 0 10px; font-size: calc(13px * var(--fs, 1)); color: #cfccc2; }
+html body ul.nx-cl-items { margin: 0; padding: 0 0 0 18px; list-style: disc; color: #e6e3da; font-size: calc(14.5px * var(--fs, 1)); line-height: 1.6; text-align: left; }
 html body ul.nx-cl-items li { margin: 0 0 6px; padding: 0; overflow-wrap: anywhere; }
 html body ul.nx-cl-items li::marker { color: #d4af37; }
 html body .nx-cl-subs { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .1); }
-html body .nx-cl-subtoggle { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font: 650 13px/1.2 var(--nx-font-body); color: #e3c25a; background: rgba(212, 175, 55, .08); border: 1px solid rgba(212, 175, 55, .4); border-radius: 12px; cursor: pointer; }
+html body .nx-cl-subtoggle { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font: 650 calc(13px * var(--fs, 1))/1.2 var(--nx-font-body); color: #e3c25a; background: rgba(212, 175, 55, .08); border: 1px solid rgba(212, 175, 55, .4); border-radius: 12px; cursor: pointer; }
 html body .nx-cl-subtoggle:hover { background: rgba(212, 175, 55, .16); }
 html body .nx-cl-sublist { margin-top: 12px; display: grid; gap: 0; border-left: 2px solid rgba(212, 175, 55, .35); }
 html body .nx-cl-sublist[hidden] { display: none; }
 html body .nx-cl-sub { padding: 4px 0 12px 14px; }
-html body .nx-cl-sub .nx-cl-head { margin-bottom: 6px; } html body .nx-cl-sub .nx-cl-ver { font-size: 16px; }
+html body .nx-cl-sub .nx-cl-head { margin-bottom: 6px; } html body .nx-cl-sub .nx-cl-ver { font-size: calc(16px * var(--fs, 1)); }
 html body .nx-cl-empty { color: #cfccc2; }
 /* «Эры» — таймлайн карточек */
 html body .nx-cl-timeline { position: relative; display: grid; gap: 14px; padding-left: 22px; }
@@ -1136,14 +1041,14 @@ html body .nx-cl-era { position: relative; padding: 16px; background: rgba(255, 
 html body .nx-cl-era::before { content: ""; position: absolute; left: -22px; top: 22px; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; background: #0c0c10; border: 2px solid #d4af37; box-shadow: 0 0 0 4px rgba(212, 175, 55, .16); }
 html body .nx-cl-era.is-soon { opacity: .8; } html body .nx-cl-era.is-soon::before { border-style: dashed; box-shadow: none; }
 html body .nx-cl-era-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; margin-bottom: 4px; }
-html body .nx-cl-era-head h3 { margin: 0; font-size: 17px; color: #fff; text-align: left; }
-html body .nx-cl-era-date { padding: 3px 10px; font: 700 11.5px/1.4 var(--nx-font-body); color: #e3c25a; background: rgba(212, 175, 55, .12); border: 1px solid rgba(212, 175, 55, .4); border-radius: 999px; white-space: nowrap; }
-html body .nx-cl-era-range { margin: 0 0 8px; font-size: 12.5px; color: #a9a69d; }
-html body .nx-cl-era-desc { margin: 0 0 12px; font-size: 14px; line-height: 1.55; color: #e0ddd3; }
+html body .nx-cl-era-head h3 { margin: 0; font-size: calc(17px * var(--fs, 1)); color: #fff; text-align: left; }
+html body .nx-cl-era-date { padding: 3px 10px; font: 700 calc(11.5px * var(--fs, 1))/1.4 var(--nx-font-body); color: #e3c25a; background: rgba(212, 175, 55, .12); border: 1px solid rgba(212, 175, 55, .4); border-radius: 999px; white-space: nowrap; }
+html body .nx-cl-era-range { margin: 0 0 8px; font-size: calc(12.5px * var(--fs, 1)); color: #a9a69d; }
+html body .nx-cl-era-desc { margin: 0 0 12px; font-size: calc(14px * var(--fs, 1)); line-height: 1.55; color: #e0ddd3; }
 html body .nx-cl-era-list { list-style: none; margin: 0; padding: 10px 0 0; display: grid; gap: 2px; border-top: 1px solid rgba(255, 255, 255, .1); }
-html body .nx-cl-era-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 5px 0; font-size: 13.5px; color: #e6e3da; }
+html body .nx-cl-era-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 8px; padding: 5px 0; font-size: calc(13.5px * var(--fs, 1)); color: #e6e3da; }
 html body .nx-cl-era-list b { color: #e3c25a; white-space: nowrap; } html body .nx-cl-era-list span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-html body .nx-cl-era-list em { font-style: normal; font-size: 11.5px; color: #a9a69d; }
+html body .nx-cl-era-list em { font-style: normal; font-size: calc(11.5px * var(--fs, 1)); color: #a9a69d; }
 @media (max-width: 480px) { html body .nx-cl-overlay { padding: 10px; } html body .nx-cl-overlay .nx-cl-card { padding: 18px 14px 12px; border-radius: 18px; max-height: 88vh; } html body .nx-cl-date { margin-left: 0; width: 100%; } }
 
 /* переключатель темы: ☀ светлая / ☾ тёмная / 🖥 системная */
@@ -1159,13 +1064,14 @@ html body .bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr
 @media (max-width: 640px) { html body .bento { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
 html body .bento-tile {
   display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 8px; min-width: 0; padding: 20px; box-sizing: border-box;
-  text-align: left; text-decoration: none; color: var(--nx-ink); background: var(--nx-surface); border: 1px solid var(--nx-line); border-radius: 18px;
+  text-align: left; text-decoration: none; color: var(--nx-ink); background: var(--lg-bg, var(--nx-surface)); border: 1px solid var(--nx-line); border-radius: 18px;
+  -webkit-backdrop-filter: blur(var(--nx-glass-blur, 18px)); backdrop-filter: blur(var(--nx-glass-blur, 18px));
   box-shadow: inset 0 1px 0 rgba(var(--nx-gold-rgb), .12); transition: border-color .2s ease, background-color .2s ease;
 }
-html body .bento-tile:hover { border-color: rgba(var(--nx-gold-rgb), .7); background: color-mix(in srgb, var(--nx-surface) 92%, var(--nx-gold)); transform: none; }
-html body .bento-tile h3 { margin: 4px 0 0; font-size: 18px; line-height: 1.25; color: var(--nx-ink); }
-html body .bento-tile p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--nx-muted); }
-html body .bento-ico { display: grid; place-items: center; width: 40px; height: 40px; font-size: 20px; line-height: 1; color: var(--nx-gold); border: 1px solid var(--nx-line); border-radius: 12px; background: rgba(var(--nx-gold-rgb), .08); }
+html body .bento-tile:hover { border-color: rgba(var(--nx-gold-rgb), .7); background: color-mix(in srgb, var(--lg-bg, var(--nx-surface)) 90%, var(--nx-gold)); transform: none; }
+html body .bento-tile h3 { margin: 4px 0 0; font-size: calc(18px * var(--fs, 1)); line-height: 1.25; color: var(--nx-ink); }
+html body .bento-tile p { margin: 0; font-size: calc(14px * var(--fs, 1)); line-height: 1.55; color: var(--nx-muted); }
+html body .bento-ico { display: grid; place-items: center; width: 40px; height: 40px; font-size: calc(20px * var(--fs, 1)); line-height: 1; color: var(--nx-gold); border: 1px solid var(--nx-line); border-radius: 12px; background: rgba(var(--nx-gold-rgb), .08); }
 html body .hero-eco h1 em { font-style: normal; background: none; -webkit-text-fill-color: currentColor; color: var(--nx-gold-text); }
 
 /* --- Публичный профиль (#u/имя): широкая обложка object-fit: cover, аватар слева с наложением, всё по левому краю --- */
@@ -1174,18 +1080,18 @@ html body .user-public .user-banner { width: 100%; height: 150px; margin: 0; bor
 html body .user-public .user-banner-def { background-image: linear-gradient(120deg, rgba(var(--nx-gold-rgb), .35), rgba(58, 37, 112, .85)); }
 html body .user-public .user-head { display: flex; align-items: flex-end; gap: 14px; margin: -46px 0 0; padding: 0 20px; box-sizing: border-box; }
 html body .user-public .user-av { flex: none; width: 92px; height: 92px; margin: 0; border-radius: 50%; object-fit: cover; border: 3px solid var(--nx-surface); box-shadow: 0 0 0 1px var(--nx-line); }
-html body .user-public .user-av-ph { display: grid; place-items: center; font: 800 36px/1 var(--nx-font-head); color: #17161c; }
+html body .user-public .user-av-ph { display: grid; place-items: center; font: 800 calc(36px * var(--fs, 1))/1 var(--nx-font-head); color: #17161c; }
 html body .user-public .user-head-info { min-width: 0; flex: 1 1 auto; padding-bottom: 2px; }
-html body .user-public .user-head-info h2 { margin: 0; font-size: 21px; line-height: 1.2; overflow-wrap: anywhere; }
-html body .user-public .user-handle, html body .user-public .user-stats { margin: 2px 0 0; font-size: 14px; color: var(--nx-muted); }
-html body .user-public .user-badge { display: inline-block; margin-top: 6px; padding: 2px 10px; font: 700 12px/1.5 var(--nx-font-body); color: var(--nx-gold-text); background: rgba(var(--nx-gold-rgb), .12); border: 1px solid var(--nx-line); border-radius: 999px; }
+html body .user-public .user-head-info h2 { margin: 0; font-size: calc(21px * var(--fs, 1)); line-height: 1.2; overflow-wrap: anywhere; }
+html body .user-public .user-handle, html body .user-public .user-stats { margin: 2px 0 0; font-size: calc(14px * var(--fs, 1)); color: var(--nx-muted); }
+html body .user-public .user-badge { display: inline-block; margin-top: 6px; padding: 2px 10px; font: 700 calc(12px * var(--fs, 1))/1.5 var(--nx-font-body); color: var(--nx-gold-text); background: rgba(var(--nx-gold-rgb), .12); border: 1px solid var(--nx-line); border-radius: 999px; }
 html body .user-public .user-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 html body .user-public .user-body { padding: 14px 20px 8px; text-align: left; }
 html body .user-public .user-bio { margin: 0 0 10px; color: var(--nx-ink); line-height: 1.55; }
-html body .user-public .user-since { margin: 0 0 8px; font-size: 13px; color: var(--nx-muted); }
+html body .user-public .user-since { margin: 0 0 8px; font-size: calc(13px * var(--fs, 1)); color: var(--nx-muted); }
 html body .user-public .god-box { margin: 8px 20px 20px; }
 @media (max-width: 420px) { html body .user-public .user-head { padding: 0 16px; } html body .user-public .user-body { padding: 14px 16px 8px; } html body .user-public .god-box { margin: 8px 16px 16px; } }
-html body .aid-search, html body .aid-card input:not([type="checkbox"]):not([type="file"]):not([type="radio"]) { box-sizing: border-box; width: 100%; padding: 12px 14px; font: 500 16px/1.3 var(--nx-font-body); color: var(--nx-ink); background: var(--nx-elevated); border: 1px solid var(--nx-line-soft); border-radius: 14px; outline: none; }
+html body .aid-search, html body .aid-card input:not([type="checkbox"]):not([type="file"]):not([type="radio"]) { box-sizing: border-box; width: 100%; padding: 12px 14px; font: 500 calc(16px * var(--fs, 1))/1.3 var(--nx-font-body); color: var(--nx-ink); background: var(--nx-elevated); border: 1px solid var(--nx-line-soft); border-radius: 14px; outline: none; }
 html body .aid-search:focus, html body .aid-card input:focus { border-color: rgba(var(--nx-gold-rgb), .7); box-shadow: 0 0 0 3px rgba(var(--nx-gold-rgb), .15); }
 html body footer a, html body .footer a, html body footer .muted a { color: var(--nx-gold-text); }
 html body.has-dock, html body { scroll-padding-bottom: 96px; }
@@ -1194,3 +1100,384 @@ html body .user-public .user-head-info { padding: 54px 0 0; }
 html body .user-public .god-box { width: auto !important; max-width: none !important; box-sizing: border-box; }
 /* окно входа делит оболочку с ченджлогом (.nx-cl-overlay), но обязано быть выше экрана блокировки закрытого сайта (z-index заставки = 2147483647) */
 html body .nx-cl-overlay.nx-login-overlay { z-index: 2147483647; }
+/* =====================================================================
+   v5.8.1 — внешний вид: размер текста (--fs) и эффект стекла (--glass-k). Значения ставит amoore-ux.js / appearance.ts
+   --fs: множитель ВСЕХ font-size (в стилях они записаны как calc(Npx * var(--fs, 1)))
+   --glass-k: 0 = прозрачный … 1 = плотный → прозрачность фона и размытие стеклянных панелей
+   ===================================================================== */
+:root { --fs: .92; --glass-k: .5; }
+
+/* Стекло: фоллбэк на прежние цвета, ниже — управляемые через color-mix */
+@supports (background: color-mix(in srgb, red 50%, transparent)) {
+  :root {
+    --lg-bg: color-mix(in srgb, rgb(18, 24, 40) calc(30% + 62% * var(--glass-k)), transparent);
+    --nx-glass-blur: calc(10px + 16px * (1 - var(--glass-k) * .4));
+  }
+  html[data-theme="light"], body.light {
+    --lg-bg: color-mix(in srgb, rgb(255, 255, 255) calc(32% + 60% * var(--glass-k)), transparent);
+  }  /* v6.0.1: ползунок управляет и общими токенами стекла (--nx-glass-bg — карточки/шапка/панели; --nx-modal-bg — окна профиля и т.п.),
+     раньше они были фиксированными rgba и не реагировали. Окна плотнее панелей, чтобы текст читался при «Прозрачном». */
+  html:root:root {
+    --nx-glass-bg: var(--lg-bg);
+    --nx-modal-bg: color-mix(in srgb, rgb(14, 18, 32) calc(66% + 30% * var(--glass-k)), transparent);
+  }
+  html[data-theme="light"]:root, html body.light {
+    --nx-glass-bg: var(--lg-bg);
+    --nx-modal-bg: color-mix(in srgb, rgb(255, 255, 255) calc(66% + 32% * var(--glass-k)), transparent);
+  }
+}
+
+/* Заголовки не такие «жирные»: 700 вместо 800 */
+html body h1, html body h2, html body h3 { font-weight: 700; }
+
+/* Нижняя панель не перекрывает контент: запас под панелью в основном контейнере страниц */
+html body #profile-host, html body #studio-profile-host, html body #view-profile, html body .aid-body {
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+}
+html body .aid-body { padding-bottom: 8px; }  /* внутри карточки лишнего запаса не нужно: он у контейнера-хоста */
+
+/* ---------- ползунки в стиле iOS ---------- */
+.ap-wrap { display: block; }
+.ap-h { margin: 14px 0 8px; font-size: calc(15px * var(--fs, 1)); }
+.ap-card { padding: 10px 16px; border-radius: 22px; background: var(--lg-bg); border: 1px solid var(--lg-line, rgba(255,255,255,.14)); -webkit-backdrop-filter: blur(var(--nx-glass-blur, 18px)); backdrop-filter: blur(var(--nx-glass-blur, 18px)); }
+.ap-row { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+.ap-a { font-weight: 700; color: var(--nx-muted, #8b90a5); line-height: 1; flex: 0 0 auto; }
+.ap-a-s { font-size: 14px; } .ap-a-l { font-size: 24px; }
+.ap-ico { display: inline-flex; color: var(--nx-muted, #8b90a5); flex: 0 0 auto; }
+.ap-track { position: relative; flex: 1 1 auto; min-width: 0; height: 32px; display: flex; align-items: center; }
+.ap-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; margin: 0; padding: 0; border-radius: 999px; background: linear-gradient(to right, var(--ap-fill, #5b5f6e) var(--ap-p, 50%), rgba(140, 146, 165, .45) var(--ap-p, 50%)); outline: none; position: relative; z-index: 1; }
+.ap-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 34px; height: 24px; border-radius: 999px; background: #fff; border: 0; box-shadow: 0 2px 8px rgba(0,0,0,.35); cursor: pointer; }
+.ap-range::-moz-range-thumb { width: 34px; height: 24px; border-radius: 999px; background: #fff; border: 0; box-shadow: 0 2px 8px rgba(0,0,0,.35); cursor: pointer; }
+.ap-range:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--nx-gold, #d4af37); outline-offset: 2px; }
+.ap-ticks { position: absolute; left: 17px; right: 17px; top: 24px; display: flex; justify-content: space-between; pointer-events: none; }
+.ap-ticks i { display: block; width: 4px; height: 4px; border-radius: 50%; background: rgba(140, 146, 165, .7); }
+.ap-cap { display: flex; justify-content: space-between; margin: 6px 16px 0; font-size: calc(12px * var(--fs, 1)); color: var(--nx-muted, #8b90a5); }
+.ap-sample, .ap-note { margin: 8px 4px 0; font-size: calc(13px * var(--fs, 1)); color: var(--nx-muted, #8b90a5); }
+.ap-reset { margin-top: 14px; }
+
+/* ---------- профиль: реферальная ссылка, кнопки в одну строку, плотная история, секции блоков ---------- */
+.aid-linkrow { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; margin-top: 8px; }
+.aid-copyfield { position: relative; flex: 1 1 0; min-width: 0; }
+.aid-copyfield input { width: 100%; box-sizing: border-box; padding-right: 46px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body .aid-copyicon { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; min-height: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: var(--nx-gold, #d4af37); cursor: pointer; }
+html body .aid-copyicon:active { background: rgba(212, 175, 55, .16); }
+html body .aid-compact { min-height: 40px; padding: 0 14px; flex: 0 0 auto; white-space: nowrap; font-size: calc(13px * var(--fs, 1)); }
+.aid-hist .aid-row { padding: 5px 0; line-height: 1.3; font-size: calc(12.5px * var(--fs, 1)); }
+.aid-sec { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(212, 175, 55, .14); }
+.aid-sec:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.aid-sec-h { margin: 0 0 8px; font-size: calc(18px * var(--fs, 1)); }
+
+/* v6.0.1: поля ввода ВСЕГДА 16px и не зависят от ползунка «Размер текста» — иначе iOS Safari приближает страницу при фокусе.
+   (В v5.8.1 их шрифт по ошибке стал calc(16px * var(--fs)) = 14.7px; тест лендинга «шрифт ≥16px» это ловит.) */
+html body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), textarea, select) { font-size: 16px !important; }
+/* =====================================================================
+   v6.0.1 — ЕДИНЫЙ слой тумблеров (iOS-стиль + Liquid Glass). Заменяет правила из слоёв 03, 04, 07, 10, 11, 24
+   и из amoore-dev/style.css. Здесь — единственный источник правды: другие файлы тумблеры не стилизуют.
+
+   Разметка, которую покрывает слой:
+     • <div class="toggle open|closed|on|off" role="switch" aria-checked> + <div class="toggle-knob">   (админка, новости)
+     • <div class="nx-switch on"> с .toggle-knob внутри (если есть)
+     • <input type="checkbox" class="aid-sw | aid-switch | switch | toggle"> и [role="switch"]              (профиль, формы)
+
+   Правила вида:
+     • ВЫКЛ: красный кружок СЛЕВА на полупрозрачной красно-тонированной подложке;
+     • ВКЛ:  зелёный кружок СПРАВА на полупрозрачной зелёно-тонированной подложке;
+     • кружок ровно один: его цвет МЕНЯЕТСЯ (красный → зелёный), а не накладывается — никакого «светофора»;
+     • никаких иконок ✓/✕ и ::after-кружков поверх; у <div>-тумблеров псевдоэлементы отключены;
+     • подложка — стекло: цвет через color-mix с учётом ползунка «Эффект стекла» (--glass-k) + blur.
+   Геометрия: 46×28, кружок 20×20, поле 3px (ход 18px). Не сжимается и не растягивается во flex/grid.
+   ===================================================================== */
+:root {
+  --tg-red: #ff453a;  --tg-green: #30d158;
+}
+html[data-theme="light"], body.light { --tg-red: #ff3b30; --tg-green: #34c759; }
+
+/* ---------- 1. Корпус (подложка) ---------- */
+html body :is(.toggle, .nx-switch, input.aid-sw, input.aid-switch, input.switch, input.toggle[type="checkbox"], input[type="checkbox"][role="switch"]) {
+  /* состояние ВЫКЛ по умолчанию */
+  --tg-c: var(--tg-red);
+  --tg-track: rgba(255, 69, 58, .20);
+  --tg-edge: rgba(255, 69, 58, .42);
+  -webkit-appearance: none; appearance: none;
+  position: relative; display: inline-block; vertical-align: middle; box-sizing: border-box;
+  flex: 0 0 46px !important; flex-shrink: 0 !important; align-self: center;
+  width: 46px !important; min-width: 46px !important; max-width: 46px !important;
+  height: 28px !important; min-height: 0 !important; max-height: 28px !important;
+  margin: 0; padding: 0 !important; overflow: hidden; border-radius: 999px; cursor: pointer;
+  background: var(--tg-track); border: 1px solid var(--tg-edge);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(0, 0, 0, .12);
+  -webkit-backdrop-filter: blur(calc(var(--nx-glass-blur, 18px) * .5)); backdrop-filter: blur(calc(var(--nx-glass-blur, 18px) * .5));
+  background-image: none;
+  transition: background-color .25s ease, border-color .25s ease;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; outline: none;
+}
+@supports (background: color-mix(in srgb, red 50%, transparent)) {
+  html body :is(.toggle, .nx-switch, input.aid-sw, input.aid-switch, input.switch, input.toggle[type="checkbox"], input[type="checkbox"][role="switch"]) {
+    --tg-track: color-mix(in srgb, var(--tg-red) calc(12% + 14% * var(--glass-k, .5)), transparent);
+    --tg-edge: color-mix(in srgb, var(--tg-red) 46%, transparent);
+  }
+}
+
+/* ---------- 2. ВКЛ: корпус зелёный, красного не остаётся нигде ---------- */
+html body :is(.toggle.open, .toggle.on, .toggle[aria-checked="true"], .nx-switch.on, .nx-switch[aria-checked="true"],
+              input.aid-sw:checked, input.aid-switch:checked, input.switch:checked, input.toggle[type="checkbox"]:checked, input[type="checkbox"][role="switch"]:checked) {
+  --tg-c: var(--tg-green);
+  --tg-track: rgba(48, 209, 88, .22);
+  --tg-edge: rgba(48, 209, 88, .46);
+}
+@supports (background: color-mix(in srgb, red 50%, transparent)) {
+  html body :is(.toggle.open, .toggle.on, .toggle[aria-checked="true"], .nx-switch.on, .nx-switch[aria-checked="true"],
+                input.aid-sw:checked, input.aid-switch:checked, input.switch:checked, input.toggle[type="checkbox"]:checked, input[type="checkbox"][role="switch"]:checked) {
+    --tg-track: color-mix(in srgb, var(--tg-green) calc(14% + 14% * var(--glass-k, .5)), transparent);
+    --tg-edge: color-mix(in srgb, var(--tg-green) 50%, transparent);
+  }
+}
+/* явное закрытое состояние перебивает случайный aria-checked, если он рассинхронизирован */
+html body :is(.toggle.closed, .toggle.off):not(.open):not(.on)[aria-checked="false"] { --tg-c: var(--tg-red); }
+
+/* ---------- 3. Кружок (один на тумблер) ---------- */
+/* <div>-тумблеры: кружок — дочерний .toggle-knob; псевдоэлементы выключены, чтобы не появился второй кружок */
+html body :is(.toggle, .nx-switch):not(input)::before, html body :is(.toggle, .nx-switch):not(input)::after { content: none !important; display: none !important; }
+html body :is(.toggle, .nx-switch) > .toggle-knob, html body .toggle > .toggle-knob {
+  position: absolute !important; top: 3px !important; left: 3px !important;
+  width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 0 !important; max-width: 20px !important; max-height: 20px !important;
+  margin: 0; box-sizing: border-box; border-radius: 50%; flex-shrink: 0;
+  background: var(--tg-c) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .35), inset 0 1px 1px rgba(255, 255, 255, .45);
+  transform: translateX(0);
+  transition: transform .3s cubic-bezier(.3, .8, .3, 1), background-color .25s ease;
+}
+/* <input>-тумблеры: кружок — ::before; ::after погашен */
+html body :is(input.aid-sw, input.aid-switch, input.switch, input.toggle[type="checkbox"], input[type="checkbox"][role="switch"])::before {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%;
+  background: var(--tg-c); box-shadow: 0 2px 6px rgba(0, 0, 0, .35), inset 0 1px 1px rgba(255, 255, 255, .45);
+  transform: translateX(0); transition: transform .3s cubic-bezier(.3, .8, .3, 1), background-color .25s ease;
+}
+html body :is(input.aid-sw, input.aid-switch, input.switch, input.toggle[type="checkbox"], input[type="checkbox"][role="switch"])::after { content: none !important; }
+
+/* ---------- 4. Положение: ВКЛ — вправо (ход 18px), ВЫКЛ — влево ---------- */
+html body :is(.toggle.open, .toggle.on, .toggle[aria-checked="true"], .nx-switch.on, .nx-switch[aria-checked="true"]) > .toggle-knob { transform: translateX(18px); }
+html body :is(.toggle.closed, .toggle.off):not(.open):not(.on):not([aria-checked="true"]) > .toggle-knob { transform: translateX(0); }
+html body :is(input.aid-sw, input.aid-switch, input.switch, input.toggle[type="checkbox"], input[type="checkbox"][role="switch"]):checked::before { transform: translateX(18px); }
+
+/* ---------- 5. Фокус, нажатие, выключено ---------- */
+html body :is(.toggle, .nx-switch, input.aid-sw, input.aid-switch, input.switch, input.toggle[type="checkbox"], input[type="checkbox"][role="switch"]):focus-visible {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 0 3px rgba(var(--nx-gold-rgb, 212, 175, 55), .45);
+}
+html body :is(.toggle.disabled, .toggle:disabled, .toggle[aria-disabled="true"], input.aid-sw:disabled, input.aid-switch:disabled, input.switch:disabled, input.toggle[type="checkbox"]:disabled) {
+  opacity: .45; cursor: not-allowed; pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html body :is(.toggle, .nx-switch, input.aid-sw, input.aid-switch, input.switch, input.toggle[type="checkbox"], input[type="checkbox"][role="switch"]),
+  html body :is(.toggle, .nx-switch) > .toggle-knob,
+  html body :is(input.aid-sw, input.aid-switch, input.switch, input.toggle[type="checkbox"], input[type="checkbox"][role="switch"])::before { transition: none !important; }
+}
+/* =====================================================================
+   v6.0.1 · Этап 2 — «Pill-Style + Liquid Glass». Оболочка (шапка/навигация) и плотность.
+   Включается ТОЛЬКО классом body.pill-shell (сейчас — лендинг; Студия и Админка — следующими шагами).
+   Разметку шапки не меняем: те же .ux-topbar / .ux-bar / .ux-left / .ux-nav / .ux-tools, те же id и data-атрибуты.
+
+   • < 900px (телефон): сверху ОДНА овальная пилюля (лого, тема, уведомления); снизу 3 пилюли (Главная · Новости · Настройки).
+   • ≥ 900px (десктоп/планшет/альбом): верхней панели нет; слева вертикальная пилюля (лого, тема, уведомления) + круглый поиск внизу слева;
+     справа вертикальная пилюля навигации; центр свободен.
+   Важно: у предков fixed-элементов нет transform/filter/backdrop-filter, иначе fixed «прилипнет» к ним — стекло рисуется псевдоэлементом ::before.
+   Сетка 8/16 px. Всё полупрозрачное, с размытием: ползунок «Эффект стекла» управляет через --lg-bg / --nx-glass-blur.
+   ===================================================================== */
+body.pill-shell {
+  --pl-bg: var(--lg-bg, rgba(18, 24, 40, .6));
+  --pl-edge: color-mix(in srgb, var(--nx-ink, #fff) 16%, transparent);
+  --pl-blur: blur(var(--nx-glass-blur, 22px)) saturate(1.5);
+  --pl-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 -1px 0 rgba(0, 0, 0, .10), 0 10px 32px rgba(0, 0, 0, .22);
+  --pl-gap: 8px; --pl-pad: 16px;
+  /* ЕДИНАЯ СЕТКА ОБОЛОЧКИ: всё считается от Лупы (якорь внизу слева). Менять только здесь. */
+  --pl-m: 16px;                 /* поле от края экрана — одинаковое сверху/снизу/слева/справа */
+  --pl-u: 64px;                 /* модуль: Лупа = высота нижнего дока = высота верхней пилюли = ширина левой пилюли */
+  --pl-nav-w: 128px;            /* ширина правой вертикальной пилюли (фиксированная, не зависит от текста) */
+  --pl-x-l: max(var(--pl-m), env(safe-area-inset-left, 0px));
+  --pl-x-r: max(var(--pl-m), env(safe-area-inset-right, 0px));
+  --pl-y-t: max(var(--pl-m), env(safe-area-inset-top, 0px));
+  --pl-y-b: max(var(--pl-m), env(safe-area-inset-bottom, 0px));
+}
+/* общая «стеклянная пилюля» */
+body.pill-shell :is(.ux-bar, .ux-nav, .pill-search)::before { content: none; }
+body.pill-shell .ux-bar::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background: var(--pl-bg); border: 1px solid var(--pl-edge); box-shadow: var(--pl-shadow);
+  -webkit-backdrop-filter: var(--pl-blur); backdrop-filter: var(--pl-blur);
+}
+/* топбар перестаёт быть полосой: без фона/размытия/границы (иначе fixed-потомки привязались бы к нему) */
+html body.pill-shell .ux-topbar {
+  position: fixed; top: 0; left: 0; right: 0; width: auto; height: 0; overflow: visible; clip-path: none; contain: none; padding: 0; border: 0; box-shadow: none; z-index: 1000;
+  background: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; pointer-events: none;
+}
+html body.pill-shell .ux-topbar > * { pointer-events: auto; }
+html body.pill-shell .ux-bar { position: relative; isolation: isolate; box-sizing: border-box; margin: 0; max-width: none; min-height: 0; }
+html body.pill-shell .ux-burger, html body.pill-shell .ux-mobile-extra { display: none !important; }
+/* панель-меню всегда «растворена»: вкладки и группа — прямые потомки .ux-bar */
+html body.pill-shell .ux-panel, html body.pill-shell .ux-topbar.open .ux-panel {
+  display: contents !important; position: static; background: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; height: auto; max-height: none; padding: 0; border: 0;
+}
+/* навигация — отдельная стеклянная пилюля, fixed */
+html body.pill-shell .ux-nav {
+  position: fixed; z-index: 1001; box-sizing: border-box; display: flex; align-items: center; gap: var(--pl-gap); overflow: visible; margin: 0;
+  background: var(--pl-bg); border: 1px solid var(--pl-edge); box-shadow: var(--pl-shadow);
+  -webkit-backdrop-filter: var(--pl-blur); backdrop-filter: var(--pl-blur);
+}
+html body.pill-shell .ux-tab {
+  box-sizing: border-box; min-height: 44px; padding: 0 16px; border-radius: 999px; justify-content: center; border: 1px solid transparent;
+  background: transparent; color: var(--nx-ink); transition: background-color .2s ease, border-color .2s ease, color .2s ease !important;
+}
+html body.pill-shell .ux-tab:hover { background: color-mix(in srgb, var(--nx-ink) 8%, transparent); }
+html body.pill-shell .ux-tab.active, html body.pill-shell .ux-tab[aria-current="page"] {
+  color: var(--nx-gold); background: rgba(var(--nx-gold-rgb), .16); border-color: rgba(var(--nx-gold-rgb), .42); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2);
+}
+/* в пилюле только 3 пункта; «Чат» и «Экосистема» остаются маршрутами (#chat, #ecosystem), их ссылки есть на главной */
+html body.pill-shell .ux-tab[data-spa-tab="chat"], html body.pill-shell .ux-tab[data-spa-tab="ecosystem"] { display: none; }
+/* иконки-кнопки (тема, колокольчик, шестерёнка) — стеклянные круги */
+html body.pill-shell :is(.ux-icon-btn) {
+  width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; border: 1px solid var(--pl-edge);
+  background: color-mix(in srgb, var(--nx-ink) 6%, transparent);
+}
+/* ЛУПА — якорь: на любом экране строго слева внизу, 64×64, поле 16px */
+html body.pill-shell .pill-search, html body.pill-nav #search-toggle {
+  position: fixed; z-index: 1002; left: var(--pl-x-l); bottom: var(--pl-y-b); top: auto; right: auto; margin: 0; transform: none;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: var(--pl-u); height: var(--pl-u); flex: none; padding: 0;
+  border-radius: 50%; cursor: pointer; color: var(--nx-ink);
+  background: var(--pl-bg); border: 1px solid var(--pl-edge); box-shadow: var(--pl-shadow); -webkit-backdrop-filter: var(--pl-blur); backdrop-filter: var(--pl-blur);
+}
+html body.pill-shell .pill-search svg, html body.pill-nav #search-toggle svg { width: 24px; height: 24px; }
+
+/* ---------- ТЕЛЕФОН: узкий экран или портрет < 900px ----------
+   Верх: одна пилюля (поле 16 со всех сторон, высота = модуль). Низ: Лупа слева + док навигации справа — одна высота, одна baseline. */
+@media (max-width: 899.98px) and (orientation: portrait), (max-width: 639.98px) {
+  html body.pill-shell .ux-topbar { height: auto; overflow: visible; clip-path: none; contain: none; top: var(--pl-y-t); left: var(--pl-x-l); right: var(--pl-x-r); }
+  html body.pill-shell .ux-bar { display: flex; flex-direction: row; align-items: center; gap: var(--pl-gap); height: var(--pl-u); padding: 0 12px 0 16px; border-radius: 999px; }
+  html body.pill-shell .ux-left { flex: 1 1 auto; min-width: 0; gap: var(--pl-gap); }
+  html body.pill-shell .ux-name small { display: none; }
+  html body.pill-shell .ux-tools { margin-left: auto; gap: var(--pl-gap); }
+  html body.pill-shell .ux-group { display: none; }
+  /* Админка: «Настройки» — это шестерёнка из .ux-group, поэтому на телефоне она остаётся в верхней пилюле (аватар/«Выйти» — в карточке «Аккаунт» в Настройках) */
+  html body.pill-nav .ux-group { display: flex; align-items: center; flex: 0 0 auto; flex-wrap: nowrap; gap: var(--pl-gap); padding: 0; border: 0; order: 2; }   /* padding-top/border-top 12px из старой мобильной шапки сдвигали шестерёнку на 7px */
+  html body.pill-nav .ux-group .ux-settings-link { display: inline-flex; align-items: center; justify-content: center; }
+  html body.pill-nav .ux-group > :not(.ux-settings-link) { display: none !important; }
+  html body.pill-nav .ux-group:not(:has(> .ux-settings-link:not([hidden]))) { display: none; }
+  html body.pill-shell:not(.pill-nav) .ux-nav { display: none; }       /* лендинг: внизу пилюля-док #spa-tabbar (3 кнопки с иконками) */
+  /* док навигации: правее Лупы, ровно по её высоте и нижней линии */
+  html body.pill-nav .ux-nav, html body.pill-shell .spa-tabbar {
+    position: fixed; z-index: 1001; box-sizing: border-box; top: auto; transform: none;
+    left: calc(var(--pl-x-l) + var(--pl-u) + var(--pl-gap)); right: var(--pl-x-r); bottom: var(--pl-y-b); height: var(--pl-u); padding: 8px; border-radius: 999px;
+    display: flex; align-items: center; gap: var(--pl-gap);
+    background: var(--pl-bg); border: 1px solid var(--pl-edge); box-shadow: var(--pl-shadow); -webkit-backdrop-filter: var(--pl-blur); backdrop-filter: var(--pl-blur);
+  }
+  /* Студия/Админка: если разделов больше, чем влезает, док листается по горизонтали внутри пилюли */
+  html body.pill-nav .ux-nav { flex-direction: row; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x proximity; }
+  html body.pill-nav .ux-nav::-webkit-scrollbar { display: none; }
+  html body.pill-nav .ux-tab { flex: 1 0 auto; min-height: 100%; scroll-snap-align: center; white-space: nowrap; }
+  html body.pill-shell .spa-tabbar { justify-content: space-between; }
+  html body.pill-shell .spa-tabbar .spa-tab { flex: 1 1 0; min-width: 0; min-height: 100%; border-radius: 999px; border: 1px solid transparent; background: transparent; }
+  html body.pill-shell .spa-tabbar .spa-tab:is(.active, [aria-current="page"]) { color: var(--nx-gold); background: rgba(var(--nx-gold-rgb), .16); border-color: rgba(var(--nx-gold-rgb), .42); }
+  html body.pill-shell .spa-tabbar .spa-tab:is([data-spa-tab="chat"], [data-spa-tab="ecosystem"]) { display: none; }
+  /* контент не уходит под пилюли: верх = поле + модуль + поле; низ — так же */
+  html body.pill-shell { padding-top: calc(var(--pl-y-t) + var(--pl-u) + var(--pl-m)); padding-bottom: calc(var(--pl-y-b) + var(--pl-u) + var(--pl-m)); }
+}
+
+/* ---------- ДЕСКТОП / ПЛАНШЕТ / АЛЬБОМ: ≥ 900px или ландшафт ≥ 640px ----------
+   Лево: вертикальная пилюля шириной = Лупа (общая ось) сверху + Лупа внизу. Право: вертикальная пилюля навигации по центру. */
+@media (min-width: 900px), (min-width: 640px) and (orientation: landscape) {
+  html body.pill-shell .ux-bar {
+    position: fixed; top: var(--pl-y-t); left: var(--pl-x-l); width: var(--pl-u); max-height: calc(100dvh - var(--pl-y-t) - var(--pl-y-b) - var(--pl-u) - var(--pl-m));
+    flex-direction: column; align-items: center; gap: 16px; padding: 16px 0; border-radius: calc(var(--pl-u) / 2);
+  }
+  html body.pill-shell .ux-left { flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+  html body.pill-shell .ux-name { display: none; }
+  html body.pill-shell .ux-left .ux-chip { min-height: 0; height: auto; margin: 0; padding: 4px 6px; font-size: calc(10px * var(--fs, 1)); }   /* margin:0 — в базе у чипа скрытый margin-left:8px, он и сдвигал его с оси на 4px */
+  html body.pill-shell .ux-tools { flex-direction: column; gap: var(--pl-gap); margin: 0; }
+  html body.pill-shell .ux-nav {
+    right: var(--pl-x-r); top: 50%; transform: translateY(-50%); flex-direction: column; align-items: stretch;
+    width: var(--pl-nav-w); padding: 16px 8px; border-radius: calc(var(--pl-u) / 2);
+  }
+  /* зеркало Лупы: блок аккаунта (шестерёнка · аватар · выход) — пилюля внизу справа: та же высота (--pl-u), та же нижняя линия, то же поле; пустой — скрыт */
+  html body.pill-shell .ux-group {
+    position: fixed; right: var(--pl-x-r); bottom: var(--pl-y-b); z-index: 1001; box-sizing: border-box; height: var(--pl-u); padding: 0 12px; display: flex; flex-direction: row; gap: var(--pl-gap); align-items: center; border-radius: 999px;
+    background: var(--pl-bg); border: 1px solid var(--pl-edge); box-shadow: var(--pl-shadow); -webkit-backdrop-filter: var(--pl-blur); backdrop-filter: var(--pl-blur);
+  }
+  html body.pill-shell .ux-group:not(:has(> :not([hidden]))) { display: none; }
+  html body.pill-shell .ux-group .ux-user { padding: 0; max-width: none; }
+  html body.pill-shell .ux-group .ux-user-name { display: none; }
+  html body.pill-shell .ux-group .ux-logout {            /* «Выйти» в пилюле — компактный круг с иконкой (текст остаётся для скринридеров) */
+    box-sizing: border-box; width: 40px; height: 40px; min-height: 0; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0; flex: 0 0 40px;
+  }
+  html body.pill-shell .ux-group .ux-logout::before {
+    content: ""; width: 20px; height: 20px; background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E%3Cpath d='m16 17 5-5-5-5'/%3E%3Cpath d='M21 12H9'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E%3Cpath d='m16 17 5-5-5-5'/%3E%3Cpath d='M21 12H9'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  /* правая навигация не заходит в нижнюю зону Лупы/аккаунта: симметрично сверху и снизу */
+  html body.pill-shell .ux-nav { max-height: calc(100dvh - 2 * (var(--pl-y-b) + var(--pl-u) + var(--pl-m))); }
+  html body.pill-shell .spa-tabbar { display: none !important; }          /* на широких экранах навигация — правая пилюля; старый нижний док не нужен */
+  html body.pill-shell .spa { max-width: none; }          /* контент растянут: поля под пилюли задаёт padding, а не max-width */
+  /* ОДИНАКОВЫЕ поля слева и справа (= поле + ширина правой пилюли + поле): контент строго по центру экрана и по оси между пилюлями */
+  html body.pill-shell .spa, html body.pill-shell footer { padding-left: calc(var(--pl-m) + var(--pl-nav-w) + var(--pl-m)); padding-right: calc(var(--pl-m) + var(--pl-nav-w) + var(--pl-m)); box-sizing: border-box; }
+  html body.pill-shell :is(.section, .hero, .cta) { max-width: min(1200px, 100%); margin-left: auto; margin-right: auto; }
+}
+@media (min-width: 640px) and (max-height: 520px) and (orientation: landscape) {          /* альбомный телефон: пилюли компактнее, ширина-ось остаётся */
+  html body.pill-shell .ux-bar { padding: 8px 0; gap: 8px; }
+  html body.pill-shell .ux-tab { min-height: 36px; padding: 0 12px; }
+  html body.pill-shell .ux-nav { padding: 8px; }
+}
+
+/* ---------- Liquid Glass для карточек и плотность (сетка 8/16) ---------- */
+html body.pill-shell :is(.glass-card, .bento-tile, .eco-card, .feat-card, .news-item, .hero-card, .nx-glass, .cmd-card, .faq-item, .live-chat, .cta, .start-step, .step-card) {
+  background: var(--pl-bg); border: 1px solid var(--pl-edge); border-radius: 24px; box-shadow: var(--pl-shadow);
+  -webkit-backdrop-filter: var(--pl-blur); backdrop-filter: var(--pl-blur);
+}
+html body.pill-shell :is(.eco-card, .feat-card, .bento-tile, .cmd-card) { padding: 16px; }
+html body.pill-shell :is(.eco-grid, .feat-grid, .bento-grid) { gap: var(--pl-gap) !important; }
+html body.pill-shell .section { padding-top: 24px; padding-bottom: 24px; }
+html body.pill-shell .section-lead { margin-bottom: 16px; }
+html body.pill-shell .section h2 { margin-top: 8px; margin-bottom: 8px; }
+html body.pill-shell .section-label { margin-bottom: 8px; }
+html body.pill-shell .hero { padding-top: 24px; padding-bottom: 16px; }
+html body.pill-shell :is(.btn, .aid-btn, .ux-chip, .chip) { -webkit-backdrop-filter: blur(calc(var(--nx-glass-blur, 22px) * .5)); backdrop-filter: blur(calc(var(--nx-glass-blur, 22px) * .5)); }
+
+/* ---------- Студия / Админка: то же поведение на десктопе ---------- */
+@media (min-width: 640px) and (orientation: landscape), (min-width: 900px) {
+  html body.pill-nav .ux-nav { overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+  html body.pill-nav .ux-nav::-webkit-scrollbar { display: none; }
+  html body.pill-nav .ux-tab { justify-content: flex-start; }
+  html body.pill-shell .main { max-width: none; box-sizing: border-box; padding-left: calc(var(--pl-m) + var(--pl-nav-w) + var(--pl-m)); padding-right: calc(var(--pl-m) + var(--pl-nav-w) + var(--pl-m)); }
+  /* панель уведомлений открывается вправо от левой пилюли, а не за край экрана */
+  html body.pill-nav .bell-panel { left: calc(100% + var(--pl-m)); right: auto; top: 0; }
+}
+
+/* ---------- Правила идеального выравнивания (общие для всех сайтов с .pill-shell) ---------- */
+/* 1. Сетки заполняют ширину: в альбомной ориентации карточки идут в несколько колонок, а не в одну длинную колонку */
+html body.pill-shell :is(.eco-grid, .feat-grid, .bento-grid, .sites-grid, .stats-row, .digest-tiles, .digest-grid, .detail-grid, .widgets-row, #template-grid, #media-grid, .media-grid) {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)) !important; gap: 8px !important; align-items: stretch; align-content: start;
+}
+/* 2. Карточки одного ряда — одной высоты и с одинаковыми внутренними отступами (16px) */
+html body.pill-shell :is(.eco-grid, .feat-grid, .bento-grid, .sites-grid, .stats-row, .digest-tiles, .digest-grid, .detail-grid, .widgets-row, #template-grid, #media-grid) > * { box-sizing: border-box; height: 100%; min-width: 0; }
+html body.pill-shell :is(.site-card, .stat-card, .stat, .widget, .digest-tile, .template-card, .media-card, .detail-card, .settings-card, .glass:not(.modal):not(.bell-panel)) { padding: 16px; border-radius: 24px; }
+/* 3. Плотность: вертикальные отступы между блоками кратны 8/16 */
+html body.pill-shell .view > * + *, html body.pill-shell .stack > * + * { margin-top: 16px; }
+html body.pill-shell .stack { gap: 16px; }
+html body.pill-shell .page-heading { margin-top: 0; margin-bottom: 16px; padding: 0; }
+html body.pill-shell .main { padding-top: 16px; padding-bottom: 16px; }
+html body.pill-shell :is(.section-head, .card-head, .widget-head) { margin-bottom: 8px; }
+/* 4. Минимализм: пустой блок скрывается (подгружаемые списки появятся, когда в них что-то будет) */
+html body.pill-shell main :is(div, section, ul, ol):empty:not([aria-live]):not(.skeleton):not([class*="skeleton"]):not([data-keep]):not([class*="knob"]):not([class*="fill"]):not([class*="bar"]):not([class*="dot"]):not([class*="avatar"]):not([class*="ico"]) { display: none; }
+/* v6.0: пустые «декоративные» div (кружок тумблера .toggle-knob, заливка прогресса, точки) НЕ скрываем — иначе на всех тумблерах пропадал кружок (дефект v6.0.2-WIP) */
+/* 5. Стеклянные поля и строки */
+html body.pill-shell :is(.main, .spa) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+  background: color-mix(in srgb, var(--nx-ink) 6%, transparent); border: 1px solid var(--pl-edge); border-radius: 16px;
+}
+
+html body.pill-shell .ux-logout-inline { align-self: flex-start; margin-top: 8px; }
+
+/* Ряды статистики: 4 карточки — в один ряд на широком экране (не «3 + 1»), 2×2 на телефоне */
+html body.pill-shell :is(.stats-row, .digest-tiles, .widgets-row) { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)) !important; }
+@media (max-width: 899.98px) and (orientation: portrait), (max-width: 639.98px) {
+  html body.pill-shell :is(.stats-row, .digest-tiles) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  /* тосты — над Лупой и доком, а не под ними */
+  html body.pill-shell .toast { bottom: calc(var(--pl-y-b) + var(--pl-u) + var(--pl-m)) !important; }
+}

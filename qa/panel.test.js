@@ -4,7 +4,7 @@ const path = require('path'), fs = require('fs');
 const H = require('./harness'), S = require('./seed'), { suite, sleep, until } = require('./lib');
 const DEV = path.resolve(__dirname, '..'), RU = path.resolve(__dirname, '../../amoore-ru');
 const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { recursive: true });
-const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','5.8.0');` : '');
+const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','6.0.0');` : '');
 
 (async () => {
   const { chromium } = H.pwRequire();
@@ -21,7 +21,7 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     await until(async () => (await page.$$('.site-card')).length >= 2, 5000);
     const tabs = await visibleTabs(page);
     T.check('порядок вкладок: Дашборд → Новости → Медиа → Дайджест, затем Команда / Люди / Логи / Заявки (Настройки — шестерёнка)', tabs.join('>') === 'Дашборд>Новости>Медиа>Дайджест>Команда>Люди>Логи>Заявки', tabs.join('>'));
-    T.check('чип версии показывает v5.8.0', (await page.textContent('#version-chip')) === 'v5.8.0', await page.textContent('#version-chip'));
+    T.check('чип версии на главном экране — только мажор «v6» (без точек и нулей)', (await page.textContent('#version-chip')) === 'v6', await page.textContent('#version-chip'));
     T.check('нет ошибок JS при входе', errors.length === 0, errors.join('; '));
     T.check('если версия уже просмотрена — окно «Что нового» не показывается', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.click('#version-chip'); await sleep(500);
@@ -30,18 +30,18 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
   { const { page } = await open({ seen: false });
     const shown = await until(async () => page.$eval('#whatsnew-modal', e => e.classList.contains('visible')), 3000);
     T.check('первый вход за версию: выскакивает окно «Что нового»', !!shown);
-    T.check('заголовок «Обновление v5.8»', /Обновление v5\.8/.test(await page.textContent('#whatsnew-title')), await page.textContent('#whatsnew-title'));
+    T.check('заголовок «Обновление v6» (6.0.0 без хвостовых нулей)', /^Обновление v6$/.test((await page.textContent('#whatsnew-title')).trim()), await page.textContent('#whatsnew-title'));
     const li = await page.$$eval('#whatsnew-list li li', e => e.map(x => x.textContent));
     T.check('в списке изменения v5.8 — не меньше 4 пунктов', li.length >= 4, li.length + ' пунктов');
     await page.click('#whatsnew-ok'); await sleep(300);
-    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '5.8.0');
+    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '6.0.0');
     await page.reload(); await sleep(1500);
     T.check('после перезагрузки окно больше не появляется', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.context().close(); }
   { const core = fs.readFileSync(path.join(DEV, 'shared/amoore-core.js'), 'utf8'), app = fs.readFileSync(path.join(DEV, 'app.js'), 'utf8');
     const cv = (core.match(/AMOORE_VERSION(?: =|:) ?['"]([\d.]+)['"]/) || [])[1], av = (app.match(/const AMOORE_VERSION = '([\d.]+)'/) || [])[1];
     const cl = JSON.parse(fs.readFileSync(path.join(DEV, 'changelog.json'), 'utf8'));
-    T.check('синхронизация версий: core = app.js = changelog (5.8.0)', cv === '5.8.0' && av === '5.8.0' && cl.current === '5.8.0', `${cv}/${av}/${cl.current}`); }
+    T.check('синхронизация версий: core = app.js = changelog (6.0.0)', cv === '6.0.0' && av === '6.0.0' && cl.current === '6.0.0', `${cv}/${av}/${cl.current}`); }
 
   // ---------- красный счётчик заявок ----------
   console.log('Заявки и счётчик');
@@ -64,8 +64,9 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     T.check('XSS в имени заявки экранируется', !(await page.evaluate(() => window.__xss)) && (await page.$$('#leads-list img')).length === 0);
     await page.context().close(); }
   { const { page } = await open({ viewport: { width: 390, height: 844 }, mobile: true });
-    await until(async () => !(await page.$eval('#burger-dot', e => e.hidden)), 4000);
-    T.check('мобильный: на бургере есть красная точка при новых заявках', !(await page.$eval('#burger-dot', e => e.hidden)));
+    await until(async () => !(await page.$eval('#leads-badge', e => e.hidden)), 4000);
+    T.check('мобильный: бургера нет в DOM вообще (убран навсегда)', (await page.$$('#burger, .ux-burger, [data-ux-burger], #burger-dot')).length === 0);
+    T.check('мобильный: счётчик новых заявок виден на вкладке «Заявки» нижнего дока', await page.isVisible('#leads-badge') && !!(await page.$('.ux-nav #tab-leads #leads-badge')));
     await page.context().close(); }
 
   // ---------- переходы вкладок ----------
@@ -225,8 +226,8 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
   console.log('Адаптив');
   const widths = process.env.WIDTHS ? process.env.WIDTHS.split(',').map(Number) : [320, 360, 375, 390, 414, 430, 540, 768, 820, 900, 1024, 1100, 1120, 1280, 1440, 1920], matrix = [];
   for (const w of widths) {
-    const mobile = w <= 1359;   // до 1119px включительно навигация сворачивается в бургер
-    const { page, errors } = await open({ viewport: { width: w, height: mobile ? 800 : 900 }, mobile: w < 820, seen: false });
+    const mobile = w < 900;   // v6: <900px (портрет) — нижний док рядом с Лупой; ≥900px — вертикальные пилюли слева/справа
+    const { page, errors } = await open({ viewport: { width: w, height: mobile ? Math.max(800, w + 60) : 900 }, mobile: w < 820, seen: false });
     await until(async () => (await page.$$('.site-card')).length >= 2, 5000);
     await sleep(900);
     const rec = { w, views: {} };
@@ -234,7 +235,6 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     T.check(`${w}px: окно «Что нового» целиком помещается на экран`, modal.vis && modal.l >= 0 && modal.r <= modal.vw + 1 && modal.t >= 0 && modal.b <= modal.vh + 2, JSON.stringify(modal));
     await page.click('#whatsnew-ok'); await sleep(250);
     for (const v of ['dashboard', 'news', 'media', 'team', 'logs', 'leads', 'digest', 'settings']) {
-      if (mobile) { await page.click('#burger'); await sleep(350); }
       await page.click(v === 'settings' ? '[data-ux-settings]' : '#tab-' + v); await sleep(900);
       if (v === 'digest') { await page.click('#digest-build'); await sleep(900); }
       const m = await page.evaluate(() => {
@@ -246,10 +246,28 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
       T.check(`${w}px · ${v}: нет горизонтальной прокрутки`, m.over <= 1 && !m.wide.length, `over=${m.over} ${m.wide.join(',')}`);
       if (v === 'dashboard' || v === 'digest') await page.screenshot({ path: path.join(SHOTS, `panel-${v}-${w}.png`), fullPage: false });
     }
-    if (mobile) {
-      await page.click('#burger'); await sleep(350);
-      const tap = await page.$$eval('.ux-nav .ux-tab', els => els.filter(e => getComputedStyle(e).display !== 'none').map(e => Math.round(e.getBoundingClientRect().height)));
-      T.check(`${w}px: пункты мобильного меню ≥ 44px высотой (удобно пальцем)`, tap.every(h => h >= 44), tap.join(','));
+    { // v6: геометрия пилюль — всё считается от Лупы (якорь слева внизу, поле 16px, модуль 64px)
+      const g = await page.evaluate(() => {
+        const R = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; };
+        const tabs = [...document.querySelectorAll('.ux-nav .ux-tab')].filter(e => getComputedStyle(e).display !== 'none').map(e => Math.round(e.getBoundingClientRect().height));
+        return { vw: innerWidth, vh: innerHeight, loupe: R('#search-toggle'), nav: R('#ux-nav'), bar: R('.ux-bar'), group: R('.ux-group'), tabs, burger: document.querySelectorAll('#burger, .ux-burger, [data-ux-burger]').length };
+      });
+      const near = (a, b, e = 1.5) => Math.abs(a - b) <= e, L = g.loupe;
+      T.check(`${w}px: бургера в DOM нет`, g.burger === 0);
+      T.check(`${w}px: Лупа — якорь: слева внизу, поле 16px, размер 64×64`, !!L && near(L.l, 16) && near(g.vh - L.b, 16) && near(L.w, 64) && near(L.h, 64), JSON.stringify(L));
+      T.check(`${w}px: пункты навигации ≥ 44px высотой (удобно пальцем)`, g.tabs.length > 0 && g.tabs.every(h => h >= 44), g.tabs.join(','));
+      if (mobile) {
+        const N = g.nav;
+        T.check(`${w}px: нижний док стоит справа от Лупы: та же нижняя линия и высота 64px`, !!N && !!L && near(N.b, L.b) && near(N.h, L.h), JSON.stringify(N));
+        T.check(`${w}px: док начинается ровно через 8px от Лупы и кончается на поле 16px справа`, !!N && near(N.l - L.r, 8) && near(g.vw - N.r, 16), `${N && N.l - L.r} / ${N && g.vw - N.r}`);
+        T.check(`${w}px: верхняя пилюля: поля 16px сверху/слева/справа, высота 64px`, !!g.bar && near(g.bar.t, 16) && near(g.bar.l, 16) && near(g.vw - g.bar.r, 16) && near(g.bar.h, 64), JSON.stringify(g.bar));
+      } else {
+        const N = g.nav, B = g.bar;
+        T.check(`${w}px: правая вертикальная пилюля: ширина 128, поле 16px, строго по центру высоты`, !!N && near(N.w, 128) && near(g.vw - N.r, 16) && near(N.cy, g.vh / 2, 2), JSON.stringify(N));
+        T.check(`${w}px: левая пилюля и Лупа на одной вертикальной оси (ширина 64px, поле 16px)`, !!B && near(B.w, 64) && near(B.l, 16) && near(B.cx, L.cx), `bar cx=${B && B.cx} loupe cx=${L && L.cx}`);
+        const G = g.group, hit = G && N && !(G.r <= N.l || G.l >= N.r || G.b <= N.t || G.t >= N.b);
+        T.check(`${w}px: блок аккаунта (зеркало Лупы) не пересекается с навигацией`, !hit && (!G || (near(g.vh - G.b, 16) && near(G.h, 64))), JSON.stringify({ G, N }));
+      }
     }
     T.check(`${w}px: нет ошибок JS`, errors.length === 0, errors.join('; '));
     matrix.push(rec);
@@ -319,16 +337,16 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
     await page.fill('.cl-card:nth-child(1) .cl-version', '9.9.9'); await page.fill('.cl-card:nth-child(1) .cl-title', 'Тест'); await page.fill('.cl-card:nth-child(1) .cl-items', 'Первое\nВторое'); await page.click('#cl-save'); await sleep(800);
     const cl = await page.evaluate(() => (window.__db.global_settings || []).find(r => r.key === 'changelog'));
     T.check('редактор Changelog пишет в БД; текущая версия = первая запись', !!cl && cl.value.current === '9.9.9' && cl.value.versions[0].items.length === 2 && cl.value.versions.length >= 2, JSON.stringify(cl && cl.value.current));
-    T.check('чип версии в админке обновился из БД', (await page.textContent('#version-chip')) === 'v9.9.9');
+    T.check('чип версии в админке обновился из БД (9.9.9 → только мажор «v9»)', (await page.textContent('#version-chip')) === 'v9', await page.textContent('#version-chip'));
     await page.fill('.cl-card:nth-child(1) .cl-version', 'abc'); await page.click('#cl-save'); await sleep(300);
     T.check('неверный формат версии не сохраняется', (await page.evaluate(() => window.__db.global_settings.find(r => r.key === 'changelog').value.current)) === '9.9.9');
     await page.context().close(); }
   { // версия из БД на старте: «Что нового» + чип
-    const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '5.8.0', versions: [{ version: '5.8.0', title: 'Из базы', items: ['Новое из БД'] }] } }, { key: 'role_labels', value: { super_admin: 'Босс', admin: 'Админ', moderator: 'Модератор' } }];
+    const s = S.seed(); s.global_settings = [{ key: 'changelog', value: { current: '7.2.0', versions: [{ version: '7.2.0', title: 'Из базы', items: ['Новое из БД'] }] } }, { key: 'role_labels', value: { super_admin: 'Босс', admin: 'Админ', moderator: 'Модератор' } }];
     const { page } = await open({ seed: s, seen: false });
-    const ok = await until(async () => (await page.textContent('#version-chip')) === 'v5.8.0', 4000);
-    const wn = await until(async () => /5\.8/.test(await page.textContent('#whatsnew-title')), 4000);
-    T.check('админка берёт версию из БД, код — только фоллбэк (v5.8.0)', !!ok && !!wn, await page.textContent('#whatsnew-title'));
+    const ok = await until(async () => (await page.textContent('#version-chip')) === 'v7', 4000);
+    const wn = await until(async () => /^Обновление v7\.2$/.test((await page.textContent('#whatsnew-title')).trim()), 4000);
+    T.check('админка берёт версию из БД, код — только фоллбэк (БД 7.2.0 → чип «v7», заголовок «v7.2»)', !!ok && !!wn, await page.textContent('#whatsnew-title'));
     T.check('названия ролей из БД применяются сразу после входа (список ролей в форме)', await until(async () => (await page.$$eval('#new-role option', o => o.map(x => x.textContent))).includes('Босс'), 3000));
     await page.context().close(); }
 

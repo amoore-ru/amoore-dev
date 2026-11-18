@@ -18,21 +18,26 @@
   async function loadPeople() {
     const box = $('people-list'); if (!box) return;
     box.innerHTML = '<div class="v5-sk"></div><div class="v5-sk"></div><div class="v5-sk"></div>';
-    try { people = await amooreID.people.list(); } catch (e) { box.innerHTML = `<div class="loading-state">${esc(friendlyError(e))}</div>`; return; }
+    try { const got = await amooreID.people.list(); people = Array.isArray(got) ? got : []; } catch (e) { box.innerHTML = `<div class="loading-state">${esc(friendlyError(e))}</div>`; return; }
     paintPeople();
   }
   function paintPeople() {
     const box = $('people-list'), s = q.toLowerCase();
     const rows = people.filter(p => !s || (p.email || '').toLowerCase().includes(s) || (p.username || '').includes(s));
     if (!rows.length) { box.innerHTML = '<div class="loading-state">Никого не найдено</div>'; return; }
-    box.innerHTML = rows.map(p => `<div class="admin-card glass" data-uid="${esc(p.id)}"><div class="admin-card-info">
-      <h4>${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="" width="28" height="28" loading="lazy" style="border-radius:50%;vertical-align:middle;margin-right:8px">` : ''}${esc(p.username ? '@' + p.username : 'без username')}
-        <span class="role-badge ${p.role === 'user' ? 'moderator' : 'admin'}">${esc(ROLE_LABEL[p.role] || p.role)}</span>${p.is_banned ? ' <span class="role-badge" style="background:#c0392b;color:#fff">бан</span>' : ''}</h4>
-      <dl class="pp-grid"><dt>Email</dt><dd class="cell-ellipsis" title="${esc(p.email || '')}">${esc(p.email || '—')}</dd><dt>Регистрация</dt><dd>${esc(fmtDate(p.created_at))}</dd>${p.last_sign_in_at ? `<dt>Вход</dt><dd>${esc(fmtDate(p.last_sign_in_at))}</dd>` : ''}${p.telegram_id ? `<dt>Telegram</dt><dd>${esc(p.telegram_id)}</dd>` : ''}</dl>
-      ${p.is_banned && p.ban_reason ? `<p class="muted" style="font-size:12px">Причина: ${esc(p.ban_reason)}</p>` : ''}</div>
-      ${p.role === 'super_admin' ? '' : `<div class="v5-row">
+    box.innerHTML = rows.map(p => {
+      const name = p.display_name || (p.username ? p.username : 'Без имени');
+      const av = p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="" width="36" height="36" loading="lazy" class="pp-av">` : `<span class="pp-av pp-av-ph" aria-hidden="true">${esc((String(name).trim()[0] || '?').toUpperCase())}</span>`;
+      const badges = `<span class="role-badge ${p.role === 'user' ? 'moderator' : 'admin'}">${esc(ROLE_LABEL[p.role] || p.role)}</span>${p.is_banned ? ' <span class="role-badge" style="background:#c0392b;color:#fff">бан</span>' : ''}`;
+      const controls = p.role === 'super_admin' ? '' : `<div class="v5-row">
         <select class="v5-sel" data-role="${esc(p.id)}" aria-label="Роль"><option value="user"${p.role === 'user' ? ' selected' : ''}>Пользователь</option><option value="moderator"${p.role === 'moderator' ? ' selected' : ''}>Модератор</option><option value="admin"${p.role === 'admin' ? ' selected' : ''}>Админ</option></select>
-        ${p.is_banned ? `<button class="btn btn-ghost btn-sm" data-unban="${esc(p.id)}">Разбанить</button>` : `<button class="btn btn-ghost btn-sm" data-ban="${esc(p.id)}">Забанить</button>`}</div>`}</div>`).join('');
+        ${p.is_banned ? `<button class="btn btn-ghost btn-sm" data-unban="${esc(p.id)}">Разбанить</button>` : `<button class="btn btn-ghost btn-sm" data-ban="${esc(p.id)}">Забанить</button>`}</div>`;
+      // v5.8.1: в свёрнутом виде — только аватар, имя и @username; остальное раскрывается по клику
+      return `<details class="admin-card glass pp-acc" data-uid="${esc(p.id)}"><summary class="pp-sum">${av}<span class="pp-name">${esc(name)}</span><span class="pp-user">${p.username ? '@' + esc(p.username) : 'без username'}</span></summary>
+        <div class="pp-body"><p class="pp-badges">${badges}</p>
+        <dl class="pp-grid"><dt>Email</dt><dd class="cell-ellipsis" title="${esc(p.email || '')}">${esc(p.email || '—')}</dd><dt>Регистрация</dt><dd>${esc(fmtDate(p.created_at))}</dd><dt>Telegram ID</dt><dd>${p.telegram_id ? esc(p.telegram_id) : '—'}</dd>${p.last_sign_in_at ? `<dt>Вход</dt><dd>${esc(fmtDate(p.last_sign_in_at))}</dd>` : ''}</dl>
+        ${p.is_banned && p.ban_reason ? `<p class="muted" style="font-size:12px">Причина: ${esc(p.ban_reason)}</p>` : ''}${controls}</div></details>`;
+    }).join('');
   }
   document.addEventListener('input', e => { if (e.target.id === 'people-search') { q = e.target.value; paintPeople(); } });
   document.addEventListener('change', async e => {
@@ -60,18 +65,20 @@
     list.innerHTML = '<div class="v5-sk"></div><div class="v5-sk"></div><div class="v5-sk"></div>';
     const { data, error } = await sb.from('leads').select('*').order('created_at', { ascending: false }).limit(200);
     if (error) { list.innerHTML = `<div class="loading-state">${esc(friendlyError(error))}</div>`; return; }
-    const cnt = k => data.filter(l => (k === 'all') || (l.status || 'new') === k).length;
-    const chips = ['all', ...Object.keys(STATUS)].map(k => `<button class="v5-chip${leadFilter === k ? ' on' : ''}" data-lf="${k}">${k === 'all' ? 'Все' : STATUS[k]} · ${cnt(k)}</button>`).join('');
-    const rows = data.filter(l => (leadFilter === 'all' || (l.status || 'new') === leadFilter) && (!tagFilter || (l.tags || []).includes(tagFilter)));
+    // v5.8.1: одна строка фильтров: [Все] [Новая] [ВИП] [Обработана] [Скачать CSV]
+    const FILTERS = [['all', 'Все'], ['new', 'Новая'], ['vip', 'ВИП'], ['done', 'Обработана']];
+    const match = (l, k) => k === 'all' || (k === 'vip' ? (l.tags || []).includes('vip') : (l.status || 'new') === k);
+    const chips = FILTERS.map(([k, t]) => `<button class="v5-chip${leadFilter === k ? ' on' : ''}" data-lf="${k}" title="${data.filter(l => match(l, k)).length}">${t}</button>`).join('');
+    const rows = data.filter(l => match(l, leadFilter));
     leadsCache = rows;
-    const tagChips = Object.keys(TAGS).map(k => `<button class="v5-chip${tagFilter === k ? ' on' : ''}" data-tf="${k}">${TAGS[k]}</button>`).join('');
-    list.innerHTML = `<div class="leads-toolbar">${chips}</div><div class="leads-toolbar">${tagChips}<button class="btn btn-ghost btn-sm" id="leads-csv" type="button">Экспорт в CSV</button></div>` + (rows.length ? rows.map(l => `
+    const canDel = typeof isSuper === 'function' && isSuper();
+    list.innerHTML = `<div class="leads-toolbar leads-one-row">${chips}<button class="v5-chip v5-chip-csv" id="leads-csv" type="button">⇩ Скачать CSV</button></div>` + (rows.length ? rows.map(l => `
       <div class="admin-card glass lead-card" data-lead="${esc(l.id)}" data-new="${l.status === 'done' ? 0 : 1}"><div class="admin-card-info">
         <h4>${esc(l.name || 'Без имени')} <span class="role-badge ${l.status === 'done' ? 'admin' : 'moderator'}">${esc(STATUS[l.status || 'new'] || l.status)}</span></h4>
         <p>${esc(l.contact || '')}</p><p class="muted">${esc((l.message || '').slice(0, 400))}</p><p class="muted" style="font-size:12px">${esc(fmtDate(l.created_at))}</p></div>
         <div class="lead-tags" data-tags-for="${esc(l.id)}">${Object.keys(TAGS).map(k => `<button type="button" class="lead-tag${(l.tags || []).includes(k) ? ' on' : ''}" data-tag="${k}" data-lead-id="${esc(l.id)}" aria-pressed="${(l.tags || []).includes(k)}">${TAGS[k]}</button>`).join('')}</div>
         <div class="lead-actions"><select class="v5-sel" data-lstatus="${esc(l.id)}" aria-label="Статус">${Object.keys(STATUS).map(k => `<option value="${k}"${(l.status || 'new') === k ? ' selected' : ''}>${STATUS[k]}</option>`).join('')}</select>
-          <button class="btn btn-ghost btn-sm" data-notes="${esc(l.id)}">Заметки</button>${l.status !== 'done' ? `<button type="button" class="btn btn-ghost btn-sm lead-done" data-id="${esc(l.id)}">Обработана</button>` : ''}</div><div class="v5-notes" id="notes-${esc(l.id)}" hidden></div></div>`).join('') : '<div class="loading-state">В этом статусе заявок нет</div>');
+          <button class="btn btn-ghost btn-sm" data-notes="${esc(l.id)}">Заметки</button>${canDel ? `<button type="button" class="btn btn-danger-outline btn-sm" data-lead-del="${esc(l.id)}">Удалить</button>` : ''}${l.status !== 'done' ? `<button type="button" class="btn btn-ghost btn-sm lead-done" data-id="${esc(l.id)}">Обработана</button>` : ''}</div><div class="v5-notes" id="notes-${esc(l.id)}" hidden></div></div>`).join('') : '<div class="loading-state">В этом статусе заявок нет</div>');
   };
   async function paintNotes(id) {
     const box = $('notes-' + id); if (!box) return;
@@ -106,8 +113,16 @@
     }
   });
   document.addEventListener('click', async e => {
-    const f = e.target.closest('[data-lf]'), n = e.target.closest('[data-notes]'), a = e.target.closest('[data-addnote]');
+    const f = e.target.closest('[data-lf]'), n = e.target.closest('[data-notes]'), a = e.target.closest('[data-addnote]'), del = e.target.closest('[data-lead-del]');
     if (f) { leadFilter = f.dataset.lf; loadLeads(); }
+    if (del) {
+      if (!confirm('Удалить заявку навсегда? Заметки к ней тоже пропадут.')) return;
+      const { data: gone, error } = await sb.from('leads').delete().eq('id', del.dataset.leadDel).select('id');
+      if (error) return toast(friendlyError(error), 'error');
+      if (!gone || !gone.length) return toast('Не удалось удалить: нужны права основателя', 'error');
+      amooreID.sb.rpc('log_event', { p_action: 'lead_delete', p_details: del.dataset.leadDel }).then(() => {});
+      toast('Заявка удалена'); loadLeads(); if (typeof refreshLeadsBadge === 'function') refreshLeadsBadge();
+    }
     if (n) { const box = $('notes-' + n.dataset.notes); box.hidden = !box.hidden; if (!box.hidden) paintNotes(n.dataset.notes); }
     if (a) {
       const id = a.dataset.addnote, inp = $('note-in-' + id), t = inp.value.trim(); if (!t) return;

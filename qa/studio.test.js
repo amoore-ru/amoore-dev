@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, '../../amoore-studio'), SHOTS = path.join(_
     await sleep(1300);
     const m = await page.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth, v: window.AMOORE_VERSION, chip: (document.querySelector('[data-ux-chip]') || {}).textContent }));
     T.check(`${w}px: нет горизонтальной прокрутки`, m.over <= 1, m.over);
-    T.check(`${w}px: версия 5.8.0, чип v5.8.0 в единой шапке`, m.v === '5.8.0' && m.chip === 'v5.8.0', JSON.stringify(m));
+    T.check(`${w}px: версия 6.0.0, чип «v6» (только мажор) в единой шапке`, m.v === '6.0.0' && m.chip === 'v6', JSON.stringify(m));
     await page.click('#new-project-button').catch(() => {}); await sleep(500);
     const modal = await page.evaluate(() => { const e = document.querySelector('.modal-card'); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, vw: innerWidth, vh: innerHeight }; });
     T.check(`${w}px: окно «Новый проект» помещается на экран`, !modal || (modal.l >= 0 && modal.r <= modal.vw + 1 && modal.t >= 0 && modal.b <= modal.vh + 1), JSON.stringify(modal));
@@ -19,7 +19,15 @@ const ROOT = path.resolve(__dirname, '../../amoore-studio'), SHOTS = path.join(_
     matrix.push({ w, over: m.over }); await page.context().close();
   }
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  T.check('кэш: все скрипты и CSS подключены с ?v=5.8.0', (html.match(/\?v=5.8.0/g) || []).length >= 13, (html.match(/\?v=5.8.0/g) || []).length);
+  T.check('кэш: все скрипты и CSS подключены с ?v=6.0.0', (html.match(/\?v=6.0.0/g) || []).length >= 13, (html.match(/\?v=6.0.0/g) || []).length);
   T.check('безопасные зоны iPhone: env(safe-area-inset-*) в CSS', /safe-area-inset-top/.test(fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8') + fs.readFileSync(path.join(ROOT, 'amoore-theme.css'), 'utf8')));
+
+  // v6: Лупа-якорь в Студии (раньше её там не было)
+  for (const [vw, vh, mob] of [[390, 844, true], [1440, 900, false]]) {
+    const { page } = await H.openPage(b, 'http://localhost:8304/index.html', S.seed(), { viewport: { width: vw, height: vh }, mobile: mob }); await page.waitForTimeout(500);
+    const g = await page.evaluate(() => { const e = document.querySelector('#pill-search'); if (!e) return null; const r = e.getBoundingClientRect(); return { l: r.left, b: innerHeight - r.bottom, w: r.width, h: r.height, vis: getComputedStyle(e).display !== 'none' }; });
+    T.check(`${vw}px: Лупа в Студии — слева внизу, поле 16px, 64×64`, !!g && g.vis && Math.abs(g.l - 16) <= 1.5 && Math.abs(g.b - 16) <= 1.5 && Math.abs(g.w - 64) <= 1 && Math.abs(g.h - 64) <= 1, JSON.stringify(g));
+    await page.context().close();
+  }
   await b.close(); srv.close(); process.exit(T.finish({ matrix }) ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });
