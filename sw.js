@@ -1,8 +1,9 @@
-/* sw.js — v5.8.0. Стратегия: HTML — сеть с запасом из кэша (офлайн-оболочка); статика — stale-while-revalidate.
+/* sw.js — v6.1.0 (PWA). Стратегия: HTML — сеть с запасом из кэша, затем offline.html; статика — stale-while-revalidate.
    Запросы к Supabase / Edge Functions / чужим доменам НЕ кэшируются (авторизация и данные всегда живые). */
-const VER = 'amoore-v6.0.0';
-const SHELL = ['./', 'manifest.json'];
-self.addEventListener('install', (e) => { e.waitUntil(caches.open(VER).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
+const VER = 'amoore-v6.1.0';
+const SHELL = ['./', 'offline.html'];                                   // без них оболочка не ставится
+const EXTRA = ['manifest.json', 'icons/notify-192.png', 'icons/notify-badge.png'];   // желательны, но не критичны
+self.addEventListener('install', (e) => { e.waitUntil(caches.open(VER).then((c) => c.addAll(SHELL).then(() => Promise.all(EXTRA.map((u) => c.add(u).catch(() => {}))))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VER).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
@@ -11,7 +12,7 @@ self.addEventListener('fetch', (e) => {
   if (r.method !== 'GET' || u.origin !== location.origin) return;
   if (r.mode === 'navigate') {
     e.respondWith(fetch(r).then((res) => { const cp = res.clone(); caches.open(VER).then((c) => c.put(r, cp)); return res; })
-      .catch(() => caches.match(r).then((m) => m || caches.match('./'))));
+      .catch(() => caches.match(r).then((m) => m || caches.match('./')).then((m) => m || caches.match('offline.html'))));
     return;
   }
   e.respondWith(caches.open(VER).then((c) => c.match(r).then((hit) => {
@@ -26,8 +27,8 @@ self.addEventListener('push', (e) => {
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(String(d.title || 'amoore').slice(0, 120), {
     body: String(d.body || '').slice(0, 300),
-    icon: 'android-chrome-192x192.png',
-    badge: 'favicon-32x32.png',
+    icon: 'icons/notify-192.png?v=' + VER,
+    badge: 'icons/notify-badge.png?v=' + VER,
     tag: d.tag || 'amoore-news',
     data: { url: typeof d.url === 'string' ? d.url : './#news' }
   }));

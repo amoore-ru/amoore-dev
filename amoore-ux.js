@@ -163,3 +163,16 @@
     setVersion: setVersion, shortVer: shortVer, closeMenu: closeMenu
   };
 })();
+
+/* v6.1: у вкладок навигации-пилюли на широком экране виден только значок — подпись дублируем в title (подсказка при наведении) */
+(function () {
+  function label() {
+    var tabs = document.querySelectorAll('.ux-tab, .spa-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      var el = tabs[i]; if (el.getAttribute('title')) continue;
+      var s = (el.getAttribute('aria-label') || el.textContent || '').replace(/\s*\d+\s*$/, '').replace(/\s+/g, ' ').trim();
+      if (s) el.setAttribute('title', s);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', label); else label();
+})();

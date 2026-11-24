@@ -1,30 +1,46 @@
 {
-  "name": "amoore dev — Mission Control",
-  "short_name": "amoore dev",
+  "name": "a. Core — Mission Control",
+  "short_name": "a. Core",
   "description": "Админ-панель экосистемы amoore",
   "id": "/?source=pwa",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#070b16",
-  "theme_color": "#070b16",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#140A28",
+  "theme_color": "#140A28",
   "lang": "ru",
+  "dir": "ltr",
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "android-chrome-192x192.png",
+      "src": "icons/icon-192.21efaa2c.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "android-chrome-512x512.png",
+      "src": "icons/icon-512.b5b68291.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "android-chrome-512x512.png",
+      "src": "icons/maskable-192.5300b124.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/maskable-512.6f26b890.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

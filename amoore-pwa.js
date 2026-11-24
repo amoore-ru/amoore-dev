@@ -7,16 +7,16 @@
   if (window.__amoorePwa) return; window.__amoorePwa = true;
   var h = document.head;
   function meta(n, c) { if (!h.querySelector('meta[name="' + n + '"]')) { var m = document.createElement('meta'); m.name = n; m.content = c; h.appendChild(m); } }
-  // «чёлка» и полоса жестов iPhone: страница рисуется под системными панелями (отступы — через env(safe-area-inset-*))
+  // «чёлка» и полоса жестов iPhone: страница рисуется под системными панелями. Отступы: у пилюль (body.pill-shell) — свои токены --pl-*; здесь только для страниц без пилюль
   var vp = h.querySelector('meta[name="viewport"]');
   if (vp && !/viewport-fit/.test(vp.content)) vp.content += ', viewport-fit=cover';
   if (!h.querySelector('link[rel="manifest"]')) { var l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.json'; h.appendChild(l); }
-  meta('theme-color', '#070b16'); meta('mobile-web-app-capable', 'yes'); meta('apple-mobile-web-app-capable', 'yes');
+  meta('theme-color', '#0A0A0A'); meta('mobile-web-app-capable', 'yes'); meta('apple-mobile-web-app-capable', 'yes');
   meta('apple-mobile-web-app-status-bar-style', 'black-translucent'); meta('apple-mobile-web-app-title', 'amoore');
-  if (!h.querySelector('link[rel="apple-touch-icon"]')) { var a = document.createElement('link'); a.rel = 'apple-touch-icon'; a.href = 'android-chrome-192x192.png'; h.appendChild(a); }
+  // apple-touch-icon, иконки и заставки подключает блок pwa:begin…end в <head> (scripts/gen-pwa.py); запасной тег с фиксированным путём не нужен
   if (!document.getElementById('amoore-safe-css')) {
     var st = document.createElement('style'); st.id = 'amoore-safe-css';
-    st.textContent = '@media (display-mode:standalone){body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}}';
+    st.textContent = '@media (display-mode:standalone){body:not(.pill-shell){padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}}';
     h.appendChild(st);
   }
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
@@ -24,7 +24,7 @@
   }
   // Телеграм Mini App: раскрываем на весь экран и красим шапку
   var tg = window.Telegram && window.Telegram.WebApp;
-  if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#070b16'); tg.setBackgroundColor('#070b16'); document.documentElement.classList.add('in-telegram'); } catch (e) {} }
+  if (tg) { try { tg.ready(); tg.expand(); var tc = ((h.querySelector('meta[name="theme-color"]') || {}).content || '#0A0A0A'); tg.setHeaderColor(tc); tg.setBackgroundColor(tc); document.documentElement.classList.add('in-telegram'); } catch (e) {} }
 
   // ---- Web Push API (v5.1). Публичный VAPID-ключ: window.AMOORE_VAPID_PUBLIC_KEY или <meta name="amoore-vapid-public-key">.
   function vapid() { return window.AMOORE_VAPID_PUBLIC_KEY || ((document.querySelector('meta[name="amoore-vapid-public-key"]') || {}).content || '').trim(); }

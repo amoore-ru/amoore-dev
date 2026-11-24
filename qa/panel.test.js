@@ -4,7 +4,7 @@ const path = require('path'), fs = require('fs');
 const H = require('./harness'), S = require('./seed'), { suite, sleep, until } = require('./lib');
 const DEV = path.resolve(__dirname, '..'), RU = path.resolve(__dirname, '../../amoore-ru');
 const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { recursive: true });
-const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','6.0.0');` : '');
+const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth', JSON.stringify({admin_id:'${id}',email:'x@amoore.ru',nickname:'U',name:'U',role:'${role}',access_token:'tok',expires_at:Date.now()+3e6}));` + (seen ? `localStorage.setItem('amoore_dev_seen_version','6.1.0');` : '');
 
 (async () => {
   const { chromium } = H.pwRequire();
@@ -30,18 +30,18 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
   { const { page } = await open({ seen: false });
     const shown = await until(async () => page.$eval('#whatsnew-modal', e => e.classList.contains('visible')), 3000);
     T.check('первый вход за версию: выскакивает окно «Что нового»', !!shown);
-    T.check('заголовок «Обновление v6» (6.0.0 без хвостовых нулей)', /^Обновление v6$/.test((await page.textContent('#whatsnew-title')).trim()), await page.textContent('#whatsnew-title'));
+    T.check('заголовок «Обновление v6.1» (6.1.0 без хвостовых нулей)', /^Обновление v6\.1$/.test((await page.textContent('#whatsnew-title')).trim()), await page.textContent('#whatsnew-title'));
     const li = await page.$$eval('#whatsnew-list li li', e => e.map(x => x.textContent));
     T.check('в списке изменения v5.8 — не меньше 4 пунктов', li.length >= 4, li.length + ' пунктов');
     await page.click('#whatsnew-ok'); await sleep(300);
-    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '6.0.0');
+    T.check('после «Понятно» версия запоминается', (await page.evaluate(() => localStorage.getItem('amoore_dev_seen_version'))) === '6.1.0');
     await page.reload(); await sleep(1500);
     T.check('после перезагрузки окно больше не появляется', !(await page.$eval('#whatsnew-modal', e => e.classList.contains('visible'))));
     await page.context().close(); }
   { const core = fs.readFileSync(path.join(DEV, 'shared/amoore-core.js'), 'utf8'), app = fs.readFileSync(path.join(DEV, 'app.js'), 'utf8');
     const cv = (core.match(/AMOORE_VERSION(?: =|:) ?['"]([\d.]+)['"]/) || [])[1], av = (app.match(/const AMOORE_VERSION = '([\d.]+)'/) || [])[1];
     const cl = JSON.parse(fs.readFileSync(path.join(DEV, 'changelog.json'), 'utf8'));
-    T.check('синхронизация версий: core = app.js = changelog (6.0.0)', cv === '6.0.0' && av === '6.0.0' && cl.current === '6.0.0', `${cv}/${av}/${cl.current}`); }
+    T.check('синхронизация версий: core = app.js = changelog (6.1.0)', cv === '6.1.0' && av === '6.1.0' && cl.current === '6.1.0', `${cv}/${av}/${cl.current}`); }
 
   // ---------- красный счётчик заявок ----------
   console.log('Заявки и счётчик');
@@ -254,6 +254,17 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
       });
       const near = (a, b, e = 1.5) => Math.abs(a - b) <= e, L = g.loupe;
       T.check(`${w}px: бургера в DOM нет`, g.burger === 0);
+      { // v6.1: ряды статистики без !important делят всю ширину между краем и правой пилюлей; на телефоне 2×2; отступы под пилюли
+        await page.click('#tab-dashboard'); await sleep(500);
+        const sr = await page.evaluate(() => { const cs = [...document.querySelectorAll('.view.active .stats-row > *')].map(e => e.getBoundingClientRect()); return { n: cs.length, rows: new Set(cs.map(r => Math.round(r.top))).size, cols: new Set(cs.map(r => Math.round(r.left))).size, l: cs.length ? Math.min(...cs.map(r => r.left)) : 0, r: cs.length ? Math.max(...cs.map(r => r.right)) : 0, pb: parseFloat(getComputedStyle(document.body).paddingBottom), pt: parseFloat(getComputedStyle(document.body).paddingTop) }; });
+        T.check(`${w}px: стат-карточки: 4 штуки, левый край — поле 16`, sr.n === 4 && near(sr.l, 16, 2), JSON.stringify(sr));
+        if (mobile) T.check(`${w}px: стат-карточки на телефоне 2×2, padding-bottom ≥ 120, padding-top ≥ 96`, sr.cols === 2 && sr.rows === 2 && sr.pb >= 119.5 && sr.pt >= 95.5, JSON.stringify(sr));
+        else {
+          T.check(`${w}px: стат-карточки заканчиваются у правой пилюли (ширина − 96)`, near(sr.r, g.vw - 96, 2), JSON.stringify(sr));
+          if (w >= 1280) T.check(`${w}px: 4 стат-карточки в один ряд (не «3 + 1»)`, sr.rows === 1, JSON.stringify(sr));
+          T.check(`${w}px: padding-top ≥ 96 (под длинной пилюлей), padding-bottom ≥ 96 (под Лупой)`, sr.pt >= 95.5 && sr.pb >= 95.5, JSON.stringify(sr));
+        }
+      }
       T.check(`${w}px: Лупа — якорь: слева внизу, поле 16px, размер 64×64`, !!L && near(L.l, 16) && near(g.vh - L.b, 16) && near(L.w, 64) && near(L.h, 64), JSON.stringify(L));
       T.check(`${w}px: пункты навигации ≥ 44px высотой (удобно пальцем)`, g.tabs.length > 0 && g.tabs.every(h => h >= 44), g.tabs.join(','));
       if (mobile) {
@@ -263,8 +274,8 @@ const sessionInit = (id, role, seen) => `localStorage.setItem('amoore_dev_auth',
         T.check(`${w}px: верхняя пилюля: поля 16px сверху/слева/справа, высота 64px`, !!g.bar && near(g.bar.t, 16) && near(g.bar.l, 16) && near(g.vw - g.bar.r, 16) && near(g.bar.h, 64), JSON.stringify(g.bar));
       } else {
         const N = g.nav, B = g.bar;
-        T.check(`${w}px: правая вертикальная пилюля: ширина 128, поле 16px, строго по центру высоты`, !!N && near(N.w, 128) && near(g.vw - N.r, 16) && near(N.cy, g.vh / 2, 2), JSON.stringify(N));
-        T.check(`${w}px: левая пилюля и Лупа на одной вертикальной оси (ширина 64px, поле 16px)`, !!B && near(B.w, 64) && near(B.l, 16) && near(B.cx, L.cx), `bar cx=${B && B.cx} loupe cx=${L && L.cx}`);
+        T.check(`${w}px: правая вертикальная пилюля: ширина 64, поле 16px, строго по центру высоты`, !!N && near(N.w, 64) && N.h > N.w && near(g.vw - N.r, 16) && near(N.cy, g.vh / 2, 2), JSON.stringify(N));
+        T.check(`${w}px: верхняя пилюля — длинная строка: поля 16px слева/справа/сверху, высота 64px`, !!B && near(B.l, 16) && near(g.vw - B.r, 16) && near(B.t, 16) && near(B.h, 64), JSON.stringify(B));
         const G = g.group, hit = G && N && !(G.r <= N.l || G.l >= N.r || G.b <= N.t || G.t >= N.b);
         T.check(`${w}px: блок аккаунта (зеркало Лупы) не пересекается с навигацией`, !hit && (!G || (near(g.vh - G.b, 16) && near(G.h, 64))), JSON.stringify({ G, N }));
       }

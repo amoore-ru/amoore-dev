@@ -96,7 +96,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
   { const { page } = await open();
     await sleep(800);
     const info = await page.evaluate(() => ({ v: window.AMOORE_VERSION, api: window.amooreCore && window.amooreCore.version, st: window.AMOORE_STATE && window.AMOORE_STATE.version, ftr: document.querySelector('.version-btn [data-amoore-version]').textContent }));
-    T.check('AMOORE_VERSION = 6.0.0 (core, state, API)', info.v === '6.0.0' && info.api === '6.0.0' && info.st === '6.0.0', JSON.stringify(info));
+    T.check('AMOORE_VERSION = 6.1.0 (core, state, API)', info.v === '6.1.0' && info.api === '6.1.0' && info.st === '6.1.0', JSON.stringify(info));
     T.check('в подвале показана «Версия v6» (на главном экране — только мажор, без точек)', info.ftr === 'v6', info.ftr);
     await page.click('#version-btn');
     await until(async () => (await page.$$('#nx-changelog.open .nx-cl-entry')).length >= 3, 3000);
@@ -302,7 +302,7 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     T.check('viewport-fit=cover включён', /viewport-fit=cover/.test(html));
     T.check('v4.4 плавающей кнопки #mobile-cta в разметке нет, а в CSS она display:none !important', !/id="mobile-cta"/.test(html) && /\.mobile-cta[^{]*\{\s*display:\s*none\s*!important/.test(css));
     T.check('safe-area-inset-* применён к шапке, меню, нижней панели, подвалу и модалке', ['.ux-topbar', '.ux-panel', 'footer'].every(sel => new RegExp(sel.replace('.', '\\.') + '[^{]*\\{[^}]*safe-area-inset', 's').test(css + fs.readFileSync(path.join(ROOT, 'amoore-theme.css'), 'utf8'))));
-    T.check('кэш: CSS/JS подключены с версией ?v=6.0.0', /style\.css\?v=6.0.0/.test(html) && /amoore-core\.js\?v=6.0.0/.test(html) && /landing\.js\?v=6.0.0/.test(html));
+    T.check('кэш: CSS/JS подключены с версией ?v=6.1.0', /style\.css\?v=6.1.0/.test(html) && /amoore-core\.js\?v=6.1.0/.test(html) && /landing\.js\?v=6.1.0/.test(html));
     const hdr = fs.readFileSync(path.join(ROOT, '_headers'), 'utf8');
     T.check('_headers: CSS больше не «immutable на год»', !/\/\*\.css\s*\n\s*Cache-Control:[^\n]*immutable/.test(hdr)); }
 
@@ -337,18 +337,25 @@ const SHOTS = path.join(__dirname, 'results', 'shots'); fs.mkdirSync(SHOTS, { re
     const { page } = await open(null, { viewport: { width: vw, height: vh }, mobile: mob }); await sleep(500);
     const g = await page.evaluate(() => {
       const R = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; };
-      return { vw: innerWidth, vh: innerHeight, loupe: R('#pill-search'), dock: R('#spa-tabbar'), nav: R('#ux-nav'), bar: R('.ux-bar'), burger: document.querySelectorAll('#burger, .ux-burger, [data-ux-burger]').length, hs: document.documentElement.scrollWidth - innerWidth };
+      return { vw: innerWidth, vh: innerHeight, loupe: R('#pill-search'), dock: R('#spa-tabbar'), nav: R('#ux-nav'), bar: R('.ux-bar'), burger: document.querySelectorAll('#burger, .ux-burger, [data-ux-burger]').length, hs: document.documentElement.scrollWidth - innerWidth,
+        grid: R('.hero-eco .bento'), grid2: R('.eco-grid'), pb: parseFloat(getComputedStyle(document.body).paddingBottom), pt: parseFloat(getComputedStyle(document.body).paddingTop),
+        tabs: [...document.querySelectorAll('#ux-nav .ux-tab')].filter(e => getComputedStyle(e).display !== 'none').map(e => ({ fs: parseFloat(getComputedStyle(e).fontSize), w: e.getBoundingClientRect().width, title: e.getAttribute('title') || '' })) };
     });
     const near = (a, b, e = 1.5) => Math.abs(a - b) <= e, L = g.loupe, tag = `${vw}×${vh}`;
     T.check(`${tag}: Лупа видна и стоит слева внизу (поле 16px, 64×64)`, !!L && near(L.l, 16) && near(g.vh - L.b, 16) && near(L.w, 64) && near(L.h, 64), JSON.stringify(L));
     T.check(`${tag}: бургера нет, горизонтальной прокрутки нет`, g.burger === 0 && g.hs <= 1, `${g.burger}/${g.hs}`);
     if (vw < 900 && vh > vw - 1 || (vw < 640)) {
       const D = g.dock;
+      T.check(`${tag}: телефон — padding-bottom ≥ 120px (док не перекрывает кнопки), padding-top ≥ 96px`, g.pb >= 119.5 && g.pt >= 95.5, `${g.pb}/${g.pt}`);
       T.check(`${tag}: нижний док справа от Лупы — та же линия и высота, зазор 8px, правое поле 16px`, !!D && near(D.b, L.b) && near(D.h, L.h) && near(D.l - L.r, 8) && near(g.vw - D.r, 16), JSON.stringify(D));
     } else {
       const N = g.nav, B = g.bar;
-      T.check(`${tag}: правая пилюля: ширина 128, поле 16px, по центру высоты`, !!N && near(N.w, 128) && near(g.vw - N.r, 16) && near(N.cy, g.vh / 2, 2), JSON.stringify(N));
-      T.check(`${tag}: левая пилюля и Лупа на одной оси (ширина 64px)`, !!B && near(B.w, 64) && near(B.cx, L.cx) && near(B.l, 16), `${B && B.cx}/${L.cx}`);
+      T.check(`${tag}: правая пилюля вертикальная: ширина 64, поле 16px, по центру высоты`, !!N && near(N.w, 64) && N.h > N.w && near(g.vw - N.r, 16) && near(N.cy, g.vh / 2, 2), JSON.stringify(N));
+      T.check(`${tag}: в правой пилюле только значки (подпись скрыта, есть title)`, g.tabs.length >= 3 && g.tabs.every(x => x.fs === 0 && x.w <= 44.5 && x.title), JSON.stringify(g.tabs));
+      T.check(`${tag}: верхняя пилюля — длинная строка: от левого поля 16 до правого 16, высота 64, сверху 16`, !!B && near(B.l, 16) && near(g.vw - B.r, 16) && near(B.h, 64) && near(B.t, 16) && B.w > 5 * B.h, JSON.stringify(B));
+      const G = g.grid, G2 = g.grid2;
+      T.check(`${tag}: плитки растянуты: левый край 16, правый = ширина − 16 − 64 − 16 (между краем и правой пилюлей)`, !!G && !!G2 && near(G.l, 16) && near(G2.l, 16) && near(G.r, g.vw - 96) && near(G2.r, g.vw - 96), JSON.stringify([G, G2]));
+      T.check(`${tag}: верх контента под длинной пилюлей (padding-top ≥ 96), низ — под Лупой (≥ 96)`, g.pt >= 95.5 && g.pb >= 95.5, `${g.pt}/${g.pb}`);
     }
     await page.context().close();
   }

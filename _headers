@@ -7,9 +7,26 @@
   Service-Worker-Allowed: /
 
 /manifest.json
+  Content-Type: application/manifest+json
   Cache-Control: public, max-age=0, must-revalidate
 
-/*.png
+/icons/icon-*
+  Cache-Control: public, max-age=31536000, immutable
+
+/icons/maskable-*
+  Cache-Control: public, max-age=31536000, immutable
+
+/icons/apple-touch-*
+  Cache-Control: public, max-age=31536000, immutable
+
+/icons/favicon-*
+  Cache-Control: public, max-age=31536000, immutable
+
+/icons/splash-*
+  Cache-Control: public, max-age=31536000, immutable
+
+# notify-* без хэша в имени — не immutable
+/icons/notify-*
   Cache-Control: public, max-age=86400
 
 /*.webp

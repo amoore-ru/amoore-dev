@@ -21,14 +21,16 @@ check('profiles: клиент не может менять role/is_banned/reward
 check('бан и смена ролей проверяют is_boss()', ['admin_ban_user', 'admin_set_role', 'admin_list_people'].every((f) => new RegExp(`function public\\.${f}[\\s\\S]*?is_boss\\(\\)`).test(sql)));
 check('SSO-токен хранится как sha256, TTL 60 с', /digest\(tok, 'sha256'\)/.test(sql) && /interval '60 seconds'/.test(sql));
 
-// ---- Edge Functions
-const edge = { 'sso-exchange': 0, 'ai-copy': 1, 'send-email': 1, geo: 0, 'push-news': 1 };
-for (const [fn, needsAuth] of Object.entries(edge)) {
-  const code = read(`supabase/functions/${fn}/index.ts`);
+// ---- Edge Functions (реально существуют две: reconnect-webhook и send-telegram)
+const EDGE_DIR = 'amoore-dev/shared/edge-functions';
+const edge = { 'reconnect-webhook': /caller\(req\)/, 'send-telegram': /getUser/ };
+for (const [fn, authRe] of Object.entries(edge)) {
+  const code = read(`${EDGE_DIR}/${fn}/index.ts`);
   check(`${fn}: нет зашитых ключей`, !/gsk_[A-Za-z0-9]|re_[A-Za-z0-9]{10}|eyJ[A-Za-z0-9_-]{20}|sb_secret/.test(code));
-  if (needsAuth) check(`${fn}: проверяет пользователя`, /caller\(req\)/.test(code));
+  check(`${fn}: проверяет пользователя`, authRe.test(code));
+  check(`${fn}: доступ только Основателю (super_admin)`, /super_admin/.test(code));
 }
-check('sso-exchange гасит токен атомарно', /update\(\{ used_at/.test(read('supabase/functions/sso-exchange/index.ts')) && /is\("used_at", null\)/.test(read('supabase/functions/sso-exchange/index.ts')));
+check('в архиве нет призрачных функций: supabase/functions не существует', !fs.existsSync(path.join(ROOT, 'supabase/functions')));
 
 // ---- amoore-id.js (в песочнице)
 const idCode = read('amoore-dev/amoore-id.js'), win = {};
@@ -41,9 +43,9 @@ check('токен SSO и ссылки стираются из адресной �
 check('нет innerHTML в amoore-id.js (XSS)', !/innerHTML/.test(idCode));
 
 // ---- версии
-const v = '6.0.0';
-check('AMOORE_VERSION в core', /AMOORE_VERSION(?: =|:) ?['"]6\.0\.0['"]/.test(read('amoore-ru/amoore-core.js')));
-check('версия в bot.py', /AMOORE_VERSION = "6.0.0"/.test(read('amoore-ai/bot.py')));
+const v = '6.1.0';
+check('AMOORE_VERSION в core', /AMOORE_VERSION(?: =|:) ?['"]6\.1\.0['"]/.test(read('amoore-ru/amoore-core.js')));
+check('версия в bot.py', /AMOORE_VERSION = "6.1.0"/.test(read('amoore-ai/bot.py')));
 for (const d of ['amoore-dev', 'amoore-ru', 'amoore-studio', 'amoore-ai']) check(`changelog ${d}`, JSON.parse(read(`${d}/changelog.json`)).current === v);
 
 // ---- PWA
@@ -81,8 +83,6 @@ check('SQL: теги заявок ограничены VIP/Спам/В ожид�
 check('SQL: Realtime для leads/site_visits/audit_logs', /supabase_realtime/.test(sql) && /'site_visits'/.test(sql));
 check('SQL: changelog 5.1.0 и 5.2.0 в таблице и global_settings', (sql.match(/5\.1\.0/g) || []).length >= 4 && (sql.match(/5\.2\.0/g) || []).length >= 4 && /2026-11-26/.test(sql));
 
-check('Edge push-news: защита от повторов и очистка мёртвых подписок', /push_sent_at/.test(read('supabase/functions/push-news/index.ts')) && /404 \|\| code === 410/.test(read('supabase/functions/push-news/index.ts')));
-check('Edge push-news: секрет вебхука сравнивается и нужен ≥16 символов', /secret\.length >= 16/.test(read('supabase/functions/push-news/index.ts')));
 check('sw.js: обработчики push и notificationclick, переход только на свой домен', /addEventListener\('push'/.test(sw) && /addEventListener\('notificationclick'/.test(sw) && /target\.origin !== location\.origin/.test(sw));
 check('pwa.js: amoorePush (enable/disable, VAPID из meta)', /amoorePush/.test(read('amoore-ru/amoore-pwa.js')) && /amoore-vapid-public-key/.test(read('amoore-ru/amoore-pwa.js')));
 check('Amoore ID: вкладки Профиль / Бизнес-ассистент / Rewards / Безопасность / Уведомления', ['Бизнес-ассистент', 'Rewards', 'Безопасность', 'Уведомления'].every((x) => idCode.includes(x)) && /Завершить все другие сессии/.test(idCode) && /Разрешить уведомления/.test(idCode));
@@ -131,8 +131,7 @@ check('SQL 003: online_now 90 с, leaderboard_top10, revoke_all_sessions', /inte
 check('SQL 003: security definer с search_path', (sql3.split(/create or replace function/i).slice(1)).every((b) => !/security definer/i.test(b.split('$$')[0]) || /search_path/i.test(b.split('$$')[0])));
 check('админка: вход без кода из письма и без «Зарегистрироваться»', !/otp-group|send-code-btn|verifyCode/.test(read('amoore-dev/app.js') + read('amoore-dev/index.html')));
 check('админка: кнопки бота «Выключить», «Тест», «Логи», «Вебхук»', /id="bot-test-btn">Тест</.test(read('amoore-dev/index.html')) && /id="bot-logs-btn"[^>]*>Логи</.test(read('amoore-dev/index.html')) && /reconnect-webhook/.test(read('amoore-dev/app.js')));
-check('Edge Function reconnect-webhook: только Основатель', /super_admin/.test(read('supabase/functions/reconnect-webhook/index.ts')));
-check('geo: ip-api.com + запасной ipwho.is', /ip-api\.com/.test(read('supabase/functions/geo/index.ts')) && /ipwho\.is/.test(read('supabase/functions/geo/index.ts')));
+check('Edge Function reconnect-webhook: только Основатель', /super_admin/.test(read(`${EDGE_DIR}/reconnect-webhook/index.ts`)));
 check('плавающая «A» убрана, вкладки профиля скроллятся', /return;\s*var p = await getProfile/.test(idCode) && /#aid-chip \{ display: none !important/.test(read('amoore-ru/amoore-theme.css')) && /v5\.5 «STABILITY»[\s\S]*flex-flow: row nowrap[\s\S]*overflow-x: auto/.test(read('amoore-ru/amoore-theme.css')));
 check('роли по-русски: founder/moder/user нормализуются', /ROLE_EN2RU/.test(idCode) && /ROLE_EN2RU/.test(read('amoore-dev/app.js')) && /EN2RU/.test(read('amoore-ru/amoore-core.js')));
 check('лендинг: лидерборд и «Завершить все сессии»', /id="board-list"/.test(read('amoore-ru/index.html')) && /leaderboard_top10/.test(read('amoore-ru/amoore-board.js')) && /revoke_all_sessions/.test(idCode));
@@ -140,8 +139,6 @@ check('Changelog 2.0: вкладки «Обновления» и «Эры», Э�
 check('presence: amoore-live.js сам создаёт visitor id', /localStorage\.setItem\('amoore_vid'/.test(read('amoore-ru/amoore-live.js')));
 check('бот: ai_logic / db_bridge / tg_handlers + Google AI + upsert пульса', /GOOGLE_AI_KEY/.test(read('amoore-ai/ai_logic.py')) && /on_conflict=id/.test(read('amoore-ai/db_bridge.py')) && /rate_limited/.test(read('amoore-ai/tg_handlers.py')));
 
-console.log(`v5: ${pass}/${pass + fail} проверок пройдено`);
-process.exit(fail ? 1 : 0);
 
 // ---- v5.8.0 GLOBAL POLISH
 const sql7 = read('amoore-dev/shared/sql/007_v571_global_polish.sql');
@@ -155,5 +152,7 @@ check('v5.8.0: ссылка Telegram — https://t.me/, без tg://', /https:\/
 check('v5.8.0: Dev-панели нет на публичной главной', !/Dev-панел/.test(read('amoore-ru/index.html')) && !/amoore-dev\.pages\.dev/.test(read('amoore-ru/index.html').split('<main')[1] || ''));
 check('v5.8.0: на странице Безопасность один блок смены пароля', (read('amoore-ru/amoore-id.js').match(/Смена пароля/g) || []).length === 1);
 check('v5.8.0: порядок настроек Внешний вид → Промокоды → Профиль', (() => { const h = read('amoore-dev/index.html'); return h.indexOf('id="set-appearance"') < h.indexOf('id="set-promo"') && h.indexOf('id="set-promo"') < h.indexOf('id="set-profile"'); })());
-check('v5.8.0: changelog — только крупные релизы (x.y.0)', /function isMajor/.test(read('amoore-ru/amoore-core.js')));
+check('v6: changelog — группировка по мажору, чип показывает только мажор', /function groupByMajor/.test(read('amoore-ru/amoore-core.js')) && /fmtVerMajor/.test(read('amoore-ru/amoore-core.js')));
 
+console.log(`v5: ${pass}/${pass + fail} проверок пройдено`);
+process.exit(fail ? 1 : 0);

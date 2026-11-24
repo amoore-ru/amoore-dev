@@ -1,0 +1,129 @@
+{
+  "suite": "version-format",
+  "total": 24,
+  "passed": 24,
+  "failed": 0,
+  "rows": [
+    {
+      "title": "core: fmtVerFull/fmtVerMajor экспортируются из src/shared/core/changelog-data.ts",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "title": "чип: 5.8.0 → v5 (core)",
+      "ok": true,
+      "detail": "v5"
+    },
+    {
+      "title": "чип: 5.8.0 → v5 (amoore-ux.js)",
+      "ok": true,
+      "detail": "v5"
+    },
+    {
+      "title": "чип: 6.0.0 → v6 (core)",
+      "ok": true,
+      "detail": "v6"
+    },
+    {
+      "title": "чип: 6.0.0 → v6 (amoore-ux.js)",
+      "ok": true,
+      "detail": "v6"
+    },
+    {
+      "title": "чип: 6.1.1 → v6 (core)",
+      "ok": true,
+      "detail": "v6"
+    },
+    {
+      "title": "чип: 6.1.1 → v6 (amoore-ux.js)",
+      "ok": true,
+      "detail": "v6"
+    },
+    {
+      "title": "чип: 8.0.0 → v8 (core)",
+      "ok": true,
+      "detail": "v8"
+    },
+    {
+      "title": "чип: 8.0.0 → v8 (amoore-ux.js)",
+      "ok": true,
+      "detail": "v8"
+    },
+    {
+      "title": "чип: 8 → v8 (core)",
+      "ok": true,
+      "detail": "v8"
+    },
+    {
+      "title": "чип: 8 → v8 (amoore-ux.js)",
+      "ok": true,
+      "detail": "v8"
+    },
+    {
+      "title": "чип: v6.0.2 → v6 (core)",
+      "ok": true,
+      "detail": "v6"
+    },
+    {
+      "title": "чип: v6.0.2 → v6 (amoore-ux.js)",
+      "ok": true,
+      "detail": "v6"
+    },
+    {
+      "title": "Changelog: 6.0.0 → v6",
+      "ok": true,
+      "detail": "v6"
+    },
+    {
+      "title": "Changelog: 6 → v6",
+      "ok": true,
+      "detail": "v6"
+    },
+    {
+      "title": "Changelog: 6.1.0 → v6.1",
+      "ok": true,
+      "detail": "v6.1"
+    },
+    {
+      "title": "Changelog: 6.1 → v6.1",
+      "ok": true,
+      "detail": "v6.1"
+    },
+    {
+      "title": "Changelog: 6.1.1 → v6.1.1",
+      "ok": true,
+      "detail": "v6.1.1"
+    },
+    {
+      "title": "Changelog: 6.0.2 → v6.0.2",
+      "ok": true,
+      "detail": "v6.0.2"
+    },
+    {
+      "title": "Changelog: 5.8.0 → v5.8",
+      "ok": true,
+      "detail": "v5.8"
+    },
+    {
+      "title": "Changelog: 8.0.0 → v8",
+      "ok": true,
+      "detail": "v8"
+    },
+    {
+      "title": "Changelog: 10.0.0 → v10",
+      "ok": true,
+      "detail": "v10"
+    },
+    {
+      "title": "Changelog: v6.2.0 → v6.2",
+      "ok": true,
+      "detail": "v6.2"
+    },
+    {
+      "title": "чип никогда не содержит точку",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "extra": null
+}
